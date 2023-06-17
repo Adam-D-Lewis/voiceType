@@ -1,0 +1,8 @@
+name: voicetype
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - speechrecognition
+  - pyaudio
+  - keyboard
