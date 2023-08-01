@@ -6,3 +6,4 @@ dependencies:
   - speechrecognition
   - pyaudio
   - keyboard
+  - ruff

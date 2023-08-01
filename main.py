@@ -5,7 +5,7 @@ from pynput.keyboard import Controller
 from threading import Thread
 import wave
 
-BASE_DIR = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent
 
 def type_text(text):
     keyboard = Controller()
@@ -59,8 +59,8 @@ def play_audio(filename):
     stream.close()
     pa.terminate()
 
-def make_sound_thread():
-    sound_file_path = str(BASE_DIR.joinpath('start-record.wav'))
+def make_sound_thread(filepath):
+    sound_file_path = str(HERE.joinpath(filepath))
     thread = Thread(
         target=play_audio, 
         args=(sound_file_path,)
@@ -73,14 +73,18 @@ def main():
 
     # Open the microphone for recording
     with sr.Microphone() as source:
-        make_sound_thread().start()
-
         # Adjust ambient noise threshold, if needed
-        # r.adjust_for_ambient_noise(source)
-        
+        r.adjust_for_ambient_noise(source)
+                
+        make_sound_thread('start-record.wav').start()
+
         # Record the audio
         print("Listening...")
-        audio = r.listen(source)
+        audio = r.listen(
+            source, 
+            timeout=5, 
+            phrase_time_limit=10
+        )
         print('done listening')
         try:
             # Perform speech recognition
@@ -91,9 +95,9 @@ def main():
             type_text(text)
             
         except sr.UnknownValueError as e:
-            make_sound_thread().start()
+            make_sound_thread('error.wav').start()
             print("Unable to recognize speech")
-            with open(BASE_DIR.joinpath('error_log.txt'), "a") as error_file:
+            with open(HERE.joinpath('error_log.txt'), "a") as error_file:
                 error_file.write(str(e) + '\n')
 
 if __name__ == "__main__":

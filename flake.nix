@@ -52,7 +52,7 @@
               pyaudio
               pynput
             ]))
-          ] ++ (with pkgs; [ portaudio flac vlc]);
+          ] ++ (with pkgs; [ portaudio flac vlc ruff ]);
       };
     };
 }
