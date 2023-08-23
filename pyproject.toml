@@ -1,0 +1,39 @@
+[build-system]
+requires = [
+    "setuptools",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voicetype"
+authors = [
+    { name = "Adam Lewis"},
+]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pyaudio",
+    "pynput",
+    "speechrecognition",
+]
+dynamic = ["version"]
+
+[project.scripts]
+voicetype = "voicetype.__main__:main"
+
+[tool.setuptools.packages.find]
+include = [
+    "voicetype*",
+]
+
+[tool.setuptools.package-data]
+"*" = ["*.wav"]
+# "*" = ["*.css", "*.png"]
+
+[tool.ruff]
+# Ignore line too long, because due to black the error can only occure for strings
+ignore = ["E501"]
+
+[tool.ruff.per-file-ignores]
+# ignore unused imports in __init__.py files
+"__init__.py" = ["F401"]

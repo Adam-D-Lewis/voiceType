@@ -25,10 +25,15 @@
         inherit system;
         overlays = my_overlays;
       };
-
+      
+      # Bulidtime dependencies
+      buildtimePythonDependencies = with pkgs.python3Packages; [
+        setuptools
+      ];
       # Runtime dependencies
       runtimePythonDependencies = pypkgs: with pypkgs; [
         fastapi
+        uvicorn
         speech_recognition
         pyaudio
         pynput
@@ -54,17 +59,30 @@
       devDependencies = with pkgs; [
         (pkgs.python3.withPackages devPythonDependencies)
       ] ++ devSystemDependencies;
-      
+
     in
     {
-      packages.${system} = {
-        output1 = pkgs.writeScriptBin "myscript" ''
-          export PATH=${pkgs.lib.makeBinPath runtimeSystemDependencies}:$PATH
-          ${pythonRuntimeEnv}/bin/python /home/balast/CodingProjects/voicetype/main.py
-        '';
+      defaultPackage.x86_64-linux = pkgs.python3Packages.buildPythonPackage {
+        pname = "voicetype";
+        version = "latest";
+        format = "pyproject";
+
+        src = ./.;
+
+        propagatedBuildInputs = runtimeDependencies;
+        # buildInputs = [buildtimePythonDependencies];
+        nativeBuildInputs = buildtimePythonDependencies;
+        doCheck = false;
       };
 
-      defaultPackage.x86_64-linux = self.packages.${system}.output1;
+      # packages.${system} = {
+      #   output1 = pkgs.writeScriptBin "myscript" ''
+      #     export PATH=${pkgs.lib.makeBinPath runtimeSystemDependencies}:$PATH
+      #     ${pythonRuntimeEnv}/bin/python /home/balast/CodingProjects/voicetype/main.py
+      #   '';
+      # };
+
+      # defaultPackage.x86_64-linux = self.packages.${system}.output1;
 
       # develop
       devShell.x86_64-linux = pkgs.mkShell {
