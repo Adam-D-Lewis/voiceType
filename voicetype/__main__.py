@@ -5,7 +5,10 @@ from pynput.keyboard import Controller
 from threading import Thread
 import wave
 
+from .sounds import ERROR_SOUND, START_RECORD_SOUND
+
 HERE = Path(__file__).resolve().parent
+
 
 def type_text(text):
     keyboard = Controller()
@@ -60,7 +63,7 @@ def play_audio(filename):
     pa.terminate()
 
 def make_sound_thread(filepath):
-    sound_file_path = str(HERE.joinpath(filepath))
+    sound_file_path = str(filepath)
     thread = Thread(
         target=play_audio, 
         args=(sound_file_path,)
@@ -76,7 +79,7 @@ def main():
         # Adjust ambient noise threshold, if needed
         r.adjust_for_ambient_noise(source)
                 
-        make_sound_thread('start-record.wav').start()
+        make_sound_thread(START_RECORD_SOUND).start()
 
         # Record the audio
         print("Listening...")
@@ -95,7 +98,7 @@ def main():
             type_text(text)
             
         except sr.UnknownValueError as e:
-            make_sound_thread('error.wav').start()
+            make_sound_thread(ERROR_SOUND).start()
             print("Unable to recognize speech")
             with open(HERE.joinpath('error_log.txt'), "a") as error_file:
                 error_file.write(str(e) + '\n')
