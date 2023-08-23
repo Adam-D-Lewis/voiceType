@@ -25,19 +25,42 @@
         inherit system;
         overlays = my_overlays;
       };
-      python = pkgs.python3.withPackages (
-        pypkgs: with pypkgs; [
-          speech_recognition
-          pyaudio
-          pynput
-        ]
-      );
+
+      # Runtime dependencies
+      runtimePythonDependencies = pypkgs: with pypkgs; [
+        fastapi
+        speech_recognition
+        pyaudio
+        pynput
+      ];
+      runtimeSystemDependencies = with pkgs; [
+        portaudio
+        flac
+      ];
+      pythonRuntimeEnv = pkgs.python3.withPackages runtimePythonDependencies;
+      runtimeDependencies = with pkgs; [
+        pythonRuntimeEnv
+      ] ++ runtimeSystemDependencies;
+
+      # Development dependencies
+      devPythonDependencies = pypkgs: with pypkgs; [
+        pytest
+      ];
+      devSystemDependencies = with pkgs; [
+        vlc
+        ruff
+      ];
+
+      devDependencies = with pkgs; [
+        (pkgs.python3.withPackages devPythonDependencies)
+      ] ++ devSystemDependencies;
+      
     in
     {
       packages.${system} = {
         output1 = pkgs.writeScriptBin "myscript" ''
-          export PATH=${pkgs.lib.makeBinPath (with pkgs; [ portaudio flac ])}:$PATH
-          ${python}/bin/python /home/balast/CodingProjects/voicetype/main.py
+          export PATH=${pkgs.lib.makeBinPath runtimeSystemDependencies}:$PATH
+          ${pythonRuntimeEnv}/bin/python /home/balast/CodingProjects/voicetype/main.py
         '';
       };
 
@@ -45,14 +68,7 @@
 
       # develop
       devShell.x86_64-linux = pkgs.mkShell {
-        buildInputs =
-          [
-            (pkgs.python3.withPackages (pypkgs: with pypkgs; [
-              speech_recognition
-              pyaudio
-              pynput
-            ]))
-          ] ++ (with pkgs; [ portaudio flac vlc ruff ]);
+        buildInputs = runtimeDependencies ++ devDependencies;
       };
     };
 }
