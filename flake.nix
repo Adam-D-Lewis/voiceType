@@ -61,8 +61,8 @@
       ] ++ devSystemDependencies;
 
     in
-    {
-      defaultPackage.x86_64-linux = pkgs.python3Packages.buildPythonPackage {
+    rec {
+      voiceType = pkgs.python3Packages.buildPythonPackage {
         pname = "voicetype";
         version = "latest";
         format = "pyproject";
@@ -74,6 +74,7 @@
         nativeBuildInputs = buildtimePythonDependencies;
         doCheck = false;
       };
+      defaultPackage.x86_64-linux = voiceType;
 
       # packages.${system} = {
       #   output1 = pkgs.writeScriptBin "myscript" ''
@@ -86,7 +87,7 @@
 
       # develop
       devShell.x86_64-linux = pkgs.mkShell {
-        buildInputs = runtimeDependencies ++ devDependencies;
+        buildInputs = runtimeDependencies ++ devDependencies ++ [voiceType];
       };
     };
 }
