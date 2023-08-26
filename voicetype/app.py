@@ -19,12 +19,31 @@ recognizer = None
 def initialize():
     global source, recognizer
     print('Initializing...')
-    source = sr.Microphone()
+    # List all microphone names
+    mic_list = sr.Microphone.list_microphone_names()
+
+    for index, name in enumerate(mic_list):
+        print(f"Microphone {index}: {name}")
+    index = mic_list.index("pipewire")
+    print(index)
+    # breakpoint()
+    
+    # for i in range(len(mic_list)):
+    # try:
+    
+    source = sr.Microphone(device_index=index)
     recognizer = sr.Recognizer()
     
     # Adjust ambient noise threshold, if needed
+    # breakpoint()
     with source:
         recognizer.adjust_for_ambient_noise(source)
+    breakpoint()
+    #     with open(_HERE.joinpath('devices.txt'), "a") as f:
+    #         f.write(f"Microphone {i}: {mic_list[i]}\n")
+    # except Exception as e:
+    #     with open(_HERE.joinpath('devices.txt'), "a") as f:
+    #         f.write(f"Microphone {i}: {mic_list[i]} Error: {str(e)} + '\n'")
 
 
 def main(): 
