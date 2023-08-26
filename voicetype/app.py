@@ -24,21 +24,21 @@ def initialize():
 
     for index, name in enumerate(mic_list):
         print(f"Microphone {index}: {name}")
-    index = mic_list.index("pipewire")
+    index = 0 # mic_list.index("pipewire")
     print(index)
     # breakpoint()
     
     # for i in range(len(mic_list)):
     # try:
     
-    source = sr.Microphone(device_index=index)
+    source = sr.Microphone()#device_index=index)
     recognizer = sr.Recognizer()
     
     # Adjust ambient noise threshold, if needed
     # breakpoint()
     with source:
         recognizer.adjust_for_ambient_noise(source)
-    breakpoint()
+    # breakpoint()
     #     with open(_HERE.joinpath('devices.txt'), "a") as f:
     #         f.write(f"Microphone {i}: {mic_list[i]}\n")
     # except Exception as e:
