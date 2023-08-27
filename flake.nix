@@ -25,7 +25,7 @@
         inherit system;
         overlays = my_overlays;
       };
-      
+
       # Bulidtime dependencies
       buildtimePythonDependencies = with pkgs.python3Packages; [
         setuptools
@@ -85,9 +85,12 @@
 
       # defaultPackage.x86_64-linux = self.packages.${system}.output1;
 
+      # modules
+      nixosModules.voicetype = import voicetype-user-service.nix;
+
       # develop
       devShell.x86_64-linux = pkgs.mkShell {
-        buildInputs = runtimeDependencies ++ devDependencies ++ [voiceType];
+        buildInputs = runtimeDependencies ++ devDependencies ++ [ voiceType ];
       };
     };
 }
