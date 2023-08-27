@@ -37,7 +37,7 @@ def initialize():
     # Adjust ambient noise threshold, if needed
     # breakpoint()
     with source:
-        recognizer.adjust_for_ambient_noise(source)
+        recognizer.adjust_for_ambient_noise(source, duration=0.5)
     # breakpoint()
     #     with open(_HERE.joinpath('devices.txt'), "a") as f:
     #         f.write(f"Microphone {i}: {mic_list[i]}\n")
