@@ -1,5 +1,5 @@
 {
-  description = "A flake to build timetagger";
+  description = "voicetype flake";
 
   inputs = {
     # pulls in the flake.nix file from this github repo    
