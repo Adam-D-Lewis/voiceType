@@ -125,7 +125,7 @@
               };
             };
           };
-        }
+        };
 
           # develop
           devShell.x86_64-linux = pkgs.mkShell {
