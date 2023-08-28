@@ -120,7 +120,7 @@
 
               Service = {
                 Type = "simple";
-                ExecStart = "${pkgs.bash}/bin/bash -lc 'env; nix run path:${cfg.package}'";
+                ExecStart = "${pkgs.bash}/bin/bash -lc 'env; ${cfg.package}/bin/voicetype'";
                 Restart = "always";
               };
             };
