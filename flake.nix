@@ -7,7 +7,7 @@
     speechrecognition.url = "git+ssh://git@github.com/Adam-D-Lewis/speech_recognition_flake.git?ref=main";
   };
 
-  outputs = inputs@{ self, nixpkgs, speechrecognition }:
+  outputs = inputs@{ self, nixpkgs, speechrecognition, ... }:
     let
       my_overlays = [
         (self: super: {
@@ -86,7 +86,12 @@
       # defaultPackage.x86_64-linux = self.packages.${system}.output1;
 
       # modules
-      nixosModules.voicetype = import ./voicetype-user-service.nix { inherit voiceType; };
+      nixosModules.voicetype = import ./voicetype-user-service.nix { 
+        inherit config;
+        inherit lib;
+        inherit pkgs; 
+        inherit voiceType;         
+      };
 
       # develop
       devShell.x86_64-linux = pkgs.mkShell {
