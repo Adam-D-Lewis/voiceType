@@ -87,7 +87,7 @@
 
       # modules
       # nixosModules.voicetype = import ./voicetype-user-service.nix;
-      nixosModules.voicetype = { config, lib, pkgs, ... }:
+      nixosModules.default = { config, lib, pkgs, ... }:
 
         with lib;
 
