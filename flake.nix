@@ -86,12 +86,7 @@
       # defaultPackage.x86_64-linux = self.packages.${system}.output1;
 
       # modules
-      nixosModules.voicetype = import ./voicetype-user-service.nix { 
-        inherit config;
-        inherit lib;
-        inherit pkgs; 
-        inherit voiceType;         
-      };
+      nixosModules.voicetype = import ./voicetype-user-service.nix;
 
       # develop
       devShell.x86_64-linux = pkgs.mkShell {
