@@ -1,4 +1,4 @@
-{ config, lib, pkgs, voiceType, ... }:
+{ config, lib, pkgs, ... }:
 
 with lib;
 
@@ -12,7 +12,7 @@ in
 
       package = mkOption {
         type = types.package;
-        default = voiceType;
+        default = pkgs.voiceType;
         description = "The voicetype package to use.";
       };
     };
