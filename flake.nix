@@ -5,7 +5,7 @@
     # pulls in the flake.nix file from this github repo    
     nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11";
     speechrecognition.url = "git+ssh://git@github.com/Adam-D-Lewis/speech_recognition_flake.git?ref=main";
-    speechrecognition.nixpkgs.follows = "nixpkgs";
+    speechrecognition.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = inputs@{ self, nixpkgs, speechrecognition, ... }:
