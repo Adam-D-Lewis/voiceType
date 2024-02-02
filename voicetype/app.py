@@ -4,7 +4,8 @@ from fastapi import Depends, FastAPI, HTTPException
 from .utils import play_audio, type_text, make_sound_thread
 from pathlib import Path
 import sys
-print(sys.executable)
+import logging
+logging.warn(sys.executable)
 import speech_recognition as sr
 
 from .sounds import ERROR_SOUND, START_RECORD_SOUND
