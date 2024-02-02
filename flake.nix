@@ -112,8 +112,7 @@
 
               Service = {
                 Type = "simple";
-                # ExecStart = "${pkgs.bash}/bin/bash -lc 'env; ${cfg.package}/bin/voicetype'";
-                ExecStart = "${pkgs.bash}/bin/bash -lc 'env; /nix/store/2az02isx5apdgrcsp85xkxjid3ixfv4i-python3.11-voicetype-latest/bin/voicetype'";
+                ExecStart = "${pkgs.bash}/bin/bash -lc 'env; ${cfg.package}/bin/voicetype'";
                 Restart = "always";
               };
             };
