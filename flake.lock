@@ -43,11 +43,11 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1706826898,
-        "narHash": "sha256-BAH6jQA35frDbchjy2g9/bQHWodeqY5rO3gvM25LObo=",
+        "lastModified": 1706837571,
+        "narHash": "sha256-9iLj/jprB0IOezItrLUvIvab7W1AiXLZ3PhWqjmA3zs=",
         "ref": "main",
-        "rev": "15eb3843a4711f5584bbfcccfca9f854fa121554",
-        "revCount": 5,
+        "rev": "38600142dfa15f694606bf93a07a8873d92f2200",
+        "revCount": 6,
         "type": "git",
         "url": "ssh://git@github.com/Adam-D-Lewis/speech_recognition_flake.git"
       },

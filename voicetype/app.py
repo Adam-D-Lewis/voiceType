@@ -5,6 +5,8 @@ from .utils import play_audio, type_text, make_sound_thread
 from pathlib import Path
 import sys
 import logging
+import fastapi
+logging.warn(fastapi.__file__)
 logging.warn(sys.executable)
 import speech_recognition as sr
 
