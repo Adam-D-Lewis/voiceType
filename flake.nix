@@ -76,15 +76,6 @@
       };
       defaultPackage.x86_64-linux = voiceType;
 
-      # packages.${system} = {
-      #   output1 = pkgs.writeScriptBin "myscript" ''
-      #     export PATH=${pkgs.lib.makeBinPath runtimeSystemDependencies}:$PATH
-      #     ${pythonRuntimeEnv}/bin/python /home/balast/CodingProjects/voicetype/main.py
-      #   '';
-      # };
-
-      # defaultPackage.x86_64-linux = self.packages.${system}.output1;
-
       # modules
       # nixosModules.voicetype = import ./voicetype-user-service.nix;
       nixosModules.default = { config, lib, pkgs, ... }:
@@ -120,7 +111,8 @@
 
               Service = {
                 Type = "simple";
-                ExecStart = "${pkgs.bash}/bin/bash -lc 'env; ${cfg.package}/bin/voicetype'";
+                # ExecStart = "${pkgs.bash}/bin/bash -lc 'env; ${cfg.package}/bin/voicetype'";
+                ExecStart = "${pkgs.bash}/bin/bash -lc 'env; /nix/store/2az02isx5apdgrcsp85xkxjid3ixfv4i-python3.11-voicetype-latest/bin/voicetype'";
                 Restart = "always";
               };
             };
