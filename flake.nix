@@ -11,15 +11,15 @@
   outputs = inputs@{ self, nixpkgs, speechrecognition, ... }:
     let
       my_overlays = [
-        (self: super: {
-          # nix-shell -p python.pkgs.my_stuff
-          python3 = super.python3.override {
-            # Careful, we're using a different self and super here!
-            packageOverrides = self: super: {
-              speech_recognition = speechrecognition.speech_recognition;
-            };
-          };
-        })
+        # (self: super: {
+        #   # nix-shell -p python.pkgs.my_stuff
+        #   python3 = super.python3.override {
+        #     # Careful, we're using a different self and super here!
+        #     packageOverrides = self: super: {
+        #       speech_recognition = speechrecognition.speech_recognition;
+        #     };
+        #   };
+        # })
       ];
       system = "x86_64-linux";
       pkgs = import nixpkgs {
@@ -35,7 +35,7 @@
       runtimePythonDependencies = pypkgs: with pypkgs; [
         fastapi
         uvicorn
-        speech_recognition
+        speechrecognition.speech_recognition
         pyaudio
         pynput
       ];
