@@ -3,7 +3,11 @@ channels:
   - conda-forge
 dependencies:
   - python
-  - speechrecognition
+  - fastapi
+  - uvicorn
   - pyaudio
-  - keyboard
+  - pynput
+  - speechrecognition
+  # dev
   - ruff
+  - pre-commit

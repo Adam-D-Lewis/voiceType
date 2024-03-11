@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "voicetype"
 authors = [
-    { name = "Adam Lewis"},
+    { name = "Adam Lewis" },
 ]
 dependencies = [
     "fastapi",
