@@ -16,6 +16,8 @@ dependencies = [
     "pynput",
     "speechrecognition",
     "pystray",
+    "prompt_toolkit",
+    "aider-chat",
 ]
 dynamic = ["version"]
 

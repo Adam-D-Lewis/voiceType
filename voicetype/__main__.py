@@ -15,7 +15,7 @@ listener: HotkeyListener | None = None
 voice: Voice | None = None
 is_recording: bool = False
 # TODO: Add configuration loading here (hotkey, model, etc.)
-HOTKEY = "<ctrl>+<alt>+v" # Example hotkey
+HOTKEY = "<pause>" 
 
 
 def get_platform_listener() -> HotkeyListener:
@@ -25,10 +25,8 @@ def get_platform_listener() -> HotkeyListener:
         # TODO: Add Wayland detection and listener
         logging.info("Detected Linux X11 (assuming for now).")
         # Need to ask user to add this file if we want to use it
-        # from voicetype.hotkey_listener.linux_x11_hotkey_listener import LinuxX11HotkeyListener
-        # return LinuxX11HotkeyListener(on_press=handle_hotkey_press, on_release=handle_hotkey_release)
-        # Using the base class for now as X11 listener is not added to chat
-        raise NotImplementedError("Linux X11 listener not available in chat context. Please add voicetype/hotkey_listener/linux_x11_hotkey_listener.py")
+        from voicetype.hotkey_listener.linux_x11_hotkey_listener import LinuxX11HotkeyListener
+        return LinuxX11HotkeyListener(on_press=handle_hotkey_press, on_release=handle_hotkey_release)
     elif system == "Windows":
         # TODO: Implement Windows listener
         raise NotImplementedError("Windows hotkey listener not yet implemented.")
@@ -88,8 +86,8 @@ def main():
 
     try:
         voice = Voice() # Initialize audio processing class
-        # listener = get_platform_listener() # Get the platform-specific listener
-        # listener.set_hotkey(HOTKEY) # Configure the hotkey
+        listener = get_platform_listener() # Get the platform-specific listener
+        listener.set_hotkey(HOTKEY) # Configure the hotkey
         # listener.start_listening() # Start listening in a background thread
 
         # --- Placeholder for listener until files are added ---
