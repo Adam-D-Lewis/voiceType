@@ -10,11 +10,12 @@ authors = [
     { name = "Adam Lewis" },
 ]
 dependencies = [
-    "fastapi",
+    "fastapi>=0.93.0",
     "uvicorn",
     "pyaudio",
     "pynput",
     "speechrecognition",
+    "pystray",
 ]
 dynamic = ["version"]
 

@@ -1,7 +1,7 @@
 # Project Progress and Task Breakdown
 
 ## 1. Hotkey Detection (Platform Dependent)
-- [ ] **Define Abstraction:** Create a `HotkeyListener` abstract base class or interface defining methods like `start_listening()`, `stop_listening()`, `set_hotkey()`, and a way to signal hotkey press/release events (e.g., callbacks or event queue).
+- [x] **Define Abstraction:** Create a `HotkeyListener` abstract base class or interface defining methods like `start_listening()`, `stop_listening()`, `set_hotkey()`, and a way to signal hotkey press/release events (e.g., callbacks or event queue).
 - [ ] **Implement Configuration:** Design and implement a mechanism to allow users to configure the desired hotkey (e.g., config file, simple UI).
 - [ ] **Implement Platform Detection:** Add logic to detect the current operating system (Linux, Windows, Mac) and, specifically for Linux, the display server type (X11/Wayland).
 - [x] **Implement Linux X11 Listener:**

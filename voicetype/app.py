@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from typing import List, Union
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -14,29 +15,37 @@ from .sounds import ERROR_SOUND, START_RECORD_SOUND
 
 _HERE = Path(__file__).resolve().parent
 
-app = FastAPI()
 
 # global variables
 source = None
 recognizer = None
 
-@app.on_event("startup")
 def initialize():
     global source, recognizer
     print('Initializing...')
     # List all microphone names
     mic_list = sr.Microphone.list_microphone_names()
+    working_mic_list = sr.Microphone.list_working_microphones()
 
-    for index, name in enumerate(mic_list):
-        print(f"Microphone {index}: {name}")
-    index = 0 # mic_list.index("pipewire")
+    for index, mic_list_index in enumerate(mic_list):
+        print(f"Microphone {index}: {mic_list_index}")
+
+    for index, mic_list_index in enumerate(working_mic_list):
+        print(f"Working Microphone {index}: {mic_list[mic_list_index]}")
+    
+    # index = mic_list.index("sysdefault")
+    # index = mic_list.index("spdif")
+    try:
+        index = mic_list.index("USB Audio Device: - (hw:3,0)")
+    except ValueError:
+        index = mic_list.index("USB Audio Device: - (hw:0,0)")
     print(index)
     # breakpoint()
     
     # for i in range(len(mic_list)):
     # try:
     
-    source = sr.Microphone()#device_index=index)
+    source = sr.Microphone(device_index=index)
     recognizer = sr.Recognizer()
     
     # Adjust ambient noise threshold, if needed
@@ -49,6 +58,22 @@ def initialize():
     # except Exception as e:
     #     with open(_HERE.joinpath('devices.txt'), "a") as f:
     #         f.write(f"Microphone {i}: {mic_list[i]} Error: {str(e)} + '\n'")
+
+
+def finalize():
+    global source, recognizer
+    print('Finalizing...')
+    del source, recognizer
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    initialize()
+    try:
+        yield
+    finally:
+        finalize()
+
+app = FastAPI(lifespan=lifespan)
 
 
 def main(): 
@@ -67,7 +92,8 @@ def main():
         print('done listening')
         try:
             # Perform speech recognition
-            text = recognizer.recognize_google(audio)
+            # text = recognizer.recognize_google(audio)
+            text = recognizer.recognize_whisper(audio, model='large-v3') # base.en, tiny.en, large-v3
 
             # Print the recognized text
             print("Detected Speech:", text)
@@ -79,11 +105,6 @@ def main():
             with open(_HERE.joinpath('error_log.txt'), "a") as error_file:
                 error_file.write(str(e) + '\n')
 
-@app.on_event("shutdown")
-def finalize():
-    global source, recognizer
-    print('Finalizing...')
-    del source, recognizer
 
 
 @app.get("/")

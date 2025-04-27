@@ -3,11 +3,21 @@ channels:
   - conda-forge
 dependencies:
   - python
-  - fastapi
+  - fastapi>=0.93.0
   - uvicorn
   - pyaudio
   - pynput
   - speechrecognition
+  # whisper
+  - pysoundfile
   # dev
   - ruff
   - pre-commit
+  # pip
+  - pip
+  - pip:
+    # whisper
+    - openai-whisper
+variables:
+  VAR1: valueA
+  VAR2: valueB
