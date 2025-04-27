@@ -8,7 +8,7 @@
     - [ ] Create a `LinuxX11HotkeyListener` class inheriting from `HotkeyListener`.
     - [ ] Use `pynput` or `keyboard` library to capture global key events.
     - [ ] Implement logic to detect the configured hotkey press/release.
-    - [ ] Signal events according to the abstraction.
+    - [x] Signal events according to the abstraction.
 - [ ] **Implement Linux Wayland Listener:**
     - [ ] Create a `LinuxWaylandHotkeyListener` class inheriting from `HotkeyListener`.
     - [ ] **Research/Implement DE Integration:** Investigate and implement D-Bus integration for GNOME (`org.gnome.settings-daemon.plugins.media-keys` / `org.gnome.Shell.Keybindings`) and KDE (`org.kde.kglobalaccel`).
