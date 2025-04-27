@@ -4,10 +4,10 @@
 - [ ] **Define Abstraction:** Create a `HotkeyListener` abstract base class or interface defining methods like `start_listening()`, `stop_listening()`, `set_hotkey()`, and a way to signal hotkey press/release events (e.g., callbacks or event queue).
 - [ ] **Implement Configuration:** Design and implement a mechanism to allow users to configure the desired hotkey (e.g., config file, simple UI).
 - [ ] **Implement Platform Detection:** Add logic to detect the current operating system (Linux, Windows, Mac) and, specifically for Linux, the display server type (X11/Wayland).
-- [ ] **Implement Linux X11 Listener:**
-    - [ ] Create a `LinuxX11HotkeyListener` class inheriting from `HotkeyListener`.
-    - [ ] Use `pynput` or `keyboard` library to capture global key events.
-    - [ ] Implement logic to detect the configured hotkey press/release.
+- [x] **Implement Linux X11 Listener:**
+    - [x] Create a `LinuxX11HotkeyListener` class inheriting from `HotkeyListener`.
+    - [x] Use `pynput` or `keyboard` library to capture global key events.
+    - [x] Implement logic to detect the configured hotkey press/release.
     - [x] Signal events according to the abstraction.
 - [ ] **Implement Linux Wayland Listener:**
     - [ ] Create a `LinuxWaylandHotkeyListener` class inheriting from `HotkeyListener`.
