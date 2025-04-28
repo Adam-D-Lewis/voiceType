@@ -42,7 +42,7 @@ class LinuxX11HotkeyListener(HotkeyListener):
             self._hotkey_combination = None
             raise ValueError(f"Invalid hotkey format: {hotkey}") from e
 
-    def _on_press(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
+    def _on_hotkey_press(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
         if key is None or self._hotkey_combination is None:
             return
         logger.debug(f"Key pressed: {key}")
@@ -54,7 +54,7 @@ class LinuxX11HotkeyListener(HotkeyListener):
                 self._trigger_hotkey_press()
 
 
-    def _on_release(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
+    def _on_hotkey_release(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
         if key is None or self._hotkey_combination is None:
             return
 
@@ -86,8 +86,8 @@ class LinuxX11HotkeyListener(HotkeyListener):
         # Ensure pynput uses X11 backend explicitly if needed, though usually automatic
         # Note: pynput might require DISPLAY environment variable to be set.
         self._listener = keyboard.Listener(
-            on_press=self._on_press,
-            on_release=self._on_release,
+            on_press=self._on_hotkey_press,
+            on_release=self._on_hotkey_release,
             # Explicitly setting suppress=False might be needed depending on environment
             # suppress=False # Try this if keys are blocked system-wide
         )
