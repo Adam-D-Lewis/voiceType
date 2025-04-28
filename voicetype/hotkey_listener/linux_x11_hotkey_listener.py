@@ -51,7 +51,7 @@ class LinuxX11HotkeyListener(HotkeyListener):
             # Check if the current set of pressed keys contains the hotkey combination
             if not self._hotkey_pressed and self._hotkey_combination.issubset(self._pressed_keys):
                 self._hotkey_pressed = True
-                self._trigger_press()
+                self._trigger_hotkey_press()
 
 
     def _on_release(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
@@ -67,7 +67,7 @@ class LinuxX11HotkeyListener(HotkeyListener):
                  any_hotkey_key_pressed = any(k in self._pressed_keys for k in self._hotkey_combination if k != key)
                  if not any_hotkey_key_pressed:
                     self._hotkey_pressed = False
-                    self._trigger_release()
+                    self._trigger_hotkey_release()
 
             # Remove the key from the set of pressed keys
             if key in self._pressed_keys:
@@ -95,6 +95,8 @@ class LinuxX11HotkeyListener(HotkeyListener):
         # Start the listener's internal thread
         import threading
         self._listener.start()
+        print('current thread', threading.get_ident())
+        print('listener thread', self._listener.ident)
         assert threading.get_ident() != self._listener.ident, "Listener thread should not be the main thread."
         print("X11 Hotkey listener started.")
 

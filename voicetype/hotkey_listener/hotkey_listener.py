@@ -13,8 +13,8 @@ class HotkeyListener(abc.ABC):
 
     def __init__(
         self,
-        on_press: Optional[Callable[[], None]] = None,
-        on_release: Optional[Callable[[], None]] = None,
+        on_hotkey_press: Optional[Callable[[], None]] = None,
+        on_hotkey_release: Optional[Callable[[], None]] = None,
     ):
         """
         Initialize the listener with optional callbacks.
@@ -23,8 +23,8 @@ class HotkeyListener(abc.ABC):
             on_press: Callback function to execute when the hotkey is pressed.
             on_release: Callback function to execute when the hotkey is released.
         """
-        self.on_press = on_press
-        self.on_release = on_release
+        self.on_hotkey_press = on_hotkey_press
+        self.on_hotkey_release = on_hotkey_release
         self._hotkey: Optional[str] = None  # Store the configured hotkey
 
     @abc.abstractmethod
@@ -55,12 +55,12 @@ class HotkeyListener(abc.ABC):
         """
         raise NotImplementedError
 
-    def _trigger_press(self) -> None:
+    def _trigger_hotkey_press(self) -> None:
         """Helper method for subclasses to trigger the press callback."""
-        if self.on_press:
-            self.on_press()
+        if self.on_hotkey_press:
+            self.on_hotkey_press()
 
-    def _trigger_release(self) -> None:
+    def _trigger_hotkey_release(self) -> None:
         """Helper method for subclasses to trigger the release callback."""
-        if self.on_release:
-            self.on_release()
+        if self.on_hotkey_release:
+            self.on_hotkey_release()
