@@ -34,7 +34,7 @@ class LinuxX11HotkeyListener(HotkeyListener):
                     Uses pynput's format.
         """
         try:
-            self._hotkey_combination = keyboard.HotKey.parse(hotkey)
+            self._hotkey_combination = set(keyboard.HotKey.parse(hotkey))
             print(f"Hotkey set to: {hotkey} -> {self._hotkey_combination}")
         except ValueError as e:
             # Consider logging this error instead of just printing
