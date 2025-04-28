@@ -3,7 +3,7 @@ import time
 import logging
 import platform
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
-from voicetype.voice import Voice
+from voicetype.voice.voice import Voice
 from voicetype.utils import play_audio, type_text
 from voicetype.sounds import START_RECORD_SOUND, ERROR_SOUND
 
