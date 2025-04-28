@@ -93,7 +93,9 @@ class LinuxX11HotkeyListener(HotkeyListener):
         )
 
         # Start the listener's internal thread
+        import threading
         self._listener.start()
+        assert threading.get_ident() != self._listener.ident, "Listener thread should not be the main thread."
         print("X11 Hotkey listener started.")
 
     def stop_listening(self) -> None:
@@ -101,6 +103,7 @@ class LinuxX11HotkeyListener(HotkeyListener):
         if self._listener and self._listener.is_alive():
             print("Stopping X11 hotkey listener...")
             self._listener.stop()
+            assert threading.get_ident() != self._listener.ident, "Listener thread should not be the main thread."
             self._listener.join() # Wait for the listener thread to finish
             print("X11 Hotkey listener stopped.")
         self._listener = None
