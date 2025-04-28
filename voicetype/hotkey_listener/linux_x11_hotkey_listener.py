@@ -1,8 +1,9 @@
-import abc
 import threading
 from typing import Callable, Optional, Set
 
 from pynput import keyboard
+
+from loguru import logger
 
 from .hotkey_listener import HotkeyListener
 
@@ -45,7 +46,7 @@ class LinuxX11HotkeyListener(HotkeyListener):
     def _on_press(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
         if key is None or self._hotkey_combination is None:
             return
-
+        logger.debug(f"Key pressed: {key}")
         with self._lock:
             self._pressed_keys.add(key)
             # Check if the current set of pressed keys contains the hotkey combination
