@@ -21,7 +21,6 @@ class LinuxX11HotkeyListener(HotkeyListener):
         super().__init__(on_press, on_release)
         self._hotkey_combination: Optional[Set[keyboard.Key | keyboard.KeyCode]] = None
         self._listener: Optional[keyboard.Listener] = None
-        self._listener_thread: Optional[threading.Thread] = None
         self._pressed_keys: Set[keyboard.Key | keyboard.KeyCode] = set()
         self._hotkey_pressed: bool = False
         self._lock = threading.Lock()
@@ -76,8 +75,8 @@ class LinuxX11HotkeyListener(HotkeyListener):
 
 
     def start_listening(self) -> None:
-        """Starts the hotkey listener thread."""
-        if self._listener_thread is not None and self._listener_thread.is_alive():
+        """Starts the hotkey listener."""
+        if self._listener is not None and self._listener.is_alive():
             print("Listener already running.")
             return
 
@@ -93,20 +92,17 @@ class LinuxX11HotkeyListener(HotkeyListener):
             # suppress=False # Try this if keys are blocked system-wide
         )
 
-        # Run the listener in a separate thread
-        self._listener_thread = threading.Thread(target=self._listener.run, daemon=True)
-        self._listener_thread.start()
+        # Start the listener's internal thread
+        self._listener.start()
         print("X11 Hotkey listener started.")
 
     def stop_listening(self) -> None:
-        """Stops the hotkey listener thread."""
-        if self._listener:
-            self._listener.stop()
+        """Stops the hotkey listener."""
+        if self._listener and self._listener.is_alive():
             print("Stopping X11 hotkey listener...")
-        if self._listener_thread:
-            self._listener_thread.join()
+            self._listener.stop()
+            self._listener.join() # Wait for the listener thread to finish
             print("X11 Hotkey listener stopped.")
         self._listener = None
-        self._listener_thread = None
         self._pressed_keys.clear()
         self._hotkey_pressed = False
