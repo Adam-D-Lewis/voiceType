@@ -53,10 +53,12 @@ def main():
 
     # Keep the main thread alive
     try:
-        listener.join()
+        while True:
+            time.sleep(1)  # Keep the main thread alive
     except KeyboardInterrupt:
         print("\nExiting...")
         listener.stop()
+        print("Listener stopped.")
 
 
 if __name__ == "__main__":

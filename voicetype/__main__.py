@@ -88,7 +88,7 @@ def main():
         voice = Voice() # Initialize audio processing class
         listener = get_platform_listener() # Get the platform-specific listener
         listener.set_hotkey(HOTKEY) # Configure the hotkey
-        # listener.start_listening() # Start listening in a background thread
+        listener.start_listening() # Start listening in a background thread
 
         # --- Placeholder for listener until files are added ---
         logging.warning("Hotkey listener functionality is currently disabled.")
