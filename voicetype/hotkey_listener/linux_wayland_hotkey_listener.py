@@ -19,10 +19,10 @@ except ImportError:
     from hotkey_listener import HotkeyListener
 
 
-# Constants for GNOME Keybinding D-Bus interface
-GNOME_SETTINGS_DAEMON_SERVICE = "org.gnome.settings-daemon.plugins.media-keys"
-GNOME_SETTINGS_DAEMON_OBJECT_PATH = "/org/gnome/settings_daemon/plugins/media_keys"
-GNOME_SETTINGS_DAEMON_INTERFACE = "org.gnome.settings-daemon.plugins.media-keys"
+# Constants for GNOME Shell Keybinding D-Bus interface
+GNOME_SHELL_SERVICE = "org.gnome.Shell"
+GNOME_SHELL_OBJECT_PATH = "/org/gnome/Shell"
+GNOME_SHELL_INTERFACE = "org.gnome.Shell"
 
 # Constants for KDE Keybinding D-Bus interface (Placeholder)
 # KDE_GLOBALACCEL_SERVICE = "org.kde.kglobalaccel"
@@ -67,6 +67,7 @@ class LinuxWaylandHotkeyListener(HotkeyListener):
         self._loop_thread: Optional[threading.Thread] = None
         self._is_listening: bool = False
         self._de_detected: str = "unknown" # e.g., "gnome", "kde", "unity", "unknown"
+        self._action_id: Optional[int] = None # Store the action ID from GrabAccelerator
 
         # Detect Desktop Environment (basic detection)
         # Detect Desktop Environment (even more robust detection)
@@ -131,17 +132,18 @@ class LinuxWaylandHotkeyListener(HotkeyListener):
         self._hotkey = hotkey
         logger.info(f"Wayland hotkey set to: {self._hotkey}")
 
-    def _dbus_signal_handler(self, application: str, keybinding: str):
-        """Callback executed when the D-Bus signal is received."""
-        logger.debug(f"D-Bus signal received: app='{application}', binding='{keybinding}'")
-        # Note: GNOME's media-keys interface only signals press, not release.
-        # To make it work with the press/release callback structure, we trigger
-        # release immediately after press. This changes the interaction model
-        # for Wayland users: they tap the hotkey once to start *and* stop/transcribe.
-        if application == APP_ID and keybinding == DBUS_BINDING_NAME:
-            logger.info("Hotkey activated (detected via D-Bus)")
+    def _dbus_signal_handler(self, action_id: int, parameters: dict):
+        """Callback executed when the AcceleratorActivated D-Bus signal is received."""
+        logger.debug(f"D-Bus AcceleratorActivated signal received: action_id={action_id}, params={parameters}")
+        # Check if the received action_id matches the one we registered
+        if self._action_id is not None and action_id == self._action_id:
+            logger.info("Hotkey activated (detected via D-Bus AcceleratorActivated)")
+            # Simulate press and immediate release as before
             self._trigger_hotkey_press()
-            self._trigger_hotkey_release() # Simulate release immediately
+            self._trigger_hotkey_release()
+        else:
+            logger.debug(f"Ignoring signal for unknown or mismatched action_id: {action_id} (expected {self._action_id})")
+
 
     def _run_dbus_loop(self):
         """Runs the D-Bus event loop in a dedicated thread."""
@@ -154,27 +156,31 @@ class LinuxWaylandHotkeyListener(HotkeyListener):
             if self._de_detected == "gnome":
                 # Pass the service name and object path strings directly to get_proxy
                 self._proxy = self._bus.get_proxy(
-                    GNOME_SETTINGS_DAEMON_SERVICE,
-                    GNOME_SETTINGS_DAEMON_OBJECT_PATH
+                    GNOME_SHELL_SERVICE,
+                    GNOME_SHELL_OBJECT_PATH
                 )
 
-                # Subscribe to the signal emitted when a custom keybinding is pressed
-                # Ensure the signal and interface names are correct
-                signal_interface = GNOME_SETTINGS_DAEMON_INTERFACE
-                signal_name = "MediaPlayerKeyPressed"
+                # Subscribe to the AcceleratorActivated signal
+                signal_interface = GNOME_SHELL_INTERFACE
+                signal_name = "AcceleratorActivated"
                 signal_obj = getattr(self._proxy, signal_name) # Access signal object
 
                 signal_obj.connect(self._dbus_signal_handler)
                 logger.info(f"Connected to D-Bus signal: {signal_interface}.{signal_name}")
 
-                # Register the hotkey with GNOME
-                # Arguments: Application ID (string), Application Description (string), Keybinding Name (string), Hotkey Combo (string)
-                # The description seems unused but required by some versions.
-                # The keybinding name (DBUS_BINDING_NAME) is what's passed to the signal handler.
-                # Use GrabCustomKeybinding method
-                grab_method = getattr(self._proxy, "GrabCustomKeybinding")
-                grab_method(APP_ID, "VoiceType Hotkey Action", DBUS_BINDING_NAME, self._hotkey)
-                logger.info(f"Registered custom keybinding with GNOME: '{self._hotkey}' as '{DBUS_BINDING_NAME}'")
+                # Register the hotkey with GNOME Shell using GrabAccelerator
+                # Arguments: Description (string), Accelerator (string), Flags (uint), ModeFlags (uint)
+                # Flags and ModeFlags might need adjustment based on desired behavior (e.g., ShellBuiltin = 1 << 0)
+                # Using 0 for both flags seems common for basic application shortcuts.
+                grab_method = getattr(self._proxy, "GrabAccelerator")
+                # GrabAccelerator returns the action_id (uint32)
+                self._action_id = grab_method(self._hotkey, 0, 0) # Flags=0, ModeFlags=0
+                if self._action_id is None or self._action_id == 0:
+                     logger.error(f"Failed to grab accelerator '{self._hotkey}'. GrabAccelerator returned {self._action_id}.")
+                     # Handle error - maybe raise exception or disconnect?
+                     raise RuntimeError(f"Failed to register hotkey '{self._hotkey}' with GNOME Shell.")
+                else:
+                    logger.info(f"Registered accelerator with GNOME Shell: '{self._hotkey}' -> action_id={self._action_id}")
 
             elif self._de_detected == "kde":
                 # Placeholder for KDE implementation
@@ -240,15 +246,16 @@ class LinuxWaylandHotkeyListener(HotkeyListener):
         self._is_listening = False # Signal intention to stop
 
         # Unregister the hotkey from D-Bus first
-        if self._proxy and self._de_detected == "gnome":
+        if self._proxy and self._de_detected == "gnome" and self._action_id is not None:
             try:
-                # Use the binding name provided during registration
-                release_method = getattr(self._proxy, "ReleaseCustomKeybinding")
-                release_method(DBUS_BINDING_NAME)
-                logger.info(f"Unregistered custom keybinding '{DBUS_BINDING_NAME}' from GNOME.")
+                # Use the action_id obtained during registration
+                ungrab_method = getattr(self._proxy, "UngrabAccelerator")
+                ungrab_method(self._action_id)
+                logger.info(f"Unregistered accelerator action_id={self._action_id} ('{self._hotkey}') from GNOME Shell.")
+                self._action_id = None # Clear the stored ID
             except Exception as e:
                 # Log error but continue cleanup
-                logger.error(f"Error unregistering D-Bus keybinding '{DBUS_BINDING_NAME}': {e}")
+                logger.error(f"Error unregistering D-Bus accelerator action_id={self._action_id}: {e}")
 
         # Disconnect signal handler *before* quitting loop if possible
         # This might require storing the signal connection object if dasbus provides one,
