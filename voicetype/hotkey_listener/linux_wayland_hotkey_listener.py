@@ -153,8 +153,8 @@ class LinuxWaylandHotkeyListener(HotkeyListener):
 
             if self._de_detected == "gnome":
                 self._proxy = self._bus.get_proxy(
-                    DBusServiceIdentifier(GNOME_SETTINGS_DAEMON_SERVICE), # Pass service name positionally
-                    DBusObjectIdentifier(GNOME_SETTINGS_DAEMON_OBJECT_PATH) # Pass object path positionally
+                    service_name=DBusServiceIdentifier(GNOME_SETTINGS_DAEMON_SERVICE), # Pass service name positionally
+                    object_path=DBusObjectIdentifier(GNOME_SETTINGS_DAEMON_OBJECT_PATH) # Pass object path positionally
                 )
 
                 # Subscribe to the signal emitted when a custom keybinding is pressed
