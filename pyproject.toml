@@ -17,7 +17,8 @@ dependencies = [
     "speechrecognition",
     "pystray",
     "prompt_toolkit",
-    "aider-chat",
+    "aider-chat",  # TODO: Remove after extracting voice stuff
+    "dasbus",
 ]
 dynamic = ["version"]
 

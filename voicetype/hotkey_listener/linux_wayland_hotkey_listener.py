@@ -6,7 +6,7 @@ from typing import Callable, Optional
 from dasbus.connection import SessionMessageBus
 from dasbus.loop import EventLoop
 from dasbus.identifier import DBusServiceIdentifier, DBusObjectIdentifier
-from dasbus.proxy import ObjectProxy
+from dasbus.client.proxy import ObjectProxy
 
 from loguru import logger
 

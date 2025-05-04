@@ -68,15 +68,6 @@ def get_platform_listener() -> HotkeyListener:
     elif system == "Darwin":  # macOS
         # TODO: Implement macOS listener
         logging.warning("macOS detected, but listener not implemented.")
-            on_press=handle_hotkey_press,
-            on_release=handle_hotkey_release,
-        )
-    elif system == "Windows":
-        # TODO: Implement Windows listener
-        raise NotImplementedError("Windows hotkey listener not yet implemented.")
-    elif system == "Darwin":  # macOS
-        # TODO: Implement macOS listener
-        raise NotImplementedError("macOS hotkey listener not yet implemented.")
     else:
         raise OSError(f"Unsupported operating system: {system}")
 
