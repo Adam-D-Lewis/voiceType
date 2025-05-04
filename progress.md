@@ -9,11 +9,11 @@
     - [x] Use `pynput` or `keyboard` library to capture global key events.
     - [x] Implement logic to detect the configured hotkey press/release.
     - [x] Signal events according to the abstraction.
-- [ ] **Implement Linux Wayland Listener:**
-    - [ ] Create a `LinuxWaylandHotkeyListener` class inheriting from `HotkeyListener`.
-    - [ ] **Research/Implement DE Integration:** Investigate and implement D-Bus integration for GNOME (`org.gnome.settings-daemon.plugins.media-keys` / `org.gnome.Shell.Keybindings`) and KDE (`org.kde.kglobalaccel`).
-    - [ ] **Fallback/Inform:** If DE integration fails or isn't applicable, attempt fallback using `pynput`/`keyboard` (documenting limitations) or inform the user that manual configuration/alternative methods might be needed. Avoid `evdev`.
-    - [ ] Signal events according to the abstraction.
+- [x] **Implement Linux Wayland Listener:**
+    - [x] Create a `LinuxWaylandHotkeyListener` class inheriting from `HotkeyListener`.
+    - [x] **Research/Implement DE Integration:** Implement D-Bus integration for GNOME (`org.gnome.settings-daemon.plugins.media-keys`). (KDE TBD).
+    - [x] **Fallback/Inform:** If DE integration fails or isn't applicable, attempt fallback using `pynput`/`keyboard` (documenting limitations) or inform the user that manual configuration/alternative methods might be needed. Avoid `evdev`. (Implemented fallback in `__main__.py`).
+    - [x] Signal press/release events according to the abstraction (Release simulated immediately after press for Wayland/GNOME).
 - [ ] **Implement Windows Listener:**
     - [ ] Create a `WindowsHotkeyListener` class inheriting from `HotkeyListener`.
     - [ ] Use `pywin32` or `ctypes` to call `RegisterHotKey` and listen for `WM_HOTKEY` messages in a dedicated thread or message loop.
@@ -24,7 +24,7 @@
     - [ ] Use `pyobjc` to access `AppKit.NSEvent.addGlobalMonitorForEvents(matching:handler:)`. Handle necessary permissions requests.
     - [ ] Alternatively, investigate `pynput` or `keyboard` library implementation for macOS.
     - [ ] Signal events according to the abstraction.
-- [ ] **Integrate Listener:** In the main application logic, instantiate the appropriate platform-specific listener based on detection results. Connect the listener's press/release signals to the audio capture start/stop functions.
+- [x] **Integrate Listener:** In the main application logic, instantiate the appropriate platform-specific listener based on detection results. Connect the listener's press/release signals to the audio capture start/stop functions (`voicetype/__main__.py`).
 - [ ] (Optional) Extend support for mouse hotkeys if feasible within the chosen libraries/APIs.
 
 ## 2. Audio Capture (Platform Independent)
