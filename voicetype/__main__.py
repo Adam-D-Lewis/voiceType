@@ -2,6 +2,7 @@ import queue
 import time
 import logging
 import platform
+import os
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 from voicetype.voice.voice import Voice
 from voicetype.utils import play_audio, type_text
@@ -19,17 +20,54 @@ HOTKEY = "<pause>"
 
 
 def get_platform_listener() -> HotkeyListener:
-    """Detects the platform and returns the appropriate listener."""
+    """Detects the platform and display server/session type, then returns the appropriate listener."""
     system = platform.system()
     if system == "Linux":
-        # TODO: Add Wayland detection and listener
-        logging.info("Detected Linux X11 (assuming for now).")
-        # Need to ask user to add this file if we want to use it
-        from voicetype.hotkey_listener.linux_x11_hotkey_listener import (
-            LinuxX11HotkeyListener,
-        )
+        session_type = os.environ.get("XDG_SESSION_TYPE", "unknown").lower()
+        logging.info(f"Detected Linux with session type: {session_type}")
 
-        return LinuxX11HotkeyListener(
+        if session_type == "wayland":
+            logging.info("Attempting to use Wayland (D-Bus) listener.")
+            try:
+                from voicetype.hotkey_listener.linux_wayland_hotkey_listener import (
+                    LinuxWaylandHotkeyListener,
+                )
+                # Note: Wayland listener simulates release immediately after press.
+                return LinuxWaylandHotkeyListener(
+                    on_press=handle_hotkey_press,
+                    on_release=handle_hotkey_release,
+                )
+            except ImportError:
+                 logging.error("Failed to import Wayland listener. Missing 'dasbus' dependency?")
+                 raise
+            except Exception as e:
+                 logging.warning(f"Failed to initialize Wayland listener ({e}), falling back to X11 listener.")
+                 # Fall through to X11/pynput listener as a fallback
+
+        # Default to X11/pynput listener if session is not Wayland or Wayland init failed
+        logging.info("Using X11 (pynput) listener.")
+        try:
+            from voicetype.hotkey_listener.linux_x11_hotkey_listener import (
+                LinuxX11HotkeyListener,
+            )
+            return LinuxX11HotkeyListener(
+                on_press=handle_hotkey_press,
+                on_release=handle_hotkey_release,
+            )
+        except ImportError:
+             logging.error("Failed to import X11 listener. Is 'pynput' installed?")
+             raise
+        except Exception as e:
+             logging.error(f"Failed to initialize X11 listener: {e}", exc_info=True)
+             raise RuntimeError("Could not initialize any Linux hotkey listener.") from e
+
+    elif system == "Windows":
+        # TODO: Implement Windows listener
+        logging.warning("Windows detected, but listener not implemented.")
+        raise NotImplementedError("Windows hotkey listener not yet implemented.")
+    elif system == "Darwin":  # macOS
+        # TODO: Implement macOS listener
+        logging.warning("macOS detected, but listener not implemented.")
             on_press=handle_hotkey_press,
             on_release=handle_hotkey_release,
         )
