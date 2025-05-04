@@ -69,29 +69,50 @@ class LinuxWaylandHotkeyListener(HotkeyListener):
         self._de_detected: str = "unknown" # e.g., "gnome", "kde", "unity", "unknown"
 
         # Detect Desktop Environment (basic detection)
-        # Detect Desktop Environment (more robust detection)
+        # Detect Desktop Environment (even more robust detection)
         self._de_detected = "unknown" # Default
-        original_xdg_desktop = os.environ.get("XDG_CURRENT_DESKTOP", "unknown")
-        processed_xdg_desktop = original_xdg_desktop.lower()
+        xdg_current = os.environ.get("XDG_CURRENT_DESKTOP", "")
+        original_xdg_current = os.environ.get("ORIGINAL_XDG_CURRENT_DESKTOP", "")
+        gnome_session_mode = os.environ.get("GNOME_SHELL_SESSION_MODE", "")
 
-        # Split by colon and check each part for known DEs
-        desktop_parts = [part for part in processed_xdg_desktop.split(':') if part] # Filter out empty strings
+        # Combine relevant variables for easier checking
+        combined_desktop_info = f"{xdg_current}:{original_xdg_current}:{gnome_session_mode}".lower()
+        desktop_parts = [part for part in combined_desktop_info.split(':') if part]
+
         is_gnome = any("gnome" in part for part in desktop_parts)
-        is_kde = any("kde" in part for part in desktop_parts)
+        # Check KDE only if not GNOME, as GNOME takes precedence for our implementation
+        is_kde = False
+        if not is_gnome:
+            # Check only XDG_CURRENT_DESKTOP for KDE for now
+            is_kde = any("kde" in part for part in xdg_current.lower().split(':') if part)
+
+        log_xdg_current = xdg_current if xdg_current else "Not set"
+        log_original_xdg = original_xdg_current if original_xdg_current else "Not set"
+        log_gnome_mode = gnome_session_mode if gnome_session_mode else "Not set"
 
         if is_gnome:
             self._de_detected = "gnome"
-            logger.info(f"Detected GNOME environment ('{original_xdg_desktop}') for Wayland listener.")
+            logger.info(
+                f"Detected GNOME environment for Wayland listener "
+                f"(XDG_CURRENT_DESKTOP='{log_xdg_current}', "
+                f"ORIGINAL_XDG_CURRENT_DESKTOP='{log_original_xdg}', "
+                f"GNOME_SHELL_SESSION_MODE='{log_gnome_mode}')"
+            )
         elif is_kde:
-            # Keep KDE detection separate, even if GNOME is also present (unlikely but possible)
             self._de_detected = "kde"
-            logger.warning(f"Detected KDE environment ('{original_xdg_desktop}'). Wayland listener currently only supports GNOME.")
+            logger.warning(
+                f"Detected KDE environment (XDG_CURRENT_DESKTOP='{log_xdg_current}'). "
+                "Wayland listener currently only supports GNOME."
+            )
         else:
-            # If neither GNOME nor KDE found, store the first non-empty part (or 'unknown') for logging
-            self._de_detected = desktop_parts[0] if desktop_parts else "unknown"
+            # Fallback: Use the primary XDG_CURRENT_DESKTOP value for logging if available
+            self._de_detected = xdg_current.lower().split(':')[0] if xdg_current else "unknown"
             logger.warning(
                 f"Detected unsupported/unknown DE for Wayland: '{self._de_detected}' "
-                f"(from XDG_CURRENT_DESKTOP='{original_xdg_desktop}'). Hotkeys via D-Bus may not work."
+                f"(XDG_CURRENT_DESKTOP='{log_xdg_current}', "
+                f"ORIGINAL_XDG_CURRENT_DESKTOP='{log_original_xdg}', "
+                f"GNOME_SHELL_SESSION_MODE='{log_gnome_mode}'). "
+                "Hotkeys via D-Bus may not work."
             )
 
 
