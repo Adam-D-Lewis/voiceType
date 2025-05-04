@@ -98,11 +98,6 @@ def main():
         listener.set_hotkey(HOTKEY)  # Configure the hotkey
         listener.start_listening()  # Start listening in a background thread
 
-        # --- Placeholder for listener until files are added ---
-        logging.warning("Hotkey listener functionality is currently disabled.")
-        logging.warning(
-            "Please add the required platform listener file (e.g., linux_x11_hotkey_listener.py) to the chat."
-        )
         logging.info(f"Intended hotkey: {HOTKEY}")
         logging.info("Press Ctrl+C to exit.")
         # --- End Placeholder ---
