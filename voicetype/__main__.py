@@ -32,17 +32,28 @@ def get_platform_listener() -> HotkeyListener:
                 from voicetype.hotkey_listener.linux_wayland_hotkey_listener import (
                     LinuxWaylandHotkeyListener,
                 )
-                # Note: Wayland listener simulates release immediately after press.
-                return LinuxWaylandHotkeyListener(
+                wayland_listener = LinuxWaylandHotkeyListener(
                     on_press=handle_hotkey_press,
                     on_release=handle_hotkey_release,
                 )
+                # Check if the detected DE is actually supported by the Wayland listener
+                # Accessing protected member _de_detected is acceptable here for this check.
+                if wayland_listener._de_detected == "gnome":
+                    logging.info("GNOME detected, proceeding with Wayland D-Bus listener.")
+                    # Note: Wayland listener simulates release immediately after press.
+                    return wayland_listener
+                else:
+                    logging.warning(
+                        f"Wayland session detected, but DE '{wayland_listener._de_detected}' "
+                        "is not supported by the D-Bus listener. Falling back to X11/pynput listener."
+                    )
+                    # Explicitly fall through to the X11 listener code below
             except ImportError:
-                 logging.error("Failed to import Wayland listener. Missing 'dasbus' dependency?")
+                 logging.error("Failed to import Wayland listener. Missing 'dasbus' dependency? `pip install dasbus`")
                  raise
             except Exception as e:
                  logging.warning(f"Failed to initialize Wayland listener ({e}), falling back to X11 listener.")
-                 # Fall through to X11/pynput listener as a fallback
+                 # Fall through to X11/pynput listener as a fallback if Wayland init fails for other reasons
 
         # Default to X11/pynput listener if session is not Wayland or Wayland init failed
         logging.info("Using X11 (pynput) listener.")

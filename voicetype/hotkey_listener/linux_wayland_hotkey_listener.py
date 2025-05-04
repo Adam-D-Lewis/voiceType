@@ -66,19 +66,25 @@ class LinuxWaylandHotkeyListener(HotkeyListener):
         self._loop: Optional[EventLoop] = None
         self._loop_thread: Optional[threading.Thread] = None
         self._is_listening: bool = False
-        self._de_detected: Optional[str] = None # e.g., "gnome", "kde"
+        self._de_detected: str = "unknown" # e.g., "gnome", "kde", "unity", "unknown"
 
         # Detect Desktop Environment (basic detection)
         # This is a simplification; more robust detection might be needed.
-        xdg_current_desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+        # Store the detected DE regardless of support status.
+        xdg_current_desktop = os.environ.get("XDG_CURRENT_DESKTOP", "unknown").lower()
+        # Handle potential multiple values like "ubuntu:GNOME" -> "gnome"
+        if ":" in xdg_current_desktop:
+            xdg_current_desktop = xdg_current_desktop.split(":")[-1]
+
         if "gnome" in xdg_current_desktop:
             self._de_detected = "gnome"
-            logger.info("Detected GNOME environment for Wayland listener.")
+            logger.info(f"Detected GNOME environment ('{os.environ.get('XDG_CURRENT_DESKTOP', 'unknown')}') for Wayland listener.")
         elif "kde" in xdg_current_desktop:
-             logger.warning("KDE detected, but Wayland listener currently only supports GNOME.")
-             self._de_detected = "kde" # Mark as KDE, but won't work yet
+             self._de_detected = "kde"
+             logger.warning(f"Detected KDE environment ('{os.environ.get('XDG_CURRENT_DESKTOP', 'unknown')}'). Wayland listener currently only supports GNOME.")
         else:
-             logger.warning(f"Unsupported/Unknown DE for Wayland: {xdg_current_desktop}. Hotkeys may not work.")
+             self._de_detected = xdg_current_desktop if xdg_current_desktop else "unknown"
+             logger.warning(f"Detected unsupported/unknown DE for Wayland: '{self._de_detected}'. Hotkeys via D-Bus may not work.")
 
 
     def set_hotkey(self, hotkey: str) -> None:
