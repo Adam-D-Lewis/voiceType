@@ -172,7 +172,7 @@ class LinuxWaylandHotkeyListener(HotkeyListener):
                 # Arguments: Description (string), Accelerator (string), Flags (uint), ModeFlags (uint)
                 # Flags and ModeFlags might need adjustment based on desired behavior (e.g., ShellBuiltin = 1 << 0)
                 # Using 0 for both flags seems common for basic application shortcuts.
-                grab_method = getattr(self._proxy, "GrabAccelerator")
+                grab_method = getattr(self._proxy, "GrabAccelerator")  # TODO: FIX I think this is a permissions issue currently.
                 # GrabAccelerator returns the action_id (uint32)
                 self._action_id = grab_method(self._hotkey, 0, 0) # Flags=0, ModeFlags=0
                 if self._action_id is None or self._action_id == 0:

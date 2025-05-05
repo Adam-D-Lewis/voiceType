@@ -8,7 +8,7 @@ from voicetype.voice.voice import Voice
 from voicetype.utils import play_audio, type_text
 from voicetype.sounds import START_RECORD_SOUND, ERROR_SOUND
 
-from voicetype.globals import listener, voice, is_recording, typing_queue
+from voicetype.globals import hotkey_listener, voice, is_recording, typing_queue
 
 # Basic Logging Setup
 logging.basicConfig(
@@ -32,6 +32,7 @@ def get_platform_listener() -> HotkeyListener:
                 from voicetype.hotkey_listener.linux_wayland_hotkey_listener import (
                     LinuxWaylandHotkeyListener,
                 )
+
                 wayland_listener = LinuxWaylandHotkeyListener(
                     on_press=handle_hotkey_press,
                     on_release=handle_hotkey_release,
@@ -39,7 +40,9 @@ def get_platform_listener() -> HotkeyListener:
                 # Check if the detected DE is actually supported by the Wayland listener
                 # Accessing protected member _de_detected is acceptable here for this check.
                 if wayland_listener._de_detected == "gnome":
-                    logging.info("GNOME detected, proceeding with Wayland D-Bus listener.")
+                    logging.info(
+                        "GNOME detected, proceeding with Wayland D-Bus listener."
+                    )
                     # Note: Wayland listener simulates release immediately after press.
                     return wayland_listener
                 else:
@@ -48,12 +51,14 @@ def get_platform_listener() -> HotkeyListener:
                         "is not supported by the D-Bus listener. Falling back to X11/pynput listener."
                     )
                     # Explicitly fall through to the X11 listener code below
-            except ImportError:
-                 logging.error("Failed to import Wayland listener. Missing 'dasbus' dependency? `pip install dasbus`")
-                 raise
+            except ImportError as e:
+                logging.error(f"Failed to import Wayland listener: {e}")
+                raise
             except Exception as e:
-                 logging.warning(f"Failed to initialize Wayland listener ({e}), falling back to X11 listener.")
-                 # Fall through to X11/pynput listener as a fallback if Wayland init fails for other reasons
+                logging.warning(
+                    f"Failed to initialize Wayland listener ({e}), falling back to X11 listener."
+                )
+                # Fall through to X11/pynput listener as a fallback if Wayland init fails for other reasons
 
         # Default to X11/pynput listener if session is not Wayland or Wayland init failed
         logging.info("Using X11 (pynput) listener.")
@@ -61,16 +66,17 @@ def get_platform_listener() -> HotkeyListener:
             from voicetype.hotkey_listener.linux_x11_hotkey_listener import (
                 LinuxX11HotkeyListener,
             )
+
             return LinuxX11HotkeyListener(
                 on_press=handle_hotkey_press,
                 on_release=handle_hotkey_release,
             )
         except ImportError:
-             logging.error("Failed to import X11 listener. Is 'pynput' installed?")
-             raise
+            logging.error("Failed to import X11 listener. Is 'pynput' installed?")
+            raise
         except Exception as e:
-             logging.error(f"Failed to initialize X11 listener: {e}", exc_info=True)
-             raise RuntimeError("Could not initialize any Linux hotkey listener.") from e
+            logging.error(f"Failed to initialize X11 listener: {e}", exc_info=True)
+            raise RuntimeError("Could not initialize any Linux hotkey listener.") from e
 
     elif system == "Windows":
         # TODO: Implement Windows listener
@@ -90,6 +96,7 @@ def handle_hotkey_press():
         logging.info("Hotkey pressed - Starting recording...")
         is_recording = True
         # TODO: Start actual audio recording stream here (requires Voice class refactor)
+        voice.start_recording()
         # TODO: Update tray icon state to "recording"
         play_audio(START_RECORD_SOUND)  # Provide feedback
     else:
@@ -107,10 +114,11 @@ def handle_hotkey_release():
 
         try:
             # TODO: Get audio data from the stream and pass to voice.transcribe()
+            recording_file =voice.stop_recording()  # Placeholder for actual stop recording
+            text = voice.transcribe(recording_file)  # Placeholder for actual transcription
+
             # transcribed_text = voice.transcribe(audio_data) # Placeholder
-            transcribed_text = (
-                "This is a placeholder transcription."  # Simulate transcription
-            )
+            transcribed_text = text
             logging.info(f"Transcription result: {transcribed_text}")
             if transcribed_text:
                 typing_queue.put(transcribed_text)  # Add to queue for typing
@@ -129,14 +137,14 @@ def handle_hotkey_release():
 
 def main():
     """Main application entry point."""
-    global listener, voice
+    global hotkey_listener, voice
     logging.info("Starting VoiceType application...")
 
     try:
         voice = Voice()  # Initialize audio processing class
-        listener = get_platform_listener()  # Get the platform-specific listener
-        listener.set_hotkey(HOTKEY)  # Configure the hotkey
-        listener.start_listening()  # Start listening in a background thread
+        hotkey_listener = get_platform_listener()  # Get the platform-specific listener
+        hotkey_listener.set_hotkey(HOTKEY)  # Configure the hotkey
+        hotkey_listener.start_listening()  # Start listening in a background thread
 
         logging.info(f"Intended hotkey: {HOTKEY}")
         logging.info("Press Ctrl+C to exit.")
@@ -166,9 +174,9 @@ def main():
         logging.error(f"An unexpected error occurred: {e}", exc_info=True)
     finally:
         logging.info("Shutting down...")
-        if listener:
+        if hotkey_listener:
             try:
-                listener.stop_listening()
+                hotkey_listener.stop_listening()
                 logging.info("Hotkey listener stopped.")
             except Exception as e:
                 logging.error(f"Error stopping listener: {e}", exc_info=True)
