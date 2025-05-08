@@ -15,6 +15,7 @@ dependencies = [
     "pyaudio",
     "pynput",
     "speechrecognition",
+    "loguru",
     "pystray",
     "prompt_toolkit",
     "aider-chat",  # TODO: Remove after extracting voice stuff

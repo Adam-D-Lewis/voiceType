@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from typing import List, Union
 
 from fastapi import Depends, FastAPI, HTTPException
-from .utils import play_audio, type_text, make_sound_thread
+from .utils import type_text #, play_audio,make_sound_thread
 from pathlib import Path
 import sys
 import logging

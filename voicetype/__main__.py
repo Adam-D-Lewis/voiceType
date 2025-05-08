@@ -5,7 +5,7 @@ import platform
 import os
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 from voicetype.voice.voice import Voice
-from voicetype.utils import play_audio, type_text
+from voicetype.utils import type_text # play_audio, 
 from voicetype.sounds import START_RECORD_SOUND, ERROR_SOUND
 
 from voicetype.globals import hotkey_listener, voice, is_recording, typing_queue
@@ -98,7 +98,7 @@ def handle_hotkey_press():
         # TODO: Start actual audio recording stream here (requires Voice class refactor)
         voice.start_recording()
         # TODO: Update tray icon state to "recording"
-        play_audio(START_RECORD_SOUND)  # Provide feedback
+        # play_audio(START_RECORD_SOUND)  # Provide feedback
     else:
         logging.warning("Hotkey pressed while already recording. Ignoring.")
 
@@ -126,7 +126,7 @@ def handle_hotkey_release():
         except Exception as e:
             logging.error(f"Error during transcription or typing: {e}", exc_info=True)
             # TODO: Update tray icon state to "error"
-            play_audio(ERROR_SOUND)  # Provide error feedback
+            # play_audio(ERROR_SOUND)  # Provide error feedback
         finally:
             # Ensure recording flag is reset even if errors occur
             is_recording = False
