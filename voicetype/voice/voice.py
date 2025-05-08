@@ -15,7 +15,7 @@ from loguru import logger
 
 from aider.llm import litellm
 
-from .dump import dump  # noqa: F401
+from voicetype.voice.dump import dump  # noqa: F401
 
 warnings.filterwarnings(
     "ignore", message="Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work"
@@ -197,6 +197,7 @@ class Voice:
             return None
 
         logger.debug("Stopping recording...")
+        time.sleep(0.25)  # Some expected recording gets lost if we don't wait a bit
         self._stop_event.set() # Signal callback to stop processing queue
 
         if self.stream:
@@ -292,14 +293,14 @@ class Voice:
         # Cleanup
         if final_filename != filename: # If conversion happened, remove the converted file
             try:
-                os.remove(final_filename)
+                # os.remove(final_filename)
                 logger.debug(f"Cleaned up temporary converted file: {final_filename}")
             except OSError as e:
                 logger.debug(f"Warning: Could not remove temporary converted file {final_filename}: {e}")
 
         # Always remove the original temporary WAV file
         try:
-            os.remove(filename)
+            # os.remove(filename)
             logger.debug(f"Cleaned up original recording file: {filename}")
         except OSError as e:
             logger.debug(f"Warning: Could not remove original recording file {filename}: {e}")
@@ -308,47 +309,117 @@ class Voice:
         return transcript_text
 
 
-    # --- Old methods removed ---
-    # def record_and_transcribe(self, history=None, language=None): ...
-    # def raw_record_and_transcribe(self, history, language): ...
-
 # --- Example Usage ---
 if __name__ == "__main__":
+    # Add more verbose logging
+    logger.remove()
+    logger.add(sys.stderr, level="DEBUG")
+    
+    # Parse command line arguments for device selection
+    import argparse
+    parser = argparse.ArgumentParser(description="Record and transcribe audio.")
+    parser.add_argument("--device", "-d", type=int, help="Device ID to use for recording")
+    parser.add_argument("--list", "-l", action="store_true", help="List available audio devices and exit")
+    parser.add_argument("--timeout", "-t", type=int, default=5, help="Recording duration in seconds")
+    args = parser.parse_args()
+    
+    # Set OpenAI API key
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError("Please set the OPENAI_API_KEY environment variable.")
-
+        logger.warning("OPENAI_API_KEY environment variable not set. Setting to placeholder for testing.")
+        os.environ["OPENAI_API_KEY"] = "sk-placeholder-for-testing"
+    
     try:
-        # Initialize with default device
-        # You can specify a device name like: voice = Voice(device_name="USB PnP Audio Device")
-        voice = Voice()
-
+        # Show available input devices to help with troubleshooting
+        import sounddevice as sd
+        logger.info("Available audio input devices:")
+        devices = sd.query_devices()
+        for i, device in enumerate(devices):
+            if device['max_input_channels'] > 0:
+                logger.info(f"  Device {i}: {device['name']} (inputs: {device['max_input_channels']})")
+        
+        if args.list:
+            # Exit after listing devices if --list argument is provided
+            logger.info("Exiting after listing devices.")
+            sys.exit(0)
+            
+        # Initialize with chosen device or default
+        device_id = args.device
+        if device_id is not None:
+            # Check if device ID is valid
+            try:
+                device_info = sd.query_devices(device_id)
+                if device_info['max_input_channels'] == 0:
+                    logger.error(f"Device {device_id} has no input channels.")
+                    sys.exit(1)
+                logger.info(f"\nInitializing Voice with specified device {device_id}: {device_info['name']}...")
+                # Get device name to pass to Voice initializer
+                device_name = device_info['name']
+                voice = Voice(device_name=device_name)
+            except (sd.PortAudioError, KeyError) as e:
+                logger.error(f"Invalid device ID {device_id}: {e}")
+                sys.exit(1)
+        else:
+            logger.info("\nInitializing Voice with default device...")
+            voice = Voice()
+        
         # Start recording
+        logger.info("Starting recording...")
         voice.start_recording()
 
-        # Simulate recording duration (e.g., 5 seconds)
-        logger.debug("Recording for 5 seconds...")
-        time.sleep(5)
+        # Record for the specified duration
+        logger.info(f"Recording for {args.timeout} seconds...")
+        for i in range(args.timeout):
+            logger.info(f"Recording: {i+1} seconds")
+            time.sleep(1)
 
         # Stop recording and get the filename
+        logger.info("Stopping recording...")
         audio_filename = voice.stop_recording()
 
         if audio_filename:
+            # First, try to play back the audio to check if it contains sound
+            logger.info(f"\nPlaying back recorded audio from {audio_filename}...")
+            try:
+                with sf.SoundFile(audio_filename) as f:
+                    duration = len(f) / f.samplerate
+                    logger.info(f"Audio file duration: {duration:.2f} seconds")
+                    
+                    # Get audio data stats to check if it's blank
+                    data = f.read()
+                    max_amplitude = np.max(np.abs(data))
+                    rms = np.sqrt(np.mean(data**2))
+                    logger.info(f"Max amplitude: {max_amplitude:.6f}, RMS: {rms:.6f}")
+                    
+                    if max_amplitude < 0.01:
+                        logger.warning("WARNING: Audio file appears to be blank or nearly silent!")
+                    
+                    # Play it back so you can hear it
+                    logger.info("Playing back audio...")
+                    sd.play(data, f.samplerate)
+                    sd.wait()  # Wait until playback is finished
+                    logger.info("Playback complete.")
+            except Exception as e:
+                logger.error(f"Error during playback: {e}")
+
             # Transcribe the recorded audio
+            logger.info("\nTranscribing audio...")
             transcribed_text = voice.transcribe(audio_filename)
 
             if transcribed_text:
-                logger.debug("\n--- Transcription ---")
-                logger.debug(transcribed_text)
+                logger.info("\n--- Transcription ---")
+                logger.info(transcribed_text)
             else:
-                logger.debug("\nTranscription failed.")
+                logger.error("\nTranscription failed.")
         else:
-            logger.debug("\nRecording failed or was stopped prematurely.")
+            logger.error("\nRecording failed or was stopped prematurely.")
 
     except SoundDeviceError as e:
-        logger.debug(f"\nSound device error: {e}")
-        logger.debug("Please ensure you have a working audio input device and necessary libraries (PortAudio, sounddevice, SoundFile).")
+        logger.error(f"\nSound device error: {e}")
+        logger.error("Please ensure you have a working audio input device and necessary libraries.")
     except ValueError as e:
-        logger.debug(f"\nConfiguration error: {e}")
+        logger.error(f"\nConfiguration error: {e}")
     except Exception as e:
-        logger.debug(f"\nAn unexpected error occurred: {e}")
+        logger.error(f"\nAn unexpected error occurred: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
