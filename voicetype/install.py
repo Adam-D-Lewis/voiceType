@@ -6,8 +6,11 @@ import sys
 from pathlib import Path
 
 SERVICE_NAME = "voicetype.service"
-SERVICE_DIR = Path.home() / ".config" / "systemd" / "user"
-SERVICE_FILE_PATH = SERVICE_DIR / SERVICE_NAME
+SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
+SERVICE_FILE_PATH = SYSTEMD_USER_DIR / SERVICE_NAME
+
+APP_CONFIG_DIR = Path.home() / ".config" / "voicetype"
+ENV_FILE_PATH = APP_CONFIG_DIR / ".env"
 
 def get_project_root() -> Path:
     """
@@ -29,6 +32,10 @@ def get_service_file_content() -> str:
     # `WorkingDirectory` is set to the project root, so Python can find the `voicetype` module.
     exec_start = f"{shlex.quote(python_executable)} -m voicetype"
     working_directory = shlex.quote(str(project_root))
+    # %h in systemd unit files expands to the user's home directory.
+    # The '-' before the path means that systemd will not fail if the file is missing.
+    environment_file_path = f"-{shlex.quote(str(ENV_FILE_PATH))}"
+
 
     return f"""[Unit]
 Description=VoiceType Application
@@ -44,6 +51,8 @@ Restart=always
 RestartSec=5
 # Ensures Python output is not buffered, useful for journald logging
 Environment="PYTHONUNBUFFERED=1"
+# Load environment variables from the specified file
+EnvironmentFile={environment_file_path}
 # StandardOutput=journal # Systemd default for user services
 # StandardError=journal  # Systemd default for user services
 
@@ -81,16 +90,40 @@ def install_service():
         print("This installation is for Linux systems with systemd only.", file=sys.stderr)
         sys.exit(1)
 
-    content = get_service_file_content()
+    # Get OpenAI API Key
+    api_key = input("Please enter your OPENAI_API_KEY: ").strip()
+    if not api_key:
+        print("OPENAI_API_KEY cannot be empty. Installation aborted.", file=sys.stderr)
+        sys.exit(1)
 
-    SERVICE_DIR.mkdir(parents=True, exist_ok=True)
+    # Create app config directory and .env file
+    APP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(ENV_FILE_PATH, "w") as f:
+            f.write(f"OPENAI_API_KEY={shlex.quote(api_key)}\n")
+        # Set restrictive permissions for the .env file
+        os.chmod(ENV_FILE_PATH, 0o600)
+        print(f"OPENAI_API_KEY stored in {ENV_FILE_PATH}")
+    except IOError as e:
+        print(f"Error writing environment file to {ENV_FILE_PATH}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # Create systemd service file
+    service_content = get_service_file_content()
+    SYSTEMD_USER_DIR.mkdir(parents=True, exist_ok=True)
 
     try:
         with open(SERVICE_FILE_PATH, "w") as f:
-            f.write(content)
+            f.write(service_content)
         print(f"Service file created at {SERVICE_FILE_PATH}")
     except IOError as e:
         print(f"Error writing service file: {e}", file=sys.stderr)
+        # Attempt to clean up the .env file if service file creation fails
+        if ENV_FILE_PATH.exists():
+            try:
+                ENV_FILE_PATH.unlink()
+            except OSError:
+                pass # Ignore error during cleanup
         sys.exit(1)
 
     run_systemctl_command(["daemon-reload"])
@@ -98,7 +131,10 @@ def install_service():
     run_systemctl_command(["start", SERVICE_NAME])
     
     print(f"\nVoiceType service '{SERVICE_NAME}' installed and started.")
-    print("You can check its status with:")
+    print(f"The OPENAI_API_KEY has been stored in {ENV_FILE_PATH}.")
+    print("If you need to change the API key, you can edit this file and then run:")
+    print(f"  systemctl --user restart {SERVICE_NAME}")
+    print("\nYou can check the service status with:")
     print(f"  systemctl --user status {SERVICE_NAME}")
     print("And view logs with:")
     print(f"  journalctl --user -u {SERVICE_NAME} -f")
@@ -121,10 +157,37 @@ def uninstall_service():
             SERVICE_FILE_PATH.unlink()
             print(f"Service file removed: {SERVICE_FILE_PATH}")
         except OSError as e:
-            print(f"Error removing service file: {e}", file=sys.stderr)
+            print(f"Error removing service file {SERVICE_FILE_PATH}: {e}", file=sys.stderr)
             # Continue to daemon-reload even if file removal fails
+    else:
+        print(f"Service file {SERVICE_FILE_PATH} not found.")
 
-    run_systemctl_command(["daemon-reload"])
+    run_systemctl_command(["daemon-reload"]) # Reload even if files were not present
+
+    # Remove the .env file
+    if ENV_FILE_PATH.exists():
+        try:
+            ENV_FILE_PATH.unlink()
+            print(f"Environment file removed: {ENV_FILE_PATH}")
+        except OSError as e:
+            print(f"Error removing environment file {ENV_FILE_PATH}: {e}", file=sys.stderr)
+    else:
+        print(f"Environment file {ENV_FILE_PATH} not found.")
+
+    # Attempt to remove the app config directory if it's empty
+    if APP_CONFIG_DIR.exists():
+        try:
+            # Check if directory is empty
+            if not any(APP_CONFIG_DIR.iterdir()):
+                APP_CONFIG_DIR.rmdir()
+                print(f"Removed empty configuration directory: {APP_CONFIG_DIR}")
+            else:
+                print(f"Configuration directory {APP_CONFIG_DIR} is not empty, not removing.")
+        except OSError as e:
+            print(f"Error removing configuration directory {APP_CONFIG_DIR}: {e}", file=sys.stderr)
+            print(f"You may need to remove it manually: rmdir {APP_CONFIG_DIR}")
+
+
     print(f"VoiceType service '{SERVICE_NAME}' uninstalled.")
 
 def service_status():
