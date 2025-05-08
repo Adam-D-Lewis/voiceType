@@ -152,7 +152,6 @@ class Voice:
                 channels=1,
                 callback=self.callback,
                 device=self.device_id,
-                blocksize=int(self.sample_rate * 0.1) # Process in 100ms chunks
             )
             self.stream.start()
             self.start_time = time.time()
