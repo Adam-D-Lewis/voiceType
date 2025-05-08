@@ -62,9 +62,9 @@
 - [ ] Ensure privacy: Audio is only captured during hotkey press.
 - [ ] (Nice-to-have) Low latency for all operations.
 - [ ] Implement "Run on Startup" functionality:
-    - [ ] Detect the operating system (Linux, Windows, macOS).
+    - [ ] Detect the operating system (Linux, Windows, macOS). (Linux part started)
     - [ ] Implement logic to create appropriate startup entries:
-        - [ ] Linux: Create and manage a user systemd service (`~/.config/systemd/user/voicetype.service`).
+        - [x] Linux: Create and manage a user systemd service (`~/.config/systemd/user/voicetype.service`). (via `voicetype/install.py`)
         - [ ] Windows: Registry entry (`HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run`) or Startup folder shortcut.
         - [ ] macOS: LaunchAgent (`~/Library/LaunchAgents/com.yourdomain.voicetype.plist`).
-    - [ ] Provide a configuration option for the user to enable/disable running on startup (including enabling/disabling the systemd service on Linux).
+    - [x] Provide a configuration option for the user to enable/disable running on startup (including enabling/disabling the systemd service on Linux). (via `voicetype/install.py install/uninstall`)
