@@ -42,35 +42,40 @@ class LinuxX11HotkeyListener(HotkeyListener):
             self._hotkey_combination = None
             raise ValueError(f"Invalid hotkey format: {hotkey}") from e
 
-    def _on_hotkey_press(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
+    def _on_key_press(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
         if key is None or self._hotkey_combination is None:
             return
         with self._lock:
-            self._pressed_keys.add(key)
-            # Check if the current set of pressed keys contains the hotkey combination
+            logger.debug(f"Key pressed: {key}")
+            # make sure key equality works despite modifier state
+            canonical_key = self._listener.canonical(key)
+            self._pressed_keys.add(canonical_key)
+
             if not self._hotkey_pressed and self._hotkey_combination.issubset(self._pressed_keys):
-                self._hotkey_pressed = True
-                self._trigger_hotkey_press()
+                if not self._hotkey_pressed:
+                    logger.debug(f"Hotkey detected: {canonical_key}")
+                    self._hotkey_pressed = True
+                    self._trigger_hotkey_press()
 
-
-    def _on_hotkey_release(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
+    def _on_key_release(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
         if key is None or self._hotkey_combination is None:
             return
+        canonical_key = self._listener.canonical(key)
 
         with self._lock:
             # Check if the released key was part of the hotkey combination
             # and if the hotkey was previously considered pressed
-            if self._hotkey_pressed and key in self._hotkey_combination:
+            if self._hotkey_pressed and canonical_key in self._hotkey_combination:
                  # Check if *any* key from the hotkey combo is still pressed
                  # This handles cases where modifiers are released after the main key
-                 any_hotkey_key_pressed = any(k in self._pressed_keys for k in self._hotkey_combination if k != key)
+                 any_hotkey_key_pressed = any(k in self._pressed_keys for k in self._hotkey_combination if k != canonical_key)
                  if not any_hotkey_key_pressed:
                     self._hotkey_pressed = False
                     self._trigger_hotkey_release()
 
             # Remove the key from the set of pressed keys
-            if key in self._pressed_keys:
-                self._pressed_keys.remove(key)
+            if canonical_key in self._pressed_keys:
+                self._pressed_keys.remove(canonical_key)
 
 
     def start_listening(self) -> None:
@@ -85,8 +90,8 @@ class LinuxX11HotkeyListener(HotkeyListener):
         # Ensure pynput uses X11 backend explicitly if needed, though usually automatic
         # Note: pynput might require DISPLAY environment variable to be set.
         self._listener = keyboard.Listener(
-            on_press=self._on_hotkey_press,
-            on_release=self._on_hotkey_release,
+            on_press=self._on_key_press,
+            on_release=self._on_key_release,
             # Explicitly setting suppress=False might be needed depending on environment
             # suppress=False # Try this if keys are blocked system-wide
         )

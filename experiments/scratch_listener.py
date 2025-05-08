@@ -5,6 +5,7 @@ from pynput import keyboard
 def on_press(key):
     try:
         print(f'Key {key.char} pressed')
+        breakpoint()
         if key.char == '=':
             print(f'You pressed the "=" key. {"="*50}')
     except AttributeError:
