@@ -68,8 +68,8 @@ def get_platform_listener() -> HotkeyListener:
             )
 
             return LinuxX11HotkeyListener(
-                on_press=handle_hotkey_press,
-                on_release=handle_hotkey_release,
+                on_hotkey_press=handle_hotkey_press,
+                on_hotkey_release=handle_hotkey_release,
             )
         except ImportError:
             logging.error("Failed to import X11 listener. Is 'pynput' installed?")

@@ -17,8 +17,8 @@ class LinuxX11HotkeyListener(HotkeyListener):
 
     def __init__(
         self,
-        on_press: Optional[Callable[[], None]] = None,
-        on_release: Optional[Callable[[], None]] = None,
+        on_hotkey_press: Optional[Callable[[], None]] = None,
+        on_hotkey_release: Optional[Callable[[], None]] = None,
     ):
         """
         Initialize the Linux X11 hotkey listener.
@@ -27,7 +27,7 @@ class LinuxX11HotkeyListener(HotkeyListener):
             on_press: Callback function to execute when the hotkey is pressed.
             on_release: Callback function to execute when the hotkey is released.
         """
-        super().__init__(on_press, on_release)
+        super().__init__(on_hotkey_press, on_hotkey_release)
         self._hotkey_combination: Optional[Set[keyboard.Key | keyboard.KeyCode]] = None
         self._listener: Optional[keyboard.Listener] = None
         self._pressed_keys: Set[keyboard.Key | keyboard.KeyCode] = set()
