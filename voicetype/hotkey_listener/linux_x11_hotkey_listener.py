@@ -1,9 +1,8 @@
 import threading
 from typing import Callable, Optional, Set
 
-from pynput import keyboard
-
 from loguru import logger
+from pynput import keyboard
 
 from .hotkey_listener import HotkeyListener
 
@@ -11,6 +10,9 @@ from .hotkey_listener import HotkeyListener
 class LinuxX11HotkeyListener(HotkeyListener):
     """
     Hotkey listener implementation for Linux X11 using pynput.
+    
+    This class handles keyboard events to detect when a specific hotkey 
+    combination is pressed and released.
     """
 
     def __init__(
@@ -18,6 +20,13 @@ class LinuxX11HotkeyListener(HotkeyListener):
         on_press: Optional[Callable[[], None]] = None,
         on_release: Optional[Callable[[], None]] = None,
     ):
+        """
+        Initialize the Linux X11 hotkey listener.
+        
+        Args:
+            on_press: Callback function to execute when the hotkey is pressed.
+            on_release: Callback function to execute when the hotkey is released.
+        """
         super().__init__(on_press, on_release)
         self._hotkey_combination: Optional[Set[keyboard.Key | keyboard.KeyCode]] = None
         self._listener: Optional[keyboard.Listener] = None
@@ -31,45 +40,60 @@ class LinuxX11HotkeyListener(HotkeyListener):
 
         Args:
             hotkey: A string representation of the hotkey (e.g., "<ctrl>+<alt>+x").
-                    Uses pynput's format.
+                   Uses pynput's format.
+                   
+        Raises:
+            ValueError: If the hotkey string cannot be parsed.
         """
         try:
             self._hotkey_combination = set(keyboard.HotKey.parse(hotkey))
-            print(f"Hotkey set to: {hotkey} -> {self._hotkey_combination}")
+            logger.info(f"Hotkey set to: {hotkey} -> {self._hotkey_combination}")
         except ValueError as e:
-            # Consider logging this error instead of just printing
-            print(f"Error parsing hotkey '{hotkey}': {e}")
+            logger.error(f"Error parsing hotkey '{hotkey}': {e}")
             self._hotkey_combination = None
             raise ValueError(f"Invalid hotkey format: {hotkey}") from e
 
     def _on_key_press(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
+        """
+        Internal handler for key press events.
+        
+        Args:
+            key: The key that was pressed.
+        """
         if key is None or self._hotkey_combination is None:
             return
+            
         with self._lock:
             logger.debug(f"Key pressed: {key}")
-            # make sure key equality works despite modifier state
+            # Ensure key equality works despite modifier state
             canonical_key = self._listener.canonical(key)
             self._pressed_keys.add(canonical_key)
 
             if not self._hotkey_pressed and self._hotkey_combination.issubset(self._pressed_keys):
-                if not self._hotkey_pressed:
-                    logger.debug(f"Hotkey detected: {canonical_key}")
-                    self._hotkey_pressed = True
-                    self._trigger_hotkey_press()
+                logger.debug(f"Hotkey detected: {canonical_key}")
+                self._hotkey_pressed = True
+                self._trigger_hotkey_press()
 
     def _on_key_release(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
+        """
+        Internal handler for key release events.
+        
+        Args:
+            key: The key that was released.
+        """
         if key is None or self._hotkey_combination is None:
             return
+            
         canonical_key = self._listener.canonical(key)
 
         with self._lock:
             # Check if the released key was part of the hotkey combination
             # and if the hotkey was previously considered pressed
             if self._hotkey_pressed and canonical_key in self._hotkey_combination:
-                 # Check if *any* key from the hotkey combo is still pressed
-                 # This handles cases where modifiers are released after the main key
-                 any_hotkey_key_pressed = any(k in self._pressed_keys for k in self._hotkey_combination if k != canonical_key)
-                 if not any_hotkey_key_pressed:
+                # Check if any key from the hotkey combo is still pressed
+                # This handles cases where modifiers are released after the main key
+                any_hotkey_key_pressed = any(k in self._pressed_keys for k in self._hotkey_combination if k != canonical_key)
+                if not any_hotkey_key_pressed:
                     self._hotkey_pressed = False
                     self._trigger_hotkey_release()
 
@@ -77,18 +101,22 @@ class LinuxX11HotkeyListener(HotkeyListener):
             if canonical_key in self._pressed_keys:
                 self._pressed_keys.remove(canonical_key)
 
-
     def start_listening(self) -> None:
-        """Starts the hotkey listener."""
+        """
+        Starts the hotkey listener.
+        
+        Raises:
+            ValueError: If hotkey is not set before starting listener.
+        """
         if self._listener is not None and self._listener.is_alive():
-            print("Listener already running.")
+            logger.info("Listener already running.")
             return
 
         if self._hotkey_combination is None:
             raise ValueError("Hotkey not set before starting listener.")
 
-        # Ensure pynput uses X11 backend explicitly if needed, though usually automatic
-        # Note: pynput might require DISPLAY environment variable to be set.
+        # Create and initialize the keyboard listener
+        # Note: pynput might require DISPLAY environment variable to be set
         self._listener = keyboard.Listener(
             on_press=self._on_key_press,
             on_release=self._on_key_release,
@@ -97,21 +125,23 @@ class LinuxX11HotkeyListener(HotkeyListener):
         )
 
         # Start the listener's internal thread
-        import threading
         self._listener.start()
-        print('current thread', threading.get_ident())
-        print('listener thread', self._listener.ident)
+        logger.debug(f'Current thread: {threading.get_ident()}')
+        logger.debug(f'Listener thread: {self._listener.ident}')
         assert threading.get_ident() != self._listener.ident, "Listener thread should not be the main thread."
-        print("X11 Hotkey listener started.")
+        logger.info("X11 Hotkey listener started.")
 
     def stop_listening(self) -> None:
-        """Stops the hotkey listener."""
+        """
+        Stops the hotkey listener and cleans up resources.
+        """
         if self._listener and self._listener.is_alive():
-            print("Stopping X11 hotkey listener...")
+            logger.info("Stopping X11 hotkey listener...")
             self._listener.stop()
             assert threading.get_ident() != self._listener.ident, "Listener thread should not be the main thread."
-            self._listener.join() # Wait for the listener thread to finish
-            print("X11 Hotkey listener stopped.")
+            self._listener.join()  # Wait for the listener thread to finish
+            logger.info("X11 Hotkey listener stopped.")
+            
         self._listener = None
         self._pressed_keys.clear()
         self._hotkey_pressed = False

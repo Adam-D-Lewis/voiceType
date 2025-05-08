@@ -34,8 +34,8 @@ def get_platform_listener() -> HotkeyListener:
                 )
 
                 wayland_listener = LinuxWaylandHotkeyListener(
-                    on_press=handle_hotkey_press,
-                    on_release=handle_hotkey_release,
+                    on_hotkey_press=handle_hotkey_press,
+                    on_hotkey_release=handle_hotkey_release,
                 )
                 # Check if the detected DE is actually supported by the Wayland listener
                 # Accessing protected member _de_detected is acceptable here for this check.

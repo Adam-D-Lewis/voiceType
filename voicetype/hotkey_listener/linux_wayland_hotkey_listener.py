@@ -56,10 +56,10 @@ class LinuxWaylandHotkeyListener(HotkeyListener):
 
     def __init__(
         self,
-        on_press: Optional[Callable[[], None]] = None,
-        on_release: Optional[Callable[[], None]] = None,
+        on_hotkey_press: Optional[Callable[[], None]] = None,
+        on_hotkey_release: Optional[Callable[[], None]] = None,
     ):
-        super().__init__(on_press, on_release)
+        super().__init__(on_hotkey_press, on_hotkey_release)
         self._hotkey: Optional[str] = None
         self._bus: Optional[SessionMessageBus] = None
         self._proxy: Optional[ObjectProxy] = None
