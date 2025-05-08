@@ -98,21 +98,9 @@ class Voice:
                 f"Device '{device_name}' not found. Available input devices: {available_names}"
             )
         else:
-            # Return default input device ID if available
-            try:
-                default_device_id = self.sd.default.device[0] # 0 is input index
-                if default_device_id != -1 and devices[default_device_id]["max_input_channels"] > 0:
-                     logger.debug(f"Using default input device: {devices[default_device_id]['name']} (ID: {default_device_id})")
-                     return default_device_id
-                else: # Default is invalid or not an input device
-                    logger.debug("Warning: Default input device is invalid or not found.")
-            except Exception as e:
-                 logger.debug(f"Warning: Could not get default input device ({e}).")
-
-            # Fallback: return the first available input device
-            first_input_id, first_input_device = input_devices[0]
-            logger.debug(f"Falling back to first available input device: {first_input_device['name']} (ID: {first_input_id})")
-            return first_input_id
+            # No specific device name provided, return None to let sounddevice pick the default input device.
+            logger.debug("No specific device name provided; sounddevice will use the system's default input device.")
+            return None
 
 
     def callback(self, indata, frames, time_info, status):
