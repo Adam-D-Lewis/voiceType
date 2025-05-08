@@ -20,7 +20,7 @@ Type with your voice.
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-username/voicetype.git # Replace with the actual URL if different
+    git clone https://github.com/Adam-D-Lewis/voicetype.git
     cd voicetype
     ```
 
