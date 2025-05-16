@@ -64,7 +64,6 @@ class LinuxX11HotkeyListener(HotkeyListener):
             return
             
         with self._lock:
-            # logger.debug(f"Key pressed: {key}")
             # Ensure key equality works despite modifier state
             canonical_key = self._listener.canonical(key)
             self._pressed_keys.add(canonical_key)
