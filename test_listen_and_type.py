@@ -32,9 +32,12 @@ def on_release(key):
         print("Hotkey released - Recording stopped.")
         # Simulate transcription and typing
         print(f"Typing: '{TEXT_TO_TYPE}'")
-        time.sleep(0.1) # Small delay before typing
+        # time.sleep(0.1) # Small delay before typing
         try:
-            keyboard_controller.type(TEXT_TO_TYPE)
+            for char in TEXT_TO_TYPE:
+                keyboard_controller.press(char)
+                keyboard_controller.release(char)
+                time.sleep(0.01)
             print("Typing complete.")
         except Exception as e:
             print(f"Error during typing: {e}")
