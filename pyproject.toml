@@ -34,7 +34,7 @@ include = ["voicetype*"]
 
 [tool.ruff]
 select = ["ALL"]
-# Ignore line too long, because due to black the error can only occure for strings
+# Ignore line too long, because due to black the error can only occur for strings
 ignore = ["E501"]
 fix = true
 
