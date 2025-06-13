@@ -46,4 +46,3 @@ Create a tool that, when a configurable hotkey is pressed, captures audio from t
 ## Architecture Notes
 - Hotkey detection, text injection, and feedback mechanisms should be abstracted behind a platform interface, with platform-specific implementations for Linux, Windows, and Mac.
 - Audio capture and speech-to-text logic should be platform-independent, using cross-platform libraries where possible.
-

@@ -2,17 +2,18 @@ import time
 
 from pynput.keyboard import Controller
 
+
 def type_text(text):
     keyboard = Controller()
-    
+
     # Type each character in the text
     for char in text:
         keyboard.tap(char)
         time.sleep(0.001)  # Adjust the delay between keypresses if needed  # noqa: F821
 
     # Press Enter key at the end
-    keyboard.press('\n')
-    keyboard.release('\n')
+    keyboard.press("\n")
+    keyboard.release("\n")
 
 
 # def play_audio(filename):
@@ -54,7 +55,7 @@ def type_text(text):
 # def make_sound_thread(filepath):
 #     sound_file_path = str(filepath)
 #     thread = Thread(
-#         target=play_audio, 
+#         target=play_audio,
 #         args=(sound_file_path,)
 #     )
 #     return thread

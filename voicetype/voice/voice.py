@@ -8,9 +8,9 @@ import time
 import warnings
 
 import numpy as np
+from aider.llm import litellm
 from loguru import logger
 
-from aider.llm import litellm
 from voicetype.settings import VoiceSettings
 from voicetype.voice.dump import dump  # noqa: F401
 

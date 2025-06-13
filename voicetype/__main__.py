@@ -1,15 +1,15 @@
+import logging
+import os
+import platform
 import queue
 import time
-import logging
-import platform
-import os
-from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
-from voicetype.voice.voice import Voice
-from voicetype.utils import type_text  # play_audio,
-from voicetype.sounds import START_RECORD_SOUND, ERROR_SOUND
-from voicetype.settings import settings
 
-from voicetype.globals import hotkey_listener, voice, is_recording, typing_queue
+from voicetype.globals import hotkey_listener, is_recording, typing_queue, voice
+from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
+from voicetype.settings import settings
+from voicetype.sounds import ERROR_SOUND, START_RECORD_SOUND
+from voicetype.utils import type_text  # play_audio,
+from voicetype.voice.voice import Voice
 
 # Basic Logging Setup
 logging.basicConfig(

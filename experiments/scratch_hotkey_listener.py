@@ -5,6 +5,7 @@ chosen_hotkey_global = None
 # Global variable to store the main listener instance (to use its .canonical() method)
 main_listener_instance_global = None
 
+
 def set_hotkey_from_text(hotkey_string):
     """
     Parses a hotkey string representing a SINGLE key (e.g., "a", "<space>", "<f1>", "<pause>")
@@ -29,24 +30,35 @@ def set_hotkey_from_text(hotkey_string):
             single_key = list(parsed_keys)[0]  # Extract the single key
             # This key is already in its canonical form thanks to HotKey.parse().
             chosen_hotkey_global = single_key
-            print(f"Hotkey has been successfully set to: {chosen_hotkey_global} (Type: {type(chosen_hotkey_global)})")
+            print(
+                f"Hotkey has been successfully set to: {chosen_hotkey_global} (Type: {type(chosen_hotkey_global)})"
+            )
             return True
         else:
             # This case means the string was a combination (e.g., "<ctrl>+s"),
             # empty, or otherwise not representing a single key.
-            print(f"Error: Hotkey string '{hotkey_string}' (parsed as {parsed_keys}) does not represent a single key.")
-            print("Please provide a string for one key, e.g., 'a', '<f1>', or '<pause>'.")
+            print(
+                f"Error: Hotkey string '{hotkey_string}' (parsed as {parsed_keys}) does not represent a single key."
+            )
+            print(
+                "Please provide a string for one key, e.g., 'a', '<f1>', or '<pause>'."
+            )
             chosen_hotkey_global = None
             return False
 
-    except ValueError as ve: # HotKey.parse can raise ValueError for badly formed strings
+    except (
+        ValueError
+    ) as ve:  # HotKey.parse can raise ValueError for badly formed strings
         print(f"Error parsing hotkey string '{hotkey_string}': {ve}")
         chosen_hotkey_global = None
         return False
-    except Exception as e: # Catch any other unexpected errors
-        print(f"An unexpected error occurred while parsing or setting hotkey from string '{hotkey_string}': {e}")
+    except Exception as e:  # Catch any other unexpected errors
+        print(
+            f"An unexpected error occurred while parsing or setting hotkey from string '{hotkey_string}': {e}"
+        )
         chosen_hotkey_global = None
         return False
+
 
 def main_on_press_callback(key):
     """
@@ -57,9 +69,9 @@ def main_on_press_callback(key):
 
     if chosen_hotkey_global is None:
         # Hotkey not set, optionally handle other keys or do nothing
-        if key == keyboard.Key.esc: # Example: allow Esc to exit even if no hotkey
+        if key == keyboard.Key.esc:  # Example: allow Esc to exit even if no hotkey
             print("ESC pressed. Exiting...")
-            return False # Stop the listener
+            return False  # Stop the listener
         return
 
     if main_listener_instance_global is None:
@@ -86,13 +98,14 @@ def main_on_press_callback(key):
     # Allow Esc to always exit the main listener, regardless of hotkey match
     if key == keyboard.Key.esc:
         print("ESC pressed. Exiting main listener...")
-        return False # Stop the listener
+        return False  # Stop the listener
+
 
 def start_main_listener():
     """
     Starts the main keyboard listener that listens for the selected hotkey.
     """
-    global main_listener_instance_global # To store the listener instance
+    global main_listener_instance_global  # To store the listener instance
 
     if chosen_hotkey_global is None:
         print("Cannot start main listener: No hotkey has been set.")
@@ -103,17 +116,20 @@ def start_main_listener():
     print("Press ESC to stop the listener at any time.")
 
     with keyboard.Listener(on_press=main_on_press_callback) as listener:
-        main_listener_instance_global = listener # Store the instance for use in the callback
+        main_listener_instance_global = (
+            listener  # Store the instance for use in the callback
+        )
         try:
-            listener.join() # Block execution until the listener stops
+            listener.join()  # Block execution until the listener stops
         except Exception as e:
             print(f"An error occurred in the main listener: {e}")
         finally:
             main_listener_instance_global = None
-    
+
     print("Main listener has stopped.")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # 1. Get the hotkey string from the user
     hotkey_text_input = input(
         "Enter the hotkey text (e.g., 's' for S key, '<f1>' for F5, '<space>', '<pause>'): "

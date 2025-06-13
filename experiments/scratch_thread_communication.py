@@ -1,12 +1,14 @@
+import queue
 import threading
 import time
-import queue
+
 from pynput import keyboard
 
 # Use a thread-safe queue for communication
 key_queue = queue.Queue()
 # Use an Event to signal the listener thread to stop
 stop_event = threading.Event()
+
 
 def on_press(key):
     """Callback function executed when a key is pressed."""
@@ -19,21 +21,25 @@ def on_press(key):
         # print(f"Listener Thread: Putting special key '{key}' onto queue.") # Optional debug print
 
     if key_info:
-        key_queue.put(key_info) # Send the key info back to the main thread
+        key_queue.put(key_info)  # Send the key info back to the main thread
 
     # Check if the main thread has signaled to stop
     if stop_event.is_set():
         print("Listener Thread: Stop event detected, stopping listener...")
-        key_queue.put(None) # Send a sentinel value to unblock the main thread's get()
-        return False # Stop the listener
+        key_queue.put(None)  # Send a sentinel value to unblock the main thread's get()
+        return False  # Stop the listener
+
 
 def keyboard_listener_thread():
     """Function running in the separate thread."""
     print("Listener Thread: Starting keyboard listener...")
     with keyboard.Listener(on_press=on_press) as listener:
-        print("Listener Thread: Listener started, waiting for stop signal or key events.")
-        listener.join() # Blocks here until the listener stops
+        print(
+            "Listener Thread: Listener started, waiting for stop signal or key events."
+        )
+        listener.join()  # Blocks here until the listener stops
     print("Listener Thread: Listener stopped and thread exiting.")
+
 
 # --- Main Thread ---
 print("Main Thread: Starting.")
@@ -51,11 +57,11 @@ try:
         try:
             # Wait for a key from the listener thread (blocks if queue is empty)
             # Add a timeout to allow checking for KeyboardInterrupt periodically
-            key_data = key_queue.get(timeout=0.5) # Timeout after 0.5 seconds
+            key_data = key_queue.get(timeout=0.5)  # Timeout after 0.5 seconds
 
-            if key_data is None: # Check for the sentinel value
+            if key_data is None:  # Check for the sentinel value
                 print("Main Thread: Received stop signal from queue. Exiting loop.")
-                break # Exit the loop cleanly
+                break  # Exit the loop cleanly
 
             # Process the key data received from the listener
             print(f"Main Thread: Received data - {key_data}")
@@ -81,7 +87,7 @@ finally:
     try:
         key_queue.put_nowait(None)
     except queue.Full:
-        pass # Queue might be full if already stopped, that's okay.
+        pass  # Queue might be full if already stopped, that's okay.
 
     print("Main Thread: Waiting for listener thread to finish...")
     listener_thread.join(timeout=2)

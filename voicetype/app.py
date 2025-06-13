@@ -1,12 +1,12 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import List, Union
 
-from fastapi import Depends, FastAPI, HTTPException
-from .utils import type_text #, play_audio,make_sound_thread
-from pathlib import Path
 import speech_recognition as sr
+from fastapi import Depends, FastAPI, HTTPException
 
 from .sounds import ERROR_SOUND, START_RECORD_SOUND
+from .utils import type_text  # , play_audio,make_sound_thread
 
 _HERE = Path(__file__).resolve().parent
 
@@ -15,9 +15,10 @@ _HERE = Path(__file__).resolve().parent
 source = None
 recognizer = None
 
+
 def initialize():
     global source, recognizer
-    print('Initializing...')
+    print("Initializing...")
     # List all microphone names
     mic_list = sr.Microphone.list_microphone_names()
     working_mic_list = sr.Microphone.list_working_microphones()
@@ -27,7 +28,7 @@ def initialize():
 
     for index, mic_list_index in enumerate(working_mic_list):
         print(f"Working Microphone {index}: {mic_list[mic_list_index]}")
-    
+
     # index = mic_list.index("sysdefault")
     # index = mic_list.index("spdif")
     try:
@@ -36,13 +37,13 @@ def initialize():
         index = mic_list.index("USB Audio Device: - (hw:0,0)")
     print(index)
     # breakpoint()
-    
+
     # for i in range(len(mic_list)):
     # try:
-    
+
     source = sr.Microphone(device_index=index)
     recognizer = sr.Recognizer()
-    
+
     # Adjust ambient noise threshold, if needed
     # breakpoint()
     with source:
@@ -57,8 +58,9 @@ def initialize():
 
 def finalize():
     global source, recognizer
-    print('Finalizing...')
+    print("Finalizing...")
     del source, recognizer
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -68,41 +70,38 @@ async def lifespan(app: FastAPI):
     finally:
         finalize()
 
+
 app = FastAPI(lifespan=lifespan)
 
 
-def main(): 
+def main():
     global source, recognizer
     with source:
-        print('playing START_RECORD_SOUND')
+        print("playing START_RECORD_SOUND")
         make_sound_thread(START_RECORD_SOUND).start()
 
         # Record the audio
         print("Listening...")
-        audio = recognizer.listen(
-            source, 
-            timeout=5, 
-            phrase_time_limit=10
-        )
-        print('done listening')
+        audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)
+        print("done listening")
         try:
             # Perform speech recognition
             # text = recognizer.recognize_google(audio)
-            text = recognizer.recognize_whisper(audio, model='large-v3') # base.en, tiny.en, large-v3
+            text = recognizer.recognize_whisper(
+                audio, model="large-v3"
+            )  # base.en, tiny.en, large-v3
 
             # Print the recognized text
             print("Detected Speech:", text)
             type_text(text)
-            
+
         except sr.UnknownValueError as e:
             make_sound_thread(ERROR_SOUND).start()
             print("Unable to recognize speech")
-            with open(_HERE.joinpath('error_log.txt'), "a") as error_file:
-                error_file.write(str(e) + '\n')
-
+            with open(_HERE.joinpath("error_log.txt"), "a") as error_file:
+                error_file.write(str(e) + "\n")
 
 
 @app.get("/")
 def voice_type():
     return main()
-
