@@ -1,0 +1,70 @@
+# pre-commit is a tool to perform a predefined set of tasks manually and/or
+# automatically before git commits are made.
+#
+# Config reference: https://pre-commit.com/#pre-commit-configyaml---top-level
+#
+# Common tasks
+#
+# - Register git hooks: pre-commit install --install-hooks
+# - Run on all files:   pre-commit run --all-files
+#
+# These pre-commit hooks are run as CI.
+#
+# NOTE: if it can be avoided, add configs/args in pyproject.toml or below instead of creating a new `.config.file`.
+# https://pre-commit.ci/#configuration
+
+repos:
+  # general
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+        exclude: "^docs-sphinx/cli.html"
+      - id: trailing-whitespace
+        exclude: "^docs-sphinx/cli.html"
+      - id: check-json
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-toml
+      # Lint: Checks that non-binary executables have a proper shebang.
+      - id: check-executables-have-shebangs
+        exclude: "^src/_nebari/template/"
+
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.30.0
+    hooks:
+      - id: typos
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        args:
+          [
+            "--write",
+          ]
+        language: python
+        additional_dependencies:
+        - tomli
+
+  # python
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        args: ["--line-length=88", "--exclude=/src/_nebari/template/"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.9
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+
+  - repo: https://github.com/pycqa/isort
+    rev: 6.0.1
+    hooks:
+      - id: isort
+        name: isort
+        additional_dependencies: [toml]
+        files: \.py$
+        args: ["--profile", "black"]

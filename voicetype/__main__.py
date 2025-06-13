@@ -5,8 +5,9 @@ import platform
 import os
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 from voicetype.voice.voice import Voice
-from voicetype.utils import type_text # play_audio, 
+from voicetype.utils import type_text  # play_audio,
 from voicetype.sounds import START_RECORD_SOUND, ERROR_SOUND
+from voicetype.settings import settings
 
 from voicetype.globals import hotkey_listener, voice, is_recording, typing_queue
 
@@ -14,9 +15,6 @@ from voicetype.globals import hotkey_listener, voice, is_recording, typing_queue
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-
-# TODO: Add configuration loading here (hotkey, model, etc.)
-HOTKEY = "<pause>"
 
 
 def get_platform_listener() -> HotkeyListener:
@@ -114,8 +112,12 @@ def handle_hotkey_release():
 
         try:
             # TODO: Get audio data from the stream and pass to voice.transcribe()
-            recording_file =voice.stop_recording()  # Placeholder for actual stop recording
-            text = voice.transcribe(recording_file)  # Placeholder for actual transcription
+            recording_file = (
+                voice.stop_recording()
+            )  # Placeholder for actual stop recording
+            text = voice.transcribe(
+                recording_file
+            )  # Placeholder for actual transcription
 
             # transcribed_text = voice.transcribe(audio_data) # Placeholder
             transcribed_text = text
@@ -141,12 +143,12 @@ def main():
     logging.info("Starting VoiceType application...")
 
     try:
-        voice = Voice()  # Initialize audio processing class
+        voice = Voice(settings=settings.voice)  # Initialize audio processing class
         hotkey_listener = get_platform_listener()  # Get the platform-specific listener
-        hotkey_listener.set_hotkey(HOTKEY)  # Configure the hotkey
+        hotkey_listener.set_hotkey(settings.hotkey.hotkey)  # Configure the hotkey
         hotkey_listener.start_listening()  # Start listening in a background thread
 
-        logging.info(f"Intended hotkey: {HOTKEY}")
+        logging.info(f"Intended hotkey: {settings.hotkey.hotkey}")
         logging.info("Press Ctrl+C to exit.")
         # --- End Placeholder ---
 

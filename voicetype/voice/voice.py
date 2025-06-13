@@ -1,30 +1,28 @@
 # import math # No longer needed directly
 import os
-import sys # For stderr output
 import queue
-import threading
+import sys  # For stderr output
 import tempfile
+import threading
 import time
 import warnings
-import numpy as np
 
+import numpy as np
 from loguru import logger
 
-# Remove prompt_toolkit as it's no longer used for blocking input
-# from prompt_toolkit.shortcuts import prompt
-
 from aider.llm import litellm
-
+from voicetype.settings import VoiceSettings
 from voicetype.voice.dump import dump  # noqa: F401
 
 warnings.filterwarnings(
-    "ignore", message="Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work"
+    "ignore",
+    message="Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work",
 )
 warnings.filterwarnings("ignore", category=SyntaxWarning)
 
 
-from pydub import AudioSegment  # noqa
-from pydub.exceptions import CouldntDecodeError, CouldntEncodeError  # noqa
+from pydub import AudioSegment
+from pydub.exceptions import CouldntDecodeError, CouldntEncodeError
 
 try:
     import soundfile as sf
@@ -41,14 +39,16 @@ class Voice:
     min_rms = 1e5
     pct = 0.0  # Initialize pct
 
-    threshold = 0.15 # Threshold for RMS visualization (if needed later)
+    threshold = 0.15  # Threshold for RMS visualization (if needed later)
 
-    def __init__(self, audio_format="wav", device_name=None):
+    def __init__(self, settings: VoiceSettings, audio_format="wav", device_name=None):
+        self.settings = settings
         if sf is None:
             raise SoundDeviceError("SoundFile library not available.")
         try:
             logger.debug("Initializing sound device...")
             import sounddevice as sd
+
             self.sd = sd
         except (OSError, ModuleNotFoundError) as e:
             raise SoundDeviceError(f"SoundDevice library error: {e}")
@@ -65,7 +65,9 @@ class Voice:
             self.sample_rate = int(device_info["default_samplerate"])
             logger.debug(f"Using sample rate: {self.sample_rate} Hz")
         except (TypeError, ValueError, KeyError) as e:
-            logger.debug(f"Warning: Could not query default sample rate ({e}), falling back to 16kHz.")
+            logger.debug(
+                f"Warning: Could not query default sample rate ({e}), falling back to 16kHz."
+            )
             self.sample_rate = 16000
         except self.sd.PortAudioError as e:
             raise SoundDeviceError(f"PortAudio error querying device: {e}")
@@ -76,7 +78,9 @@ class Voice:
         self.temp_wav = None
         self.is_recording = False
         self.start_time = None
-        self._stop_event = threading.Event() # Used to signal the callback to stop processing
+        self._stop_event = (
+            threading.Event()
+        )  # Used to signal the callback to stop processing
 
     def _find_device_id(self, device_name):
         """Helper to find the input device ID."""
@@ -84,7 +88,9 @@ class Voice:
         if not devices:
             raise SoundDeviceError("No audio devices found.")
 
-        input_devices = [(i, d) for i, d in enumerate(devices) if d["max_input_channels"] > 0]
+        input_devices = [
+            (i, d) for i, d in enumerate(devices) if d["max_input_channels"] > 0
+        ]
         if not input_devices:
             raise SoundDeviceError("No audio input devices found.")
 
@@ -99,16 +105,17 @@ class Voice:
             )
         else:
             # No specific device name provided, return None to let sounddevice pick the default input device.
-            logger.debug("No specific device name provided; sounddevice will use the system's default input device.")
+            logger.debug(
+                "No specific device name provided; sounddevice will use the system's default input device."
+            )
             return None
-
 
     def callback(self, indata, frames, time_info, status):
         """This is called (from a separate thread) for each audio block."""
         if status:
             logger.debug(f"Audio callback status: {status}", file=sys.stderr)
-        if self._stop_event.is_set(): # Check if stop signal received
-             raise self.sd.CallbackStop # Signal sounddevice to stop the callback chain
+        if self._stop_event.is_set():  # Check if stop signal received
+            raise self.sd.CallbackStop  # Signal sounddevice to stop the callback chain
         try:
             rms = np.sqrt(np.mean(indata**2))
             # Update RMS tracking (optional, could be used for visual feedback)
@@ -119,7 +126,7 @@ class Voice:
             if rng > 0.001:
                 self.pct = (rms - self.min_rms) / rng
             else:
-                self.pct = 0.5 # Avoid division by zero if range is tiny
+                self.pct = 0.5  # Avoid division by zero if range is tiny
 
             self.q.put(indata.copy())
         except Exception as e:
@@ -137,10 +144,10 @@ class Voice:
             return
 
         logger.debug("Starting recording...")
-        self.max_rms = 0 # Reset RMS tracking
+        self.max_rms = 0  # Reset RMS tracking
         self.min_rms = 1e5
         self.pct = 0.0
-        self._stop_event.clear() # Ensure stop event is clear
+        self._stop_event.clear()  # Ensure stop event is clear
 
         try:
             self.temp_wav = tempfile.mktemp(suffix=".wav")
@@ -158,13 +165,13 @@ class Voice:
             self.is_recording = True
             logger.debug(f"Recording started, saving to {self.temp_wav}")
         except self.sd.PortAudioError as e:
-            self.is_recording = False # Ensure state is correct
+            self.is_recording = False  # Ensure state is correct
             if self.audio_file:
                 self.audio_file.close()
                 self.audio_file = None
             if os.path.exists(self.temp_wav):
-                 os.remove(self.temp_wav)
-                 self.temp_wav = None
+                os.remove(self.temp_wav)
+                self.temp_wav = None
             raise SoundDeviceError(f"Failed to start audio stream: {e}")
         except Exception as e:
             self.is_recording = False
@@ -172,10 +179,10 @@ class Voice:
                 self.audio_file.close()
                 self.audio_file = None
             if self.temp_wav and os.path.exists(self.temp_wav):
-                 os.remove(self.temp_wav)
-                 self.temp_wav = None
+                os.remove(self.temp_wav)
+                self.temp_wav = None
             logger.debug(f"An unexpected error occurred during start_recording: {e}")
-            raise # Re-raise the exception
+            raise  # Re-raise the exception
 
     def stop_recording(self):
         """Stops recording audio and returns the path to the saved WAV file."""
@@ -185,7 +192,7 @@ class Voice:
 
         logger.debug("Stopping recording...")
         time.sleep(0.25)  # Some expected recording gets lost if we don't wait a bit
-        self._stop_event.set() # Signal callback to stop processing queue
+        self._stop_event.set()  # Signal callback to stop processing queue
 
         if self.stream:
             try:
@@ -195,22 +202,23 @@ class Voice:
             except self.sd.PortAudioError as e:
                 logger.debug(f"Warning: PortAudioError stopping/closing stream: {e}")
             except Exception as e:
-                 logger.debug(f"Warning: Unexpected error stopping/closing stream: {e}")
+                logger.debug(f"Warning: Unexpected error stopping/closing stream: {e}")
             finally:
                 self.stream = None
 
         # Process any remaining items in the queue after stopping the stream
-        logger.debug(f"Processing remaining audio data (queue size: {self.q.qsize()})...")
+        logger.debug(
+            f"Processing remaining audio data (queue size: {self.q.qsize()})..."
+        )
         while not self.q.empty():
             try:
                 data = self.q.get_nowait()
                 if self.audio_file and not self.audio_file.closed:
                     self.audio_file.write(data)
             except queue.Empty:
-                break # Should not happen with while not self.q.empty()
+                break  # Should not happen with while not self.q.empty()
             except Exception as e:
-                 logger.debug(f"Error writing remaining audio data: {e}")
-
+                logger.debug(f"Error writing remaining audio data: {e}")
 
         if self.audio_file:
             try:
@@ -222,7 +230,7 @@ class Voice:
                 self.audio_file = None
 
         recorded_filename = self.temp_wav
-        self.temp_wav = None # Clear temp path
+        self.temp_wav = None  # Clear temp path
         self.is_recording = False
         self.start_time = None
         logger.debug("Recording stopped.")
@@ -230,6 +238,25 @@ class Voice:
 
     def transcribe(self, filename, history=None, language=None):
         """Transcribes the audio file using the configured model."""
+        provider = self.settings.provider
+        logger.info(f"Using '{provider}' provider for transcription.")
+
+        if provider == "litellm":
+            return self._transcribe_with_litellm(filename, history, language)
+        elif provider == "local":
+            return self._transcribe_with_local(filename, history, language)
+        else:
+            raise NotImplementedError(f"Provider '{provider}' is not supported.")
+
+    def _transcribe_with_local(self, filename, history, language):
+        # A placeholder for a future local implementation.
+        logger.warning(
+            "Local provider is not yet implemented. Returning placeholder text."
+        )
+        return "Local transcription result."
+
+    def _transcribe_with_litellm(self, filename, history=None, language=None):
+        """Transcribes the audio file using the litellm provider."""
         if not filename or not os.path.exists(filename):
             logger.debug(f"Error: Audio file not found or invalid: {filename}")
             return None
@@ -241,7 +268,9 @@ class Voice:
         # Check file size and offer to convert if too large and format is wav
         file_size = os.path.getsize(filename)
         if file_size > 24.9 * 1024 * 1024 and self.audio_format == "wav":
-            logger.debug(f"\nWarning: {filename} ({file_size / (1024*1024):.1f} MB) may be too large for some APIs, converting to mp3.")
+            logger.debug(
+                f"\nWarning: {filename} ({file_size / (1024 * 1024):.1f} MB) may be too large for some APIs, converting to mp3."
+            )
             use_audio_format = "mp3"
 
         # Convert if necessary
@@ -255,13 +284,19 @@ class Voice:
                 # Keep original wav for now, transcribe the converted file
                 final_filename = new_filename
             except (CouldntDecodeError, CouldntEncodeError) as e:
-                logger.debug(f"Error converting audio to {use_audio_format}: {e}. Will attempt transcription with original WAV.")
-                final_filename = filename # Fallback to original wav
+                logger.debug(
+                    f"Error converting audio to {use_audio_format}: {e}. Will attempt transcription with original WAV."
+                )
+                final_filename = filename  # Fallback to original wav
             except (OSError, FileNotFoundError) as e:
-                logger.debug(f"File system error during conversion: {e}. Will attempt transcription with original WAV.")
+                logger.debug(
+                    f"File system error during conversion: {e}. Will attempt transcription with original WAV."
+                )
                 final_filename = filename
             except Exception as e:
-                logger.debug(f"Unexpected error during audio conversion: {e}. Will attempt transcription with original WAV.")
+                logger.debug(
+                    f"Unexpected error during audio conversion: {e}. Will attempt transcription with original WAV."
+                )
                 final_filename = filename
 
         # Transcribe
@@ -275,23 +310,28 @@ class Voice:
                 logger.debug("Transcription successful.")
         except Exception as err:
             logger.debug(f"Error during transcription of {final_filename}: {err}")
-            transcript_text = None # Ensure it's None on error
+            transcript_text = None  # Ensure it's None on error
 
         # Cleanup
-        if final_filename != filename: # If conversion happened, remove the converted file
+        if (
+            final_filename != filename
+        ):  # If conversion happened, remove the converted file
             try:
                 # os.remove(final_filename)
                 logger.debug(f"Cleaned up temporary converted file: {final_filename}")
             except OSError as e:
-                logger.debug(f"Warning: Could not remove temporary converted file {final_filename}: {e}")
+                logger.debug(
+                    f"Warning: Could not remove temporary converted file {final_filename}: {e}"
+                )
 
         # Always remove the original temporary WAV file
         try:
             # os.remove(filename)
             logger.debug(f"Cleaned up original recording file: {filename}")
         except OSError as e:
-            logger.debug(f"Warning: Could not remove original recording file {filename}: {e}")
-
+            logger.debug(
+                f"Warning: Could not remove original recording file {filename}: {e}"
+            )
 
         return transcript_text
 
@@ -301,47 +341,64 @@ if __name__ == "__main__":
     # Add more verbose logging
     logger.remove()
     logger.add(sys.stderr, level="DEBUG")
-    
+
     # Parse command line arguments for device selection
     import argparse
+
     parser = argparse.ArgumentParser(description="Record and transcribe audio.")
-    parser.add_argument("--device", "-d", type=int, help="Device ID to use for recording")
-    parser.add_argument("--list", "-l", action="store_true", help="List available audio devices and exit")
-    parser.add_argument("--timeout", "-t", type=int, default=5, help="Recording duration in seconds")
+    parser.add_argument(
+        "--device", "-d", type=int, help="Device ID to use for recording"
+    )
+    parser.add_argument(
+        "--list",
+        "-l",
+        action="store_true",
+        help="List available audio devices and exit",
+    )
+    parser.add_argument(
+        "--timeout", "-t", type=int, default=5, help="Recording duration in seconds"
+    )
     args = parser.parse_args()
-    
+
     # Set OpenAI API key
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        logger.warning("OPENAI_API_KEY environment variable not set. Setting to placeholder for testing.")
+        logger.warning(
+            "OPENAI_API_KEY environment variable not set. Setting to placeholder for testing."
+        )
         os.environ["OPENAI_API_KEY"] = "sk-placeholder-for-testing"
-    
+
     try:
         # Show available input devices to help with troubleshooting
         import sounddevice as sd
+
         logger.info("Available audio input devices:")
         devices = sd.query_devices()
         for i, device in enumerate(devices):
-            if device['max_input_channels'] > 0:
-                logger.info(f"  Device {i}: {device['name']} (inputs: {device['max_input_channels']})")
-        
+            if device["max_input_channels"] > 0:
+                logger.info(
+                    f"  Device {i}: {device['name']} (inputs: {device['max_input_channels']})"
+                )
+
         if args.list:
             # Exit after listing devices if --list argument is provided
             logger.info("Exiting after listing devices.")
             sys.exit(0)
-            
+
         # Initialize with chosen device or default
         device_id = args.device
         if device_id is not None:
             # Check if device ID is valid
             try:
                 device_info = sd.query_devices(device_id)
-                if device_info['max_input_channels'] == 0:
+                if device_info["max_input_channels"] == 0:
                     logger.error(f"Device {device_id} has no input channels.")
                     sys.exit(1)
-                logger.info(f"\nInitializing Voice with specified device {device_id}: {device_info['name']}...")
+                logger.info(
+                    f"\nInitializing Voice with specified device {device_id}: {device_info['name']}..."
+                )
                 # Get device name to pass to Voice initializer
-                device_name = device_info['name']
+                device_name = device_info["name"]
                 voice = Voice(device_name=device_name)
             except (sd.PortAudioError, KeyError) as e:
                 logger.error(f"Invalid device ID {device_id}: {e}")
@@ -349,7 +406,7 @@ if __name__ == "__main__":
         else:
             logger.info("\nInitializing Voice with default device...")
             voice = Voice()
-        
+
         # Start recording
         logger.info("Starting recording...")
         voice.start_recording()
@@ -357,7 +414,7 @@ if __name__ == "__main__":
         # Record for the specified duration
         logger.info(f"Recording for {args.timeout} seconds...")
         for i in range(args.timeout):
-            logger.info(f"Recording: {i+1} seconds")
+            logger.info(f"Recording: {i + 1} seconds")
             time.sleep(1)
 
         # Stop recording and get the filename
@@ -371,16 +428,18 @@ if __name__ == "__main__":
                 with sf.SoundFile(audio_filename) as f:
                     duration = len(f) / f.samplerate
                     logger.info(f"Audio file duration: {duration:.2f} seconds")
-                    
+
                     # Get audio data stats to check if it's blank
                     data = f.read()
                     max_amplitude = np.max(np.abs(data))
                     rms = np.sqrt(np.mean(data**2))
                     logger.info(f"Max amplitude: {max_amplitude:.6f}, RMS: {rms:.6f}")
-                    
+
                     if max_amplitude < 0.01:
-                        logger.warning("WARNING: Audio file appears to be blank or nearly silent!")
-                    
+                        logger.warning(
+                            "WARNING: Audio file appears to be blank or nearly silent!"
+                        )
+
                     # Play it back so you can hear it
                     logger.info("Playing back audio...")
                     sd.play(data, f.samplerate)
@@ -403,10 +462,13 @@ if __name__ == "__main__":
 
     except SoundDeviceError as e:
         logger.error(f"\nSound device error: {e}")
-        logger.error("Please ensure you have a working audio input device and necessary libraries.")
+        logger.error(
+            "Please ensure you have a working audio input device and necessary libraries."
+        )
     except ValueError as e:
         logger.error(f"\nConfiguration error: {e}")
     except Exception as e:
         logger.error(f"\nAn unexpected error occurred: {e}")
         import traceback
+
         logger.error(traceback.format_exc())
