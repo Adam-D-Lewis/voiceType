@@ -25,6 +25,11 @@ dynamic = ["version"]
 [project.scripts]
 voicetype = "voicetype.__main__:main"
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pre-commit",
+]
 [tool.setuptools.packages.find]
 include = ["voicetype*"]
 
