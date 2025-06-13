@@ -14,7 +14,6 @@ dependencies = [
     "loguru",
     "pystray",
     "prompt_toolkit",
-    # "aider-chat",  # TODO: Remove after extracting voice stuff
     "dasbus", # wayland
     # "pygame",  # for sound
     "playsound3",        # for sound
