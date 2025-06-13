@@ -40,8 +40,3 @@ fix = true
 
 [tool.ruff.lint]
 select = ["I"]
-# extend-select = ["I"]
-
-[tool.ruff.per-file-ignores]
-# ignore unused imports in __init__.py files
-"__init__.py" = ["F401"]
