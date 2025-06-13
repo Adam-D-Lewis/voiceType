@@ -4,11 +4,6 @@ from typing import List, Union
 from fastapi import Depends, FastAPI, HTTPException
 from .utils import type_text #, play_audio,make_sound_thread
 from pathlib import Path
-import sys
-import logging
-import fastapi
-logging.warn(fastapi.__file__)
-logging.warn(sys.executable)
 import speech_recognition as sr
 
 from .sounds import ERROR_SOUND, START_RECORD_SOUND

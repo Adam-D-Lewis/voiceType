@@ -1,20 +1,14 @@
-from threading import Thread
-import wave
+import time
 
-# import pyaudio
 from pynput.keyboard import Controller
 
 def type_text(text):
     keyboard = Controller()
-
-    # Give some time for the user to focus on the input field
-    # time.sleep(2)
-
+    
     # Type each character in the text
     for char in text:
-        keyboard.press(char)
-        keyboard.release(char)
-        # time.sleep(0.1)  # Adjust the delay between keypresses if needed
+        keyboard.tap(char)
+        time.sleep(0.001)  # Adjust the delay between keypresses if needed  # noqa: F821
 
     # Press Enter key at the end
     keyboard.press('\n')

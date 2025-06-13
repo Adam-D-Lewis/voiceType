@@ -13,12 +13,12 @@ dependencies = [
     "fastapi>=0.93.0",
     "uvicorn",
     # "pyaudio",  # was causing me problems with audio
-    "pynput",
+    "pynput @ git+https://github.com/Adam-D-Lewis/pynput@26fe001ada956c0ad023ea0e3aa3c7dded3526ad",
     "speechrecognition",
     "loguru",
     "pystray",
     "prompt_toolkit",
-    "aider-chat",  # TODO: Remove after extracting voice stuff
+    # "aider-chat",  # TODO: Remove after extracting voice stuff
     "dasbus",  # wayland
     # "pygame",  # for sound
     "playsound3", # for sound
