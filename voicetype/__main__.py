@@ -17,11 +17,6 @@ from voicetype.voice.voice import Voice
 HERE = Path(__file__).resolve().parent
 SOUNDS_DIR = HERE / "sounds"
 
-# Basic Logging Setup
-logger.basicConfig(
-    level=logger.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-
 
 def get_platform_listener() -> HotkeyListener:
     """Detects the platform and display server/session type, then returns the appropriate listener."""
