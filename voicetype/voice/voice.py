@@ -11,7 +11,7 @@ import numpy as np
 from aider.llm import litellm
 from loguru import logger
 
-from voicetype.settings import VoiceSettings
+from voicetype.settings import VoiceSettings, VoiceSettingsProvider
 from voicetype.voice.dump import dump  # noqa: F401
 
 warnings.filterwarnings(
@@ -241,9 +241,9 @@ class Voice:
         provider = self.settings.provider
         logger.info(f"Using '{provider}' provider for transcription.")
 
-        if provider == "litellm":
+        if provider == VoiceSettingsProvider.LITELLM:
             return self._transcribe_with_litellm(filename, history, language)
-        elif provider == "local":
+        elif provider == VoiceSettingsProvider.LOCAL:
             return self._transcribe_with_local(filename, history, language)
         else:
             raise NotImplementedError(f"Provider '{provider}' is not supported.")

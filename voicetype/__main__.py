@@ -1,14 +1,16 @@
+import argparse
 import logging
 import os
 import platform
 import queue
 import time
+from pathlib import Path
 
 from voicetype.globals import hotkey_listener, is_recording, typing_queue, voice
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
-from voicetype.settings import settings
+from voicetype.settings import load_settings
 from voicetype.sounds import ERROR_SOUND, START_RECORD_SOUND
-from voicetype.utils import type_text  # play_audio,
+from voicetype.utils import type_text
 from voicetype.voice.voice import Voice
 
 # Basic Logging Setup
@@ -140,32 +142,38 @@ def handle_hotkey_release():
 def main():
     """Main application entry point."""
     global hotkey_listener, voice
+
+    parser = argparse.ArgumentParser(description="VoiceType application.")
+    parser.add_argument(
+        "--settings-file", type=Path, help="Path to the settings TOML file."
+    )
+    args = parser.parse_args()
+
+    settings = load_settings(args.settings_file)
+
     logging.info("Starting VoiceType application...")
 
     try:
-        voice = Voice(settings=settings.voice)  # Initialize audio processing class
-        hotkey_listener = get_platform_listener()  # Get the platform-specific listener
-        hotkey_listener.set_hotkey(settings.hotkey.hotkey)  # Configure the hotkey
-        hotkey_listener.start_listening()  # Start listening in a background thread
+        voice = Voice(settings=settings.voice)
+        hotkey_listener = get_platform_listener()
+        hotkey_listener.set_hotkey(settings.hotkey.hotkey)
+        hotkey_listener.start_listening()
 
         logging.info(f"Intended hotkey: {settings.hotkey.hotkey}")
         logging.info("Press Ctrl+C to exit.")
-        # --- End Placeholder ---
 
-        # Keep the main thread alive.
-        # If using pystray, icon.run() would block here.
-        # If the listener runs in the main thread and blocks, this loop isn't needed.
-        # If the listener runs in a background thread, we need to keep alive.
         while True:
+            # Keep the main thread alive.
+            # If using pystray, icon.run() would block here.
+            # If the listener runs in the main thread and blocks, this loop isn't needed.
+            # If the listener runs in a background thread, we need to keep alive.
             try:
-                transribed_text = typing_queue.get(timeout=1)
-                type_text(transribed_text)
+                transcribed_text = typing_queue.get(timeout=1)
+                type_text(transcribed_text)
             except queue.Empty:
-                # No items in the queue, continue to check for hotkey events
                 continue
             except Exception as e:
                 logging.error(f"Error processing typing queue: {e}", exc_info=True)
-                # Handle any other exceptions that might occur
                 break
 
     except KeyboardInterrupt:
@@ -182,7 +190,6 @@ def main():
                 logging.info("Hotkey listener stopped.")
             except Exception as e:
                 logging.error(f"Error stopping listener: {e}", exc_info=True)
-        # Add any other cleanup needed here
         logging.info("VoiceType application finished.")
 
 

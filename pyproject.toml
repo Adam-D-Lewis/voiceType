@@ -18,6 +18,7 @@ dependencies = [
     # "pygame",  # for sound
     "playsound3",        # for sound
     "pydantic-settings",
+    "toml",
 ]
 dynamic = ["version"]
 
