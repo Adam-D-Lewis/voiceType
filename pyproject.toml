@@ -30,6 +30,13 @@ dev = [
     "pytest",
     "pre-commit",
 ]
+local = [
+    "faster-whisper",
+    # system deps on conda-forge
+    # "libcublas",
+    # "cudnn",
+
+]
 [tool.setuptools.packages.find]
 include = ["voicetype*"]
 

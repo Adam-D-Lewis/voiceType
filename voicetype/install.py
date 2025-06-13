@@ -103,20 +103,34 @@ def install_service():
         )
         sys.exit(1)
 
-    # Get OpenAI API Key
-    api_key = input("Please enter your OPENAI_API_KEY: ").strip()
-    if not api_key:
-        print("OPENAI_API_KEY cannot be empty. Installation aborted.", file=sys.stderr)
-        sys.exit(1)
+    # --- Provider and API Key Configuration ---
+    provider = ""
+    while provider not in ["litellm", "local"]:
+        provider = input("Choose a voice provider [litellm, local]: ").strip().lower()
+        if provider not in ["litellm", "local"]:
+            print("Invalid provider. Please choose 'litellm' or 'local'.")
+
+    env_vars = {"VOICE__PROVIDER": provider}
+
+    if provider == "litellm":
+        api_key = input("Please enter your OPENAI_API_KEY: ").strip()
+        if not api_key:
+            print(
+                "OPENAI_API_KEY cannot be empty for the 'litellm' provider. Installation aborted.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        env_vars["OPENAI_API_KEY"] = api_key
 
     # Create app config directory and .env file
     APP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     try:
         with open(ENV_FILE_PATH, "w") as f:
-            f.write(f"OPENAI_API_KEY={shlex.quote(api_key)}\n")
+            for key, value in env_vars.items():
+                f.write(f"{key}={shlex.quote(value)}\n")
         # Set restrictive permissions for the .env file
         os.chmod(ENV_FILE_PATH, 0o600)
-        print(f"OPENAI_API_KEY stored in {ENV_FILE_PATH}")
+        print(f"Configuration stored in {ENV_FILE_PATH}")
     except IOError as e:
         print(
             f"Error writing environment file to {ENV_FILE_PATH}: {e}", file=sys.stderr
@@ -146,8 +160,14 @@ def install_service():
     run_systemctl_command(["start", SERVICE_NAME])
 
     print(f"\nVoiceType service '{SERVICE_NAME}' installed and started.")
-    print(f"The OPENAI_API_KEY has been stored in {ENV_FILE_PATH}.")
-    print("If you need to change the API key, you can edit this file and then run:")
+    if "OPENAI_API_KEY" in env_vars:
+        print(f"The OPENAI_API_KEY has been stored in {ENV_FILE_PATH}.")
+        print("If you need to change the API key, you can edit this file and then run:")
+    else:
+        print(f"The provider has been set to 'local' in {ENV_FILE_PATH}.")
+        print(
+            "If you need to change the provider, you can edit this file and then run:"
+        )
     print(f"  systemctl --user restart {SERVICE_NAME}")
     print("\nYou can check the service status with:")
     print(f"  systemctl --user status {SERVICE_NAME}")

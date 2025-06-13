@@ -14,7 +14,7 @@ class VoiceSettingsProvider(enum.Enum):
 class VoiceSettings(BaseSettings):
     """Settings related to the voice transcription service."""
 
-    provider: VoiceSettingsProvider = VoiceSettingsProvider.LITELLM
+    provider: VoiceSettingsProvider = VoiceSettingsProvider.LOCAL
 
 
 class HotkeySettings(BaseSettings):
