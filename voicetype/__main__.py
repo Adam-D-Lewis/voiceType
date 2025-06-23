@@ -46,9 +46,6 @@ def get_platform_listener() -> HotkeyListener:
                 on_hotkey_press=handle_hotkey_press,
                 on_hotkey_release=handle_hotkey_release,
             )
-        except ImportError:
-            logger.error("Failed to import X11 listener. Is 'pynput' installed?")
-            raise
         except Exception as e:
             logger.error(f"Failed to initialize X11 listener: {e}", exc_info=True)
             raise RuntimeError("Could not initialize any Linux hotkey listener.") from e
