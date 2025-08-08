@@ -4,24 +4,34 @@ channels:
 dependencies:
   - python
   - fastapi>=0.93.0
-  - uvicorn
+  - loguru
   - pyaudio
   - pynput
-  - speechrecognition
+  # - speechrecognition
+  - pysoundfile
+
   # needed by faster-whisper gpu
   - libcublas
   - cudnn
-  # whisper
-  - pysoundfile
+
+  # system tray
+  - pystray
+  - gtk3  # unsure if needed
+  - gobject-introspection  # unsure if needed
+  - pygobject
+
   # dev
   - ruff
   - pre-commit
+
   # pip
   - pip
   - pip:
+
     # whisper
     - openai-whisper
     - faster-whisper
+
 variables:
   VAR1: valueA
   VAR2: valueB

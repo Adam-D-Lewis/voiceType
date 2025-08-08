@@ -258,7 +258,8 @@ class Voice:
             None, audio_data=audio, model="large-v3", language="en"
         )
 
-        return transcribed_text
+        # transcribed_text seems to come back with a leading space, so we strip it
+        return transcribed_text.strip()
 
     def _transcribe_with_litellm(self, filename, history=None, language=None):
         """Transcribes the audio file using the litellm provider."""
