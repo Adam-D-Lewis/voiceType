@@ -13,8 +13,9 @@ from loguru import logger
 # IMPORTANT: Choose a reliable backend for Linux Desktop Environments.
 # GTK is generally the most compatible on Ubuntu 22.04/24.04 and others.
 # Valid values: 'gtk', 'appindicator', 'xorg', 'dummy' (fallback/test)
-os.environ.setdefault("PYSTRAY_BACKEND", "gtk")
-
+# os.environ.setdefault("PYSTRAY_BACKEND", "gtk")
+# Trying to use the appindicator backend fails on Ubuntu 24.04 due to not finding the installed dependencies.  We could maybe try packaging it on conda-forge (see https://claude.ai/share/0786af55-4154-414b-bc74-1ede6d45e52a)
+# GI_TYPELIB_PATH='/usr/lib/x86_64-linux-gnu/girepository-1.0' python
 # pystray imports must happen after setting PYSTRAY_BACKEND
 from PIL import Image, ImageDraw
 
@@ -335,7 +336,8 @@ def background_worker(icon: pystray._base.Icon):
 # --------------------------
 def main():
     logger.remove()
-    logger.add(sys.stderr, level="INFO", enqueue=False)
+    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+    logger.add(sys.stderr, level=log_level, enqueue=False)
 
     snap = state.snapshot()
     icon_image = make_icon(64, snap.icon_color)
