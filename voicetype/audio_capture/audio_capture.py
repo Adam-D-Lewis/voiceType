@@ -36,7 +36,7 @@ class SoundDeviceError(Exception):
     pass
 
 
-class Voice:
+class SpeechProcessor:
     """Audio recording and transcription system.
 
     Provides functionality for:
@@ -53,7 +53,7 @@ class Voice:
     threshold = 0.15  # Threshold for RMS visualization (if needed later)
 
     def __init__(self, settings: VoiceSettings, audio_format="wav", device_name=None):
-        """Initialize Voice with audio settings and device configuration.
+        """Initialize SpeechProcessor with audio settings and device configuration.
 
         Args:
             settings: VoiceSettings instance containing provider and model config

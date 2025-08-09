@@ -7,12 +7,12 @@ from pathlib import Path
 
 from loguru import logger
 
+from voicetype.audio_capture import SpeechProcessor
 from voicetype.globals import hotkey_listener, is_recording, typing_queue, voice
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 from voicetype.settings import VoiceSettingsProvider, load_settings
 from voicetype.sounds import ERROR_SOUND, START_RECORD_SOUND
 from voicetype.utils import type_text
-from voicetype.voice.voice import Voice
 
 HERE = Path(__file__).resolve().parent
 SOUNDS_DIR = HERE / "sounds"
@@ -67,7 +67,7 @@ def handle_hotkey_press():
     if not is_recording:
         logger.info("Hotkey pressed - Starting recording...")
         is_recording = True
-        # TODO: Start actual audio recording stream here (requires Voice class refactor)
+        # TODO: Start actual audio recording stream here (requires SpeechProcessor class refactor)
         voice.start_recording()
         # TODO: Update tray icon state to "recording"
         # play_audio(START_RECORD_SOUND)  # Provide feedback
@@ -81,7 +81,7 @@ def handle_hotkey_release():
     if is_recording:
         logger.info("Hotkey released - Stopping recording and processing...")
         is_recording = False
-        # TODO: Stop audio recording stream here (requires Voice class refactor)
+        # TODO: Stop audio recording stream here (requires SpeechProcessor class refactor)
         # TODO: Update tray icon state to "processing"
 
         try:
@@ -149,7 +149,7 @@ def main():
     logger.info("Starting VoiceType application...")
 
     try:
-        voice = Voice(settings=settings.voice)
+        voice = SpeechProcessor(settings=settings.voice)
         hotkey_listener = get_platform_listener()
         hotkey_listener.set_hotkey(settings.hotkey.hotkey)
         hotkey_listener.start_listening()
