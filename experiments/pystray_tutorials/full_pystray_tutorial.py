@@ -200,7 +200,7 @@ def on_quit(icon: pystray._base.Icon, item: Item):
 # --------------------------
 # Dynamic menu builder
 # --------------------------
-def dynamic_section(icon: pystray._base.Icon) -> Iterable[Item]:
+def dynamic_section() -> Iterable[Item]:
     """
     This is a callable menu section. It is re-evaluated when the menu is opened.
     Useful for showing live values, ephemeral actions, or refreshed sub-menus.
@@ -267,19 +267,27 @@ def build_menu(dynamic: bool = False) -> Menu:
     )
 
     # Optional dynamic section
+    # Make the dynamic section discoverable at startup by providing a submenu
+    # that contains an action to rebuild the menu with dynamic=True.
     dyn = (
         Item("Live info", Menu(dynamic_section))
         if dynamic
         else Item(
-            "Live info (open me after using 'Rebuild')",
-            lambda i, it: None,
-            enabled=False,
+            "Live info",
+            Menu(
+                Item("Enable live info (rebuild menu)", on_refresh_menu),
+                Item("---", None),
+                Item(
+                    "Hint: After enabling, reopen this submenu to see live values.",
+                    lambda i, it: None,
+                    enabled=False,
+                ),
+            ),
         )
     )
 
     return Menu(
-        Item("Increment counter", on_increment),
-        Item("Show notification", on_show_notification),
+        Item("Increment counter", on_increment, default=True),
         toggle_item,
         Item("Theme", Menu(*theme_group)),
         submenu,
