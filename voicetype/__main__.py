@@ -1,8 +1,8 @@
 import argparse
 import os
 import platform
-import queue
 import threading
+import time
 from pathlib import Path
 
 from loguru import logger
@@ -111,7 +111,7 @@ def handle_hotkey_release():
         logger.debug("Hotkey released while not recording. Ignoring.")
 
 
-def load_model_in_background():
+def load_stt_model():
     import speech_recognition as sr
     from speech_recognition.recognizers.whisper_local import faster_whisper
 
@@ -120,13 +120,19 @@ def load_model_in_background():
     audio = sr.AudioData.from_file(str(SOUNDS_DIR / "empty.wav"))
 
     logger.info("Loading local model in background...")
-    _ = faster_whisper.recognize(
-        r,
-        audio_data=audio,
-        model="large-v3",
-        language="en",
-    )
-    logger.info("Local model loaded.")
+    try:
+        _ = faster_whisper.recognize(
+            r,
+            audio_data=audio,
+            model="large-v3",
+            language="en",
+        )
+        logger.info("Local model loaded.")
+    except Exception as e:
+        logger.error(f"Failed to load local model: {e}", exc_info=True)
+        raise NotImplementedError(
+            "Local model loading failed. Ensure the model is correctly installed."
+        )
 
 
 def main():
@@ -144,7 +150,7 @@ def main():
     # Load local model if configured
     if settings.voice.provider == VoiceSettingsProvider.LOCAL:
         # load in background
-        threading.Thread(target=load_model_in_background, daemon=True).start()
+        threading.Thread(target=load_stt_model, daemon=True).start()
 
     logger.info("Starting VoiceType application...")
 
@@ -157,20 +163,21 @@ def main():
         logger.info(f"Intended hotkey: {settings.hotkey.hotkey}")
         logger.info("Press Ctrl+C to exit.")
 
-        while True:
-            # Keep the main thread alive.
-            # If using pystray, icon.run() would block here.
-            # If the listener runs in the main thread and blocks, this loop isn't needed.
-            # If the listener runs in a background thread, we need to keep alive.
-            try:
-                transcribed_text = typing_queue.get(timeout=1)
-                type_text(transcribed_text)
-            except queue.Empty:
-                continue
-            except Exception as e:
-                logger.error(f"Error processing typing queue: {e}", exc_info=True)
-                break
+        def type_text_with_queue():
+            """Continuously checks the typing queue and types text."""
+            while True:
+                try:
+                    transcribed_text = typing_queue.get()
+                    type_text(transcribed_text)
+                except Exception as e:
+                    logger.error(f"Error processing typing queue: {e}", exc_info=True)
+                    break
 
+        threading.Thread(target=type_text_with_queue, daemon=True).start()
+        # do something blocking here to keep the main thread alive
+        while True:
+            # Keep the main thread alive
+            time.sleep(10)
     except KeyboardInterrupt:
         logger.info("Shutdown requested via KeyboardInterrupt.")
     except NotImplementedError as e:

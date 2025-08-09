@@ -11,8 +11,8 @@ import numpy as np
 from aider.llm import litellm
 from loguru import logger
 
+from voicetype.audio_capture.dump import dump  # noqa: F401
 from voicetype.settings import VoiceSettings, VoiceSettingsProvider
-from voicetype.voice.dump import dump  # noqa: F401
 
 warnings.filterwarnings(
     "ignore",
