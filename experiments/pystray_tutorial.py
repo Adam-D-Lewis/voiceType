@@ -119,13 +119,13 @@ class TutorialState:
             )
 
 
-STATE = TutorialState()
+state = TutorialState()
 
 
 # --------------------------
 # Menu handlers (actions)
 # --------------------------
-def on_show_notification(icon: pystray.Icon, item: Item):
+def on_show_notification(icon: pystray._base.Icon, item: Item):
     """
     Show a desktop notification via pystray's notify (where supported).
     On some Linux DEs this uses libnotify over DBus.
@@ -140,35 +140,35 @@ def on_show_notification(icon: pystray.Icon, item: Item):
         logger.exception(f"Failed to show notification: {e}")
 
 
-def on_toggle_enabled(icon: pystray.Icon, item: Item):
-    STATE.toggle_enabled()
+def on_toggle_enabled(icon: pystray._base.Icon, item: Item):
+    state.toggle_enabled()
     # Update title to reflect state
-    snap = STATE.snapshot()
+    snap = state.snapshot()
     icon.title = f"pystray tutorial (Enabled: {snap.enabled})"
     icon.update_menu()  # update checked state immediately
 
 
-def on_open_url(icon: pystray.Icon, item: Item):
+def on_open_url(icon: pystray._base.Icon, item: Item):
     url = "https://github.com/moses-palmer/pystray"
     webbrowser.open(url)
     logger.info(f"Opened {url}")
 
 
-def on_change_theme(icon: pystray.Icon, item: Item, theme_name: str):
-    STATE.set_theme(theme_name)
+def on_change_theme(icon: pystray._base.Icon, item: Item, theme_name: str):
+    state.set_theme(theme_name)
     # Update icon image to reflect theme color
-    snap = STATE.snapshot()
+    snap = state.snapshot()
     icon.icon = make_icon(64, snap.icon_color)
     icon.update_menu()
 
 
-def on_increment(icon: pystray.Icon, item: Item):
-    STATE.increment()
+def on_increment(icon: pystray._base.Icon, item: Item):
+    state.increment()
     # Dynamic menu reflects counter via callable menu
     icon.update_menu()
 
 
-def on_refresh_menu(icon: pystray.Icon, item: Item):
+def on_refresh_menu(icon: pystray._base.Icon, item: Item):
     """
     Demonstrate rebuilding the entire menu at runtime.
     """
@@ -177,21 +177,21 @@ def on_refresh_menu(icon: pystray.Icon, item: Item):
     icon.update_menu()
 
 
-def on_pause_background(icon: pystray.Icon, item: Item):
+def on_pause_background(icon: pystray._base.Icon, item: Item):
     """
     Pause/resume the background worker thread via the toggle.
     """
-    STATE.toggle_enabled()
+    state.toggle_enabled()
     icon.update_menu()
 
 
-def on_quit(icon: pystray.Icon, item: Item):
+def on_quit(icon: pystray._base.Icon, item: Item):
     """
     Stop background work and remove the icon.
     Note: icon.stop removes the tray icon and ends the main loop.
     """
     logger.info("Quit requested")
-    STATE.running = False
+    state.running = False
     # Allow background thread to observe running=False quickly
     icon.visible = False
     icon.stop()
@@ -200,12 +200,12 @@ def on_quit(icon: pystray.Icon, item: Item):
 # --------------------------
 # Dynamic menu builder
 # --------------------------
-def dynamic_section(icon: pystray.Icon) -> Iterable[Item]:
+def dynamic_section(icon: pystray._base.Icon) -> Iterable[Item]:
     """
     This is a callable menu section. It is re-evaluated when the menu is opened.
     Useful for showing live values, ephemeral actions, or refreshed sub-menus.
     """
-    snap = STATE.snapshot()
+    snap = state.snapshot()
     yield Item(f"Counter: {snap.counter}", lambda i, it: None, enabled=False)
     yield Item("Increment counter", on_increment)
     yield Item("---", None)  # separator example
@@ -227,13 +227,13 @@ def build_menu(dynamic: bool = False) -> Menu:
     - Dynamic items via callable
     - Separator lines
     """
-    snap = STATE.snapshot()
+    snap = state.snapshot()
 
     # Toggle item demonstrates checked state and on_click handler
     toggle_item = Item(
         "Enabled",
         on_toggle_enabled,
-        checked=lambda item: STATE.snapshot().enabled,
+        checked=lambda item: state.snapshot().enabled,
     )
 
     # Radio group: only one selected. We bind closures with theme value captured.
@@ -242,7 +242,7 @@ def build_menu(dynamic: bool = False) -> Menu:
             on_change_theme(icon, item, label)
 
         def is_checked(item):
-            return STATE.snapshot().theme == label
+            return state.snapshot().theme == label
 
         return Item(
             label,
@@ -288,7 +288,7 @@ def build_menu(dynamic: bool = False) -> Menu:
         Item(
             "Pause/Resume background",
             on_pause_background,
-            checked=lambda i: STATE.snapshot().enabled,
+            checked=lambda i: state.snapshot().enabled,
         ),
         Item("Quit", on_quit),
     )
@@ -297,22 +297,22 @@ def build_menu(dynamic: bool = False) -> Menu:
 # --------------------------
 # Background worker (thread)
 # --------------------------
-def background_worker(icon: pystray.Icon):
+def background_worker(icon: pystray._base.Icon):
     """
     Demonstrates interacting with the icon from a worker thread.
     Use icon.update to marshal UI changes safely across backends.
     """
     logger.info("Background worker started")
     dots = ""
-    while STATE.running:
+    while state.running:
         time.sleep(1.0)
-        snap = STATE.snapshot()
+        snap = state.snapshot()
         if snap.enabled:
             dots = (dots + ".")[-3:]
             title = f"pystray tutorial{dots}"
 
             # Safe cross-thread updates: mutate within a single update call
-            def apply_update(ic: pystray.Icon):
+            def apply_update(ic: pystray._base.Icon):
                 ic.title = title
 
             try:
@@ -329,7 +329,7 @@ def main():
     logger.remove()
     logger.add(sys.stderr, level="INFO", enqueue=False)
 
-    snap = STATE.snapshot()
+    snap = state.snapshot()
     icon_image = make_icon(64, snap.icon_color)
     menu = build_menu(dynamic=False)
 
@@ -352,7 +352,7 @@ def main():
         icon.run()  # blocks until icon.stop() or app quit
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received, shutting down...")
-        STATE.running = False
+        state.running = False
         try:
             icon.visible = False
             icon.stop()
@@ -360,7 +360,7 @@ def main():
             pass
     finally:
         # Ensure the worker terminates
-        STATE.running = False
+        state.running = False
         worker.join(timeout=2.0)
         logger.info("Exited cleanly")
 
