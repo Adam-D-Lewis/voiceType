@@ -6,8 +6,6 @@ dependencies:
   - fastapi>=0.93.0
   - loguru
   - pyaudio
-  - pynput
-  # - speechrecognition
   - pysoundfile
 
   # needed by faster-whisper gpu
@@ -27,6 +25,8 @@ dependencies:
   # pip
   - pip
   - pip:
+    # pynput fork
+    - pynput @ git+https://github.com/Adam-D-Lewis/pynput@26fe001ada956c0ad023ea0e3aa3c7dded3526ad
 
     # whisper
     - openai-whisper
