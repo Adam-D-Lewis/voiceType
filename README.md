@@ -40,7 +40,7 @@ Type with your voice.
     This command reads `pyproject.toml`, installs all necessary dependencies, and makes the `voicetype` script available (callable as `python -m voicetype`).
 
 4.  **Run the installation script (for Linux with systemd):**
-    If you are on Linux and want to run VoiceType as a systemd user service (recommended for background operation and auto-start on login), use the `voicetype/install.py` script.
+    If you are on Linux and want to run VoiceType as a systemd user service (recommended for background operation and auto-start on login), use the `voicetype/install.py` script.  Be sure to run it in the correct environment (with deps installed).
     ```bash
     python voicetype/install.py install
     ```
@@ -149,7 +149,7 @@ Setup Pixi
 
 Create and activate the environment
 - From the project root:
-  - pixi install
+  - pixi install -e local
   - pixi shell
 
 Run the application

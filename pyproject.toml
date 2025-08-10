@@ -70,11 +70,10 @@ channels = ["conda-forge"]
 
 # PyPI packages for this feature
 [tool.pixi.feature.local.pypi-dependencies]
-# none
+voicetype = { path = ".", editable = true }
 
 # Conda packages common across all platforms
 [tool.pixi.feature.local.dependencies]
-# none
 
 # Platform-scoped dependencies
 [tool.pixi.feature.local.target.linux-64.dependencies]
