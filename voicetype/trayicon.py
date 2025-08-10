@@ -5,6 +5,8 @@ from typing import Tuple
 
 from PIL import Image, ImageDraw
 
+from voicetype.assets.imgs import YELLOW_BG_MIC
+
 # Valid values: 'gtk', 'appindicator', 'xorg', 'dummy' (fallback/test)
 os.environ.setdefault("PYSTRAY_BACKEND", "gtk")
 
@@ -13,7 +15,83 @@ from pystray import Menu
 from pystray import MenuItem as Item
 
 
-def mic_icon(
+def _load_tray_image() -> Image.Image:
+    """
+    Load the mic.png asset for the tray icon. Falls back to the drawn icon if
+    the asset is missing or fails to load.
+    """
+    try:
+        img = Image.open(YELLOW_BG_MIC).convert("RGBA")
+        return img
+    except Exception:
+        # Fallback to the programmatic icon to avoid crashing the tray.
+        return _backup_mic_icon()
+
+
+# State and callbacks
+_is_listening = False
+
+
+def _toggle_listening(icon: pystray._base.Icon, item: Item):
+    global _is_listening
+    _is_listening = not _is_listening
+    # TODO: Wire these into your actual start/stop logic if available.
+    # For now these are stubs to be connected to your hotkey/listener controller.
+    if _is_listening:
+        # start_listening()
+        pass
+    else:
+        # stop_listening()
+        pass
+    # Update menu text dynamically by rebuilding menu
+    icon.menu = _build_menu()
+    icon.update_menu()
+
+
+def _open_logs(icon: pystray._base.Icon, item: Item):
+    # Attempt to open the error log in the system editor/viewer
+    log_path = os.path.join(os.path.dirname(__file__), "error_log.txt")
+    if not os.path.exists(log_path):
+        # If absent, create empty file so the opener still works
+        try:
+            with open(log_path, "a", encoding="utf-8"):
+                pass
+        except Exception:
+            return
+    try:
+        if sys.platform.startswith("linux"):
+            subprocess.Popen(["xdg-open", log_path])
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", log_path])
+        elif os.name == "nt":
+            os.startfile(log_path)  # type: ignore[attr-defined]
+    except Exception:
+        # Silently ignore open errors in tray context
+        pass
+
+
+def _quit(icon: pystray._base.Icon, item: Item):
+    icon.stop()
+
+
+def _build_menu() -> Menu:
+    label = "Stop Listening" if _is_listening else "Start Listening"
+    return Menu(
+        Item(label, _toggle_listening, default=True),
+        Item("Open Logs", _open_logs),
+        Item("Quit", _quit),
+    )
+
+
+tray_icon = pystray.Icon(
+    name="voicetype_tray",
+    title="VoiceType",
+    icon=_load_tray_image(),
+    menu=_build_menu(),
+)
+
+
+def _backup_mic_icon(
     size: int = 64,
     color: Tuple[int, int, int] = (0, 128, 255),
     fg: Tuple[int, int, int] = (255, 255, 255),
@@ -82,81 +160,3 @@ def mic_icon(
     )
 
     return img
-
-
-def _load_tray_image() -> Image.Image:
-    """
-    Load the mic.png asset for the tray icon. Falls back to the drawn icon if
-    the asset is missing or fails to load.
-    """
-    try:
-        img_assets_dir = os.path.join(os.path.dirname(__file__), "assets/imgs")
-        png_path = os.path.join(img_assets_dir, "yellow-bg-mic.png")
-        img = Image.open(png_path).convert("RGBA")
-        return img
-    except Exception:
-        # Fallback to the programmatic icon to avoid crashing the tray.
-        return mic_icon()
-
-
-# State and callbacks
-_is_listening = False
-
-
-def _toggle_listening(icon: pystray._base.Icon, item: Item):
-    global _is_listening
-    _is_listening = not _is_listening
-    # TODO: Wire these into your actual start/stop logic if available.
-    # For now these are stubs to be connected to your hotkey/listener controller.
-    if _is_listening:
-        # start_listening()
-        pass
-    else:
-        # stop_listening()
-        pass
-    # Update menu text dynamically by rebuilding menu
-    icon.menu = _build_menu()
-    icon.update_menu()
-
-
-def _open_logs(icon: pystray._base.Icon, item: Item):
-    # Attempt to open the error log in the system editor/viewer
-    log_path = os.path.join(os.path.dirname(__file__), "error_log.txt")
-    if not os.path.exists(log_path):
-        # If absent, create empty file so the opener still works
-        try:
-            with open(log_path, "a", encoding="utf-8"):
-                pass
-        except Exception:
-            return
-    try:
-        if sys.platform.startswith("linux"):
-            subprocess.Popen(["xdg-open", log_path])
-        elif sys.platform == "darwin":
-            subprocess.Popen(["open", log_path])
-        elif os.name == "nt":
-            os.startfile(log_path)  # type: ignore[attr-defined]
-    except Exception:
-        # Silently ignore open errors in tray context
-        pass
-
-
-def _quit(icon: pystray._base.Icon, item: Item):
-    icon.stop()
-
-
-def _build_menu() -> Menu:
-    label = "Stop Listening" if _is_listening else "Start Listening"
-    return Menu(
-        Item(label, _toggle_listening, default=True),
-        Item("Open Logs", _open_logs),
-        Item("Quit", _quit),
-    )
-
-
-tray_icon = pystray.Icon(
-    name="voicetype_tray",
-    title="VoiceType",
-    icon=_load_tray_image(),
-    menu=_build_menu(),
-)
