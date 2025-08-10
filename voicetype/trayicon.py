@@ -5,7 +5,7 @@ from typing import Tuple
 
 from PIL import Image, ImageDraw
 
-from voicetype.assets.imgs import YELLOW_BG_MIC
+from voicetype.assets.imgs import GREEN_BG_MIC, YELLOW_BG_MIC
 
 # Valid values: 'gtk', 'appindicator', 'xorg', 'dummy' (fallback/test)
 os.environ.setdefault("PYSTRAY_BACKEND", "gtk")
@@ -91,6 +91,28 @@ tray_icon = pystray.Icon(
 )
 
 
+def set_ready_icon():
+    """
+    Switch the tray icon to the GREEN background microphone to indicate
+    the local model has loaded and the app is ready.
+    Safe to call from background threads.
+    """
+    try:
+        img = Image.open(GREEN_BG_MIC).convert("RGBA")
+    except Exception:
+        # If green asset missing, fall back to a green backup icon
+        img = _backup_mic_icon(color=(0, 180, 0))
+
+    try:
+        tray_icon.icon = img
+        try:
+            tray_icon.update_icon()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
 def _backup_mic_icon(
     size: int = 64,
     color: Tuple[int, int, int] = (0, 128, 255),
@@ -115,15 +137,14 @@ def _backup_mic_icon(
 
     # Microphone body proportions (increase relative size)
     cx, cy = size // 2, size // 2
-    mic_w = max(6, (size * 3) // 10)  # was size // 5, now ~30% of size
-    mic_h = max(10, (size * 11) // 20)  # was ~45%, now ~55% of size
-    body_top = cy - (mic_h * 4) // 7  # shift up to center visually
+    mic_w = max(6, (size * 3) // 10)
+    mic_h = max(10, (size * 11) // 20)
+    body_top = cy - (mic_h * 4) // 7
     body_bottom = cy + (mic_h * 1) // 5
     body_left = cx - mic_w // 2
     body_right = cx + mic_w // 2
     radius = mic_w // 2
 
-    # Capsule (rounded rect) — draw with a subtle outline to improve legibility
     top_ellipse = [body_left, body_top, body_right, body_top + mic_w]
     d.ellipse(top_ellipse, fill=fg + (255,), outline=fg + (255,))
     d.rectangle(
@@ -132,7 +153,6 @@ def _backup_mic_icon(
         outline=fg + (255,),
     )
 
-    # U-shaped holder — thicker for visibility in small sizes
     holder_w = mic_w + max(6, size // 16)
     holder_top = body_bottom + max(1, size // 80)
     arc_box = [
@@ -143,7 +163,6 @@ def _backup_mic_icon(
     ]
     d.arc(arc_box, start=200, end=340, fill=fg + (255,), width=max(2, size // 18))
 
-    # Stand — thicker and wider base for clarity
     stem_h = max(4, size // 10)
     stem_w = max(3, size // 20)
     stem_top = holder_top + max(1, size // 80)
