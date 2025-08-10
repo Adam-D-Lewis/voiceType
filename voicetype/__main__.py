@@ -7,15 +7,15 @@ from pathlib import Path
 
 from loguru import logger
 
+from voicetype.assets.sounds import EMPTY_SOUND, ERROR_SOUND, START_RECORD_SOUND
 from voicetype.audio_capture import SpeechProcessor
 from voicetype.globals import hotkey_listener, is_recording, typing_queue, voice
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 from voicetype.settings import VoiceSettingsProvider, load_settings
-from voicetype.sounds import ERROR_SOUND, START_RECORD_SOUND
+from voicetype.trayicon import tray_icon
 from voicetype.utils import type_text
 
 HERE = Path(__file__).resolve().parent
-SOUNDS_DIR = HERE / "sounds"
 
 
 def get_platform_listener() -> HotkeyListener:
@@ -118,7 +118,7 @@ def load_stt_model():
 
     r = sr.Recognizer()
     # pass in empty file to force load
-    audio = sr.AudioData.from_file(str(SOUNDS_DIR / "empty.wav"))
+    audio = sr.AudioData.from_file(str(EMPTY_SOUND))
 
     logger.info("Loading local model in background...")
     try:
@@ -175,11 +175,10 @@ def main():
                     break
 
         threading.Thread(target=type_text_with_queue, daemon=True).start()
-        # type_text_with_queue()
-        # do something blocking here to keep the main thread alive
-        while True:
-            # Keep the main thread alive
-            time.sleep(10)
+
+        # Start the system tray icon (blocks until closed)
+        tray_icon.run()
+
     except KeyboardInterrupt:
         logger.info("Shutdown requested via KeyboardInterrupt.")
     except NotImplementedError as e:
