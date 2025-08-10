@@ -80,6 +80,10 @@ channels = ["conda-forge"]
 [tool.pixi.feature.local.target.linux-64.dependencies]
 libcublas = "*"
 cudnn = "*"
+gtk3 = "*"
+gobject-introspection = "*"
+pygobject = "*"
+
 
 # Map environments to feature sets
 [tool.pixi.environments]

@@ -5,6 +5,9 @@ from typing import Tuple
 
 from PIL import Image, ImageDraw
 
+# Valid values: 'gtk', 'appindicator', 'xorg', 'dummy' (fallback/test)
+os.environ.setdefault("PYSTRAY_BACKEND", "gtk")
+
 import pystray
 from pystray import Menu
 from pystray import MenuItem as Item
@@ -87,8 +90,8 @@ def _load_tray_image() -> Image.Image:
     the asset is missing or fails to load.
     """
     try:
-        assets_dir = os.path.join(os.path.dirname(__file__), "assets")
-        png_path = os.path.join(assets_dir, "yellow-bg-mic.png")
+        img_assets_dir = os.path.join(os.path.dirname(__file__), "assets/imgs")
+        png_path = os.path.join(img_assets_dir, "yellow-bg-mic.png")
         img = Image.open(png_path).convert("RGBA")
         return img
     except Exception:
@@ -100,7 +103,7 @@ def _load_tray_image() -> Image.Image:
 _is_listening = False
 
 
-def _toggle_listening(icon: pystray.Icon, item: Item):
+def _toggle_listening(icon: pystray._base.Icon, item: Item):
     global _is_listening
     _is_listening = not _is_listening
     # TODO: Wire these into your actual start/stop logic if available.
@@ -116,7 +119,7 @@ def _toggle_listening(icon: pystray.Icon, item: Item):
     icon.update_menu()
 
 
-def _open_logs(icon: pystray.Icon, item: Item):
+def _open_logs(icon: pystray._base.Icon, item: Item):
     # Attempt to open the error log in the system editor/viewer
     log_path = os.path.join(os.path.dirname(__file__), "error_log.txt")
     if not os.path.exists(log_path):
@@ -138,7 +141,7 @@ def _open_logs(icon: pystray.Icon, item: Item):
         pass
 
 
-def _quit(icon: pystray.Icon, item: Item):
+def _quit(icon: pystray._base.Icon, item: Item):
     icon.stop()
 
 
