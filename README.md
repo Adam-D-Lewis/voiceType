@@ -1,5 +1,7 @@
 # voiceType
 
+![voiceType Logo](voicetype/assets/yellow-splotch-logo.png)
+
 Type with your voice.
 
 ## Features

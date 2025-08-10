@@ -81,6 +81,21 @@ def mic_icon(
     return img
 
 
+def _load_tray_image() -> Image.Image:
+    """
+    Load the mic.png asset for the tray icon. Falls back to the drawn icon if
+    the asset is missing or fails to load.
+    """
+    try:
+        assets_dir = os.path.join(os.path.dirname(__file__), "assets")
+        png_path = os.path.join(assets_dir, "yellow-bg-mic.png")
+        img = Image.open(png_path).convert("RGBA")
+        return img
+    except Exception:
+        # Fallback to the programmatic icon to avoid crashing the tray.
+        return mic_icon()
+
+
 # State and callbacks
 _is_listening = False
 
@@ -139,6 +154,6 @@ def _build_menu() -> Menu:
 tray_icon = pystray.Icon(
     name="voicetype_tray",
     title="VoiceType",
-    icon=mic_icon(),
+    icon=_load_tray_image(),
     menu=_build_menu(),
 )
