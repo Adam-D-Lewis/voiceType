@@ -174,8 +174,8 @@ def main():
                     logger.error(f"Error processing typing queue: {e}", exc_info=True)
                     break
 
-        # threading.Thread(target=type_text_with_queue, daemon=True).start()
-        type_text_with_queue()
+        threading.Thread(target=type_text_with_queue, daemon=True).start()
+        # type_text_with_queue()
         # do something blocking here to keep the main thread alive
         while True:
             # Keep the main thread alive

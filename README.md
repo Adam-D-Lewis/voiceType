@@ -130,5 +130,65 @@ pip uninstall voicetype
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
+## Development
+
+Preferred workflow: Pixi
+
+- Pixi is the preferred way to create and manage the development environment for this project. It ensures reproducible, cross-platform setups using the definitions in environment.yaml and pyproject.toml.
+
+Setup Pixi
+- Install Pixi:
+  - Linux/macOS (official installer):
+    - curl -fsSL https://pixi.sh/install.sh | bash
+  - macOS (Homebrew):
+    - brew install prefix-dev/pixi/pixi
+  - Verify:
+    - pixi --version
+
+Create and activate the environment
+- From the project root:
+  - pixi install
+  - pixi shell
+
+Run the application
+- pixi run voicetype
+  - Equivalent to:
+    - python -m voicetype
+
+Run tests
+- If a test task is defined:
+  - pixi run test
+- Otherwise (pytest directly):
+  - pixi run python -m pytest
+
+Lint and format
+- If tasks are defined:
+  - pixi run lint
+  - pixi run fmt
+- Or run tools directly:
+  - pixi run ruff format
+  - pixi run ruff check .
+
+Pre-commit hooks (recommended)
+- Install hooks:
+  - pixi run pre-commit install
+- Run on all files:
+  - pixi run pre-commit run --all-files
+
+Alternative: Python venv (fallback)
+- Ensure Python 3.11+ is installed.
+- Create and activate a venv:
+  - python -m venv .venv
+  - source .venv/bin/activate
+- Editable install with dev dependencies:
+  - pip install -U pip
+  - pip install -e ".[dev]"
+- Run the app:
+  - python -m voicetype
+
+Notes
+- Dependency definitions live in pyproject.toml; additional environment details may be in environment.yaml.
+- After changing dependencies, update pyproject.toml (and environment.yaml if needed), then run:
+  - pixi install
 ## License
 This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
