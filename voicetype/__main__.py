@@ -112,6 +112,7 @@ def handle_hotkey_release():
 
 
 def load_stt_model():
+    """Load the local speech-to-text (STT) model"""
     import speech_recognition as sr
     from speech_recognition.recognizers.whisper_local import faster_whisper
 
@@ -173,7 +174,8 @@ def main():
                     logger.error(f"Error processing typing queue: {e}", exc_info=True)
                     break
 
-        threading.Thread(target=type_text_with_queue, daemon=True).start()
+        # threading.Thread(target=type_text_with_queue, daemon=True).start()
+        type_text_with_queue()
         # do something blocking here to keep the main thread alive
         while True:
             # Keep the main thread alive
@@ -183,7 +185,9 @@ def main():
     except NotImplementedError as e:
         logger.error(f"Initialization failed: {e}")
     except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}", exc_info=True)
+        import traceback
+
+        logger.error(f"An unexpected error occurred: {e}\n{traceback.format_exc()}")
     finally:
         logger.info("Shutting down...")
         if hotkey_listener:

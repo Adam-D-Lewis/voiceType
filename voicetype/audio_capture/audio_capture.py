@@ -8,7 +8,6 @@ import time
 import warnings
 
 import numpy as np
-from aider.llm import litellm
 from loguru import logger
 
 from voicetype.audio_capture.dump import dump  # noqa: F401
@@ -407,6 +406,8 @@ class SpeechProcessor:
         transcript_text = None
         try:
             with open(final_filename, "rb") as fh:
+                from aider.llm import litellm
+
                 transcript = litellm.transcription(
                     model="whisper-1", file=fh, prompt=history, language=language
                 )

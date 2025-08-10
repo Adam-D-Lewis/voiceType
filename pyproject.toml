@@ -5,9 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "voicetype"
 authors = [{ name = "Adam Lewis" }]
+requires-python = "<=3.12"
 dependencies = [
-    "fastapi>=0.93.0",
-    "uvicorn",
     # "pyaudio",  # was causing me problems with audio
     "pynput @ git+https://github.com/Adam-D-Lewis/pynput@26fe001ada956c0ad023ea0e3aa3c7dded3526ad",
     "speechrecognition",
@@ -16,9 +15,13 @@ dependencies = [
     "prompt_toolkit",
     "dasbus", # wayland
     # "pygame",  # for sound
-    "playsound3",        # for sound
+    # "playsound3",        # for sound
+    "soundfile",  # for sound
+    "sounddevice",  # for sound
+    "pydub",  # for sound
     "pydantic-settings",
     "toml",
+    "aider-chat", # for litellm
 ]
 dynamic = ["version"]
 
@@ -52,3 +55,34 @@ fix = true
 
 [tool.ruff.lint]
 select = ["I"]
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.dependencies]
+# conda-forge dependencies
+python = "<=3.12"
+
+# Define the 'local' feature
+[tool.pixi.feature.local]
+channels = ["conda-forge"]
+
+# PyPI packages for this feature
+[tool.pixi.feature.local.pypi-dependencies]
+# none
+
+# Conda packages common across all platforms
+[tool.pixi.feature.local.dependencies]
+# none
+
+# Platform-scoped dependencies
+[tool.pixi.feature.local.target.linux-64.dependencies]
+libcublas = "*"
+cudnn = "*"
+
+# Map environments to feature sets
+[tool.pixi.environments]
+
+[tool.pixi.environments.local]
+features = ["local"]
