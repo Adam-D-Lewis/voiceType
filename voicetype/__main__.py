@@ -2,14 +2,13 @@ import argparse
 import os
 import platform
 import threading
-import time
 from pathlib import Path
 
 from loguru import logger
 
+from voicetype import globals
 from voicetype.assets.sounds import EMPTY_SOUND, ERROR_SOUND, START_RECORD_SOUND
 from voicetype.audio_capture import SpeechProcessor
-from voicetype.globals import hotkey_listener, is_recording, typing_queue, voice
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 from voicetype.settings import VoiceSettingsProvider, load_settings
 from voicetype.trayicon import tray_icon
@@ -63,12 +62,11 @@ def get_platform_listener() -> HotkeyListener:
 
 def handle_hotkey_press():
     """Callback function when the hotkey is pressed."""
-    global is_recording
-    if not is_recording:
+    if not globals.is_recording:
         logger.info("Hotkey pressed - Starting recording...")
-        is_recording = True
+        globals.is_recording = True
         # TODO: Start actual audio recording stream here (requires SpeechProcessor class refactor)
-        voice.start_recording()
+        globals.speech_processor.start_recording()
         # TODO: Update tray icon state to "recording"
         # play_audio(START_RECORD_SOUND)  # Provide feedback
     else:
@@ -77,19 +75,18 @@ def handle_hotkey_press():
 
 def handle_hotkey_release():
     """Callback function when the hotkey is released."""
-    global is_recording
-    if is_recording:
+    if globals.is_recording:
         logger.info("Hotkey released - Stopping recording and processing...")
-        is_recording = False
+        globals.is_recording = False
         # TODO: Stop audio recording stream here (requires SpeechProcessor class refactor)
         # TODO: Update tray icon state to "processing"
 
         try:
             # TODO: Get audio data from the stream and pass to voice.transcribe()
             recording_file = (
-                voice.stop_recording()
+                globals.speech_processor.stop_recording()
             )  # Placeholder for actual stop recording
-            text = voice.transcribe(
+            text = globals.speech_processor.transcribe(
                 recording_file
             )  # Placeholder for actual transcription
 
@@ -97,7 +94,7 @@ def handle_hotkey_release():
             transcribed_text = text
             logger.info(f"Transcription result: {transcribed_text}")
             if transcribed_text:
-                typing_queue.put(transcribed_text)  # Add to queue for typing
+                globals.typing_queue.put(transcribed_text)  # Add to queue for typing
             # TODO: Update tray icon state back to "idle"
         except Exception as e:
             logger.error(f"Error during transcription or typing: {e}", exc_info=True)
@@ -105,7 +102,7 @@ def handle_hotkey_release():
             # play_audio(ERROR_SOUND)  # Provide error feedback
         finally:
             # Ensure recording flag is reset even if errors occur
-            is_recording = False
+            globals.is_recording = False
             # TODO: Reset tray icon to idle if it wasn't already
     else:
         logger.debug("Hotkey released while not recording. Ignoring.")
@@ -138,7 +135,7 @@ def load_stt_model():
 
 def main():
     """Main application entry point."""
-    global hotkey_listener, voice
+    global globals
 
     parser = argparse.ArgumentParser(description="VoiceType application.")
     parser.add_argument(
@@ -156,10 +153,10 @@ def main():
     logger.info("Starting VoiceType application...")
 
     try:
-        voice = SpeechProcessor(settings=settings.voice)
-        hotkey_listener = get_platform_listener()
-        hotkey_listener.set_hotkey(settings.hotkey.hotkey)
-        hotkey_listener.start_listening()
+        globals.speech_processor = SpeechProcessor(settings=settings.voice)
+        globals.hotkey_listener = get_platform_listener()
+        globals.hotkey_listener.set_hotkey(settings.hotkey.hotkey)
+        globals.hotkey_listener.start_listening()
 
         logger.info(f"Intended hotkey: {settings.hotkey.hotkey}")
         logger.info("Press Ctrl+C to exit.")
@@ -168,7 +165,7 @@ def main():
             """Continuously checks the typing queue and types text."""
             while True:
                 try:
-                    transcribed_text = typing_queue.get()
+                    transcribed_text = globals.typing_queue.get()
                     type_text(transcribed_text)
                 except Exception as e:
                     logger.error(f"Error processing typing queue: {e}", exc_info=True)
@@ -189,9 +186,9 @@ def main():
         logger.error(f"An unexpected error occurred: {e}\n{traceback.format_exc()}")
     finally:
         logger.info("Shutting down...")
-        if hotkey_listener:
+        if globals.hotkey_listener:
             try:
-                hotkey_listener.stop_listening()
+                globals.hotkey_listener.stop_listening()
                 logger.info("Hotkey listener stopped.")
             except Exception as e:
                 logger.error(f"Error stopping listener: {e}", exc_info=True)

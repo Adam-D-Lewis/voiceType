@@ -5,6 +5,7 @@ from typing import Tuple
 
 from PIL import Image, ImageDraw
 
+from voicetype import globals
 from voicetype.assets.imgs import GREEN_BG_MIC, YELLOW_BG_MIC
 
 # Valid values: 'gtk', 'appindicator', 'xorg', 'dummy' (fallback/test)
@@ -28,22 +29,68 @@ def _load_tray_image() -> Image.Image:
         return _backup_mic_icon()
 
 
-# State and callbacks
-_is_listening = False
+def _desaturate_to_grayscale(img: Image.Image) -> Image.Image:
+    """
+    Convert an RGBA image to grayscale while preserving alpha channel.
+    """
+    if img.mode != "RGBA":
+        img = img.convert("RGBA")
+    # Split channels
+    r, g, b, a = img.split()
+    # Luma conversion
+    gray = Image.merge("RGB", (r, g, b)).convert("L")
+    # Rebuild RGBA with gray in all RGB channels
+    gray_rgb = Image.merge("RGBA", (gray, gray, gray, a))
+    return gray_rgb
 
 
-def _toggle_listening(icon: pystray._base.Icon, item: Item):
-    global _is_listening
-    _is_listening = not _is_listening
-    # TODO: Wire these into your actual start/stop logic if available.
-    # For now these are stubs to be connected to your hotkey/listener controller.
-    if _is_listening:
-        # start_listening()
+def _apply_enabled_icon():
+    """
+    Show normal icon when enabled: base mic with green status circle.
+    """
+    try:
+        img = create_mic_icon_variant(circle_color="green", alpha=255)
+        tray_icon.icon = img
+        try:
+            tray_icon.update_icon()
+        except Exception:
+            pass
+    except Exception:
         pass
+
+
+def _apply_disabled_icon():
+    """
+    Show disabled icon: grayscale base at full opacity with a gray status circle.
+    """
+    try:
+        try:
+            base = Image.open(YELLOW_BG_MIC).convert("RGBA")
+        except Exception:
+            base = _backup_mic_icon()
+        base = _desaturate_to_grayscale(base)
+        img = _add_status_circle(base, circle_color="gray", alpha=255)
+        tray_icon.icon = img
+        try:
+            tray_icon.update_icon()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def _toggle_enabled(icon: pystray._base.Icon, item: Item):
+    """
+    Toggle the global enabled/disabled state and update icon + menu.
+    """
+    globals.is_enabled = not globals.is_enabled
+    if globals.is_enabled:
+        _apply_enabled_icon()
+        globals.hotkey_listener.start_listening()
     else:
-        # stop_listening()
-        pass
-    # Update menu text dynamically by rebuilding menu
+        _apply_disabled_icon()
+        globals.hotkey_listener.stop_listening()
+    # Rebuild and refresh menu so label is dynamic
     icon.menu = _build_menu()
     icon.update_menu()
 
@@ -75,33 +122,49 @@ def _quit(icon: pystray._base.Icon, item: Item):
 
 
 def _build_menu() -> Menu:
-    label = "Stop Listening" if _is_listening else "Start Listening"
+    # First menu item: Enable/Disable (dynamic label)
+    enable_label = "Disable" if globals.is_enabled else "Enable"
+    # Keep listening control as a secondary item with dynamic label
+    listen_label = "Stop Listening" if globals.is_listening else "Start Listening"
+
     return Menu(
-        Item(label, _toggle_listening, default=True),
+        Item(enable_label, _toggle_enabled, default=True),
+        # Item(listen_label, _toggle_listening),
         Item("Open Logs", _open_logs),
         Item("Quit", _quit),
     )
 
 
-tray_icon = pystray.Icon(
-    name="voicetype_tray",
-    title="VoiceType",
-    icon=_load_tray_image(),
-    menu=_build_menu(),
-)
-
-
-def set_ready_icon():
+def set_error_icon():
     """
-    Switch the tray icon to the GREEN background microphone to indicate
-    the local model has loaded and the app is ready.
+    Switch the tray icon to the YELLOW background microphone with a red X overlay
+    to indicate an error occurred during initialization or processing.
     Safe to call from background threads.
     """
     try:
-        img = Image.open(GREEN_BG_MIC).convert("RGBA")
+        img = Image.open(YELLOW_BG_MIC).convert("RGBA")
     except Exception:
-        # If green asset missing, fall back to a green backup icon
-        img = _backup_mic_icon(color=(0, 180, 0))
+        # If yellow asset missing, fall back to a yellow backup icon
+        img = _backup_mic_icon(color=(180, 180, 0))
+
+    # Draw a red 'X' overlay to clearly indicate error
+    try:
+        w, h = img.size
+        draw = ImageDraw.Draw(img)
+        # Stroke width scales with icon size, clamped to visible range
+        stroke = max(2, min(w, h) // 10)
+        margin = max(4, min(w, h) // 8)  # keep X away from edges
+        color = (220, 30, 30, 255)  # solid red
+        # Two diagonal lines
+        draw.line(
+            [(margin, margin), (w - margin, h - margin)], fill=color, width=stroke
+        )
+        draw.line(
+            [(w - margin, margin), (margin, h - margin)], fill=color, width=stroke
+        )
+    except Exception:
+        # If drawing fails for any reason, proceed without overlay
+        pass
 
     try:
         tray_icon.icon = img
@@ -111,6 +174,93 @@ def set_ready_icon():
             pass
     except Exception:
         pass
+
+
+def _add_status_circle(
+    base_img: Image.Image, circle_color: str = "green", alpha: int = 255
+) -> Image.Image:
+    """
+    Add a status circle in the bottom right corner of the icon.
+
+    Args:
+        base_img: The base icon image
+        circle_color: "green", "yellow", "red", or "gray"
+        alpha: Alpha transparency for the entire image (0-255)
+    """
+    img = base_img.copy()
+
+    # Apply alpha transparency to the entire image if requested
+    if alpha < 255:
+        img.putalpha(alpha)
+
+    w, h = img.size
+    draw = ImageDraw.Draw(img)
+
+    # Circle size and position (bottom right corner)
+    circle_size = max(12, min(w, h) // 3)  # 1/3 of the smaller dimension
+    margin = max(2, min(w, h) // 25)
+
+    circle_x = w - circle_size + margin  # Move right (partially out of bounds)
+    circle_y = h - circle_size + margin  # Move down (partially out of bounds)
+
+    # Color mapping
+    color_map = {
+        "green": (40, 200, 40, 255),
+        "yellow": (255, 215, 0, 255),
+        "red": (220, 30, 30, 255),
+        "gray": (128, 128, 128, 255),
+    }
+
+    fill_color = color_map.get(circle_color, color_map["gray"])
+
+    # Draw the status circle with a subtle border
+    draw.ellipse(
+        [circle_x, circle_y, circle_x + circle_size, circle_y + circle_size],
+        fill=fill_color,
+        outline=(0, 0, 0, 180),
+        width=max(1, circle_size // 8),
+    )
+
+    return img
+
+
+def create_mic_icon_variant(circle_color: str = None, alpha: int = 255) -> Image.Image:
+    """
+    Create a microphone icon variant with optional status circle and transparency.
+
+    Args:
+        circle_color: "green", "yellow", "red", "gray", or None for no circle
+        alpha: Alpha transparency for the background (0-255, where 255 is opaque)
+    """
+    try:
+        base_img = Image.open(YELLOW_BG_MIC).convert("RGBA")
+    except Exception:
+        base_img = _backup_mic_icon()
+
+    # Apply transparency to background if requested
+    if alpha < 255:
+        # Create a new image with the desired alpha
+        img_with_alpha = Image.new("RGBA", base_img.size, (0, 0, 0, 0))
+        # Blend the base image with transparency
+        img_with_alpha.paste(base_img, (0, 0))
+        pixels = img_with_alpha.load()
+        width, height = img_with_alpha.size
+
+        for y in range(height):
+            for x in range(width):
+                r, g, b, a = pixels[x, y]
+                if a > 0:  # Only modify non-transparent pixels
+                    pixels[x, y] = (r, g, b, min(a, alpha))
+
+        base_img = img_with_alpha
+
+    # Add status circle if requested
+    if circle_color:
+        base_img = _add_status_circle(
+            base_img, circle_color, 255
+        )  # Circle alpha handled separately
+
+    return base_img
 
 
 def _backup_mic_icon(
@@ -179,3 +329,22 @@ def _backup_mic_icon(
     )
 
     return img
+
+
+tray_icon = pystray.Icon(
+    name="voicetype_tray",
+    title="VoiceType",
+    icon=_load_tray_image(),
+    menu=_build_menu(),
+)
+
+# Initialize icon appearance according to default enabled state
+try:
+    if globals.is_enabled:
+        _apply_enabled_icon()
+    else:
+        _apply_disabled_icon()
+except Exception:
+    pass
+
+# set_error_icon()
