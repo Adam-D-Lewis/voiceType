@@ -6,19 +6,20 @@ from pathlib import Path
 
 from loguru import logger
 
-from voicetype import globals
-from voicetype.assets.sounds import EMPTY_SOUND, ERROR_SOUND, START_RECORD_SOUND
-from voicetype.audio_capture import SpeechProcessor
+from voicetype.app_context import AppContext
+from voicetype.assets.sounds import EMPTY_SOUND
+from voicetype.audio_capture.audio_capture import SpeechProcessor
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 from voicetype.settings import VoiceSettingsProvider, load_settings
-from voicetype.trayicon import tray_icon
+from voicetype.state import AppState, State
+from voicetype.trayicon import create_tray
 from voicetype.utils import type_text
 
 HERE = Path(__file__).resolve().parent
 
 
-def get_platform_listener() -> HotkeyListener:
-    """Detects the platform and display server/session type, then returns the appropriate listener."""
+def get_platform_listener(on_press: callable, on_release: callable) -> HotkeyListener:
+    """Detect the platform/session and return a listener instance (callbacks bound later)."""
     system = platform.system()
     if system == "Linux":
         session_type = os.environ.get("XDG_SESSION_TYPE", "unknown").lower()
@@ -42,70 +43,33 @@ def get_platform_listener() -> HotkeyListener:
             )
 
             return LinuxX11HotkeyListener(
-                on_hotkey_press=handle_hotkey_press,
-                on_hotkey_release=handle_hotkey_release,
+                on_hotkey_press=on_press, on_hotkey_release=on_release
             )
         except Exception as e:
             logger.error(f"Failed to initialize X11 listener: {e}", exc_info=True)
             raise RuntimeError("Could not initialize any Linux hotkey listener.") from e
 
     elif system == "Windows":
-        # TODO: Implement Windows listener
         logger.warning("Windows detected, but listener not implemented.")
         raise NotImplementedError("Windows hotkey listener not yet implemented.")
     elif system == "Darwin":  # macOS
-        # TODO: Implement macOS listener
         logger.warning("macOS detected, but listener not implemented.")
+        raise NotImplementedError("macOS hotkey listener not yet implemented.")
     else:
         raise OSError(f"Unsupported operating system: {system}")
 
 
-def handle_hotkey_press():
-    """Callback function when the hotkey is pressed."""
-    if not globals.is_recording:
-        logger.info("Hotkey pressed - Starting recording...")
-        globals.is_recording = True
-        # TODO: Start actual audio recording stream here (requires SpeechProcessor class refactor)
-        globals.speech_processor.start_recording()
-        # TODO: Update tray icon state to "recording"
-        # play_audio(START_RECORD_SOUND)  # Provide feedback
-    else:
-        logger.warning("Hotkey pressed while already recording. Ignoring.")
+def unload_stt_model():
+    """Unload the STT model from GPU memory"""
+    import gc
 
+    import torch
 
-def handle_hotkey_release():
-    """Callback function when the hotkey is released."""
-    if globals.is_recording:
-        logger.info("Hotkey released - Stopping recording and processing...")
-        globals.is_recording = False
-        # TODO: Stop audio recording stream here (requires SpeechProcessor class refactor)
-        # TODO: Update tray icon state to "processing"
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
 
-        try:
-            # TODO: Get audio data from the stream and pass to voice.transcribe()
-            recording_file = (
-                globals.speech_processor.stop_recording()
-            )  # Placeholder for actual stop recording
-            text = globals.speech_processor.transcribe(
-                recording_file
-            )  # Placeholder for actual transcription
-
-            # transcribed_text = voice.transcribe(audio_data) # Placeholder
-            transcribed_text = text
-            logger.info(f"Transcription result: {transcribed_text}")
-            if transcribed_text:
-                globals.typing_queue.put(transcribed_text)  # Add to queue for typing
-            # TODO: Update tray icon state back to "idle"
-        except Exception as e:
-            logger.error(f"Error during transcription or typing: {e}", exc_info=True)
-            # TODO: Update tray icon state to "error"
-            # play_audio(ERROR_SOUND)  # Provide error feedback
-        finally:
-            # Ensure recording flag is reset even if errors occur
-            globals.is_recording = False
-            # TODO: Reset tray icon to idle if it wasn't already
-    else:
-        logger.debug("Hotkey released while not recording. Ignoring.")
+    gc.collect()
 
 
 def load_stt_model():
@@ -114,7 +78,6 @@ def load_stt_model():
     from speech_recognition.recognizers.whisper_local import faster_whisper
 
     r = sr.Recognizer()
-    # pass in empty file to force load
     audio = sr.AudioData.from_file(str(EMPTY_SOUND))
 
     logger.info("Loading local model in background...")
@@ -135,8 +98,6 @@ def load_stt_model():
 
 def main():
     """Main application entry point."""
-    global globals
-
     parser = argparse.ArgumentParser(description="VoiceType application.")
     parser.add_argument(
         "--settings-file", type=Path, help="Path to the settings TOML file."
@@ -147,34 +108,63 @@ def main():
 
     # Load local model if configured
     if settings.voice.provider == VoiceSettingsProvider.LOCAL:
-        # load in background
         threading.Thread(target=load_stt_model, daemon=True).start()
 
     logger.info("Starting VoiceType application...")
 
     try:
-        globals.speech_processor = SpeechProcessor(settings=settings.voice)
-        globals.hotkey_listener = get_platform_listener()
-        globals.hotkey_listener.set_hotkey(settings.hotkey.hotkey)
-        globals.hotkey_listener.start_listening()
+        # Forward-declare context so callbacks can use it.
+        # It will be properly initialized before the listener is started.
+        ctx = None
+
+        def on_hotkey_press():
+            if ctx and ctx.state.state == State.LISTENING:
+                ctx.state.state = State.RECORDING
+                logger.debug("Hotkey pressed: State -> RECORDING")
+                ctx.speech_processor.start_recording()
+            else:
+                logger.warning(
+                    f"Hotkey pressed in unexpected state: {ctx.state.state if ctx else 'uninitialized'}"
+                )
+
+        def on_hotkey_release():
+            if ctx and ctx.state.state == State.RECORDING:
+                ctx.state.state = State.PROCESSING
+                logger.debug("Hotkey released: State -> PROCESSING")
+                audio_file = ctx.speech_processor.stop_recording()
+                if audio_file:
+                    # TODO: This should run in a separate thread
+                    text = ctx.speech_processor.transcribe(audio_file)
+                    if text:
+                        type_text(text)
+                ctx.state.state = State.LISTENING
+            else:
+                logger.warning(
+                    f"Hotkey released in unexpected state: {ctx.state.state if ctx else 'uninitialized'}"
+                )
+
+        listener = get_platform_listener(
+            on_press=on_hotkey_press, on_release=on_hotkey_release
+        )
+        listener.set_hotkey(settings.hotkey.hotkey)
+
+        speech_processor = SpeechProcessor(settings=settings.voice)
+
+        ctx = AppContext(
+            state=AppState(),
+            speech_processor=speech_processor,
+            hotkey_listener=listener,
+        )
+        ctx.state.state = State.LISTENING
+
+        listener.start_listening()
 
         logger.info(f"Intended hotkey: {settings.hotkey.hotkey}")
         logger.info("Press Ctrl+C to exit.")
 
-        def type_text_with_queue():
-            """Continuously checks the typing queue and types text."""
-            while True:
-                try:
-                    transcribed_text = globals.typing_queue.get()
-                    type_text(transcribed_text)
-                except Exception as e:
-                    logger.error(f"Error processing typing queue: {e}", exc_info=True)
-                    break
-
-        threading.Thread(target=type_text_with_queue, daemon=True).start()
-
         # Start the system tray icon (blocks until closed)
-        tray_icon.run()
+        tray = create_tray(ctx)
+        tray.run()
 
     except KeyboardInterrupt:
         logger.info("Shutdown requested via KeyboardInterrupt.")
@@ -186,9 +176,9 @@ def main():
         logger.error(f"An unexpected error occurred: {e}\n{traceback.format_exc()}")
     finally:
         logger.info("Shutting down...")
-        if globals.hotkey_listener:
+        if "listener" in locals() and listener:
             try:
-                globals.hotkey_listener.stop_listening()
+                listener.stop_listening()
                 logger.info("Hotkey listener stopped.")
             except Exception as e:
                 logger.error(f"Error stopping listener: {e}", exc_info=True)
