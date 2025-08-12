@@ -2,13 +2,19 @@ name: voicetype
 channels:
   - conda-forge
 dependencies:
-  - python
+  - python<=3.12
   - fastapi>=0.93.0
   - loguru
   - pyaudio
-  - pynput
-  # - speechrecognition
-  - pysoundfile
+  - speechrecognition
+  - pydub
+
+  # settings
+  - pydantic-settings
+  - toml
+
+  # using aider-chat only for litellm
+  # - aider-chat
 
   # needed by faster-whisper gpu
   - libcublas
@@ -27,10 +33,18 @@ dependencies:
   # pip
   - pip
   - pip:
+    # pynput fork
+    - pynput @ git+https://github.com/Adam-D-Lewis/pynput@26fe001ada956c0ad023ea0e3aa3c7dded3526ad
 
     # whisper
     - openai-whisper
     - faster-whisper
+
+    # other
+    - soundfile
+    - sounddevice
+    - -e ./ [local, dev]
+
 
 variables:
   VAR1: valueA

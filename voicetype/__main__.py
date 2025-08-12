@@ -1,21 +1,21 @@
 import argparse
 import os
 import platform
-import queue
 import threading
+import time
 from pathlib import Path
 
 from loguru import logger
 
+from voicetype.assets.sounds import EMPTY_SOUND, ERROR_SOUND, START_RECORD_SOUND
+from voicetype.audio_capture import SpeechProcessor
 from voicetype.globals import hotkey_listener, is_recording, typing_queue, voice
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 from voicetype.settings import VoiceSettingsProvider, load_settings
-from voicetype.sounds import ERROR_SOUND, START_RECORD_SOUND
+from voicetype.trayicon import tray_icon
 from voicetype.utils import type_text
-from voicetype.voice.voice import Voice
 
 HERE = Path(__file__).resolve().parent
-SOUNDS_DIR = HERE / "sounds"
 
 
 def get_platform_listener() -> HotkeyListener:
@@ -67,7 +67,7 @@ def handle_hotkey_press():
     if not is_recording:
         logger.info("Hotkey pressed - Starting recording...")
         is_recording = True
-        # TODO: Start actual audio recording stream here (requires Voice class refactor)
+        # TODO: Start actual audio recording stream here (requires SpeechProcessor class refactor)
         voice.start_recording()
         # TODO: Update tray icon state to "recording"
         # play_audio(START_RECORD_SOUND)  # Provide feedback
@@ -81,7 +81,7 @@ def handle_hotkey_release():
     if is_recording:
         logger.info("Hotkey released - Stopping recording and processing...")
         is_recording = False
-        # TODO: Stop audio recording stream here (requires Voice class refactor)
+        # TODO: Stop audio recording stream here (requires SpeechProcessor class refactor)
         # TODO: Update tray icon state to "processing"
 
         try:
@@ -111,22 +111,29 @@ def handle_hotkey_release():
         logger.debug("Hotkey released while not recording. Ignoring.")
 
 
-def load_model_in_background():
+def load_stt_model():
+    """Load the local speech-to-text (STT) model"""
     import speech_recognition as sr
     from speech_recognition.recognizers.whisper_local import faster_whisper
 
     r = sr.Recognizer()
     # pass in empty file to force load
-    audio = sr.AudioData.from_file(str(SOUNDS_DIR / "empty.wav"))
+    audio = sr.AudioData.from_file(str(EMPTY_SOUND))
 
     logger.info("Loading local model in background...")
-    _ = faster_whisper.recognize(
-        r,
-        audio_data=audio,
-        model="large-v3",
-        language="en",
-    )
-    logger.info("Local model loaded.")
+    try:
+        _ = faster_whisper.recognize(
+            r,
+            audio_data=audio,
+            model="large-v3",
+            language="en",
+        )
+        logger.info("Local model loaded.")
+    except Exception as e:
+        logger.error(f"Failed to load local model: {e}", exc_info=True)
+        raise NotImplementedError(
+            "Local model loading failed. Ensure the model is correctly installed."
+        )
 
 
 def main():
@@ -144,12 +151,12 @@ def main():
     # Load local model if configured
     if settings.voice.provider == VoiceSettingsProvider.LOCAL:
         # load in background
-        threading.Thread(target=load_model_in_background, daemon=True).start()
+        threading.Thread(target=load_stt_model, daemon=True).start()
 
     logger.info("Starting VoiceType application...")
 
     try:
-        voice = Voice(settings=settings.voice)
+        voice = SpeechProcessor(settings=settings.voice)
         hotkey_listener = get_platform_listener()
         hotkey_listener.set_hotkey(settings.hotkey.hotkey)
         hotkey_listener.start_listening()
@@ -157,26 +164,29 @@ def main():
         logger.info(f"Intended hotkey: {settings.hotkey.hotkey}")
         logger.info("Press Ctrl+C to exit.")
 
-        while True:
-            # Keep the main thread alive.
-            # If using pystray, icon.run() would block here.
-            # If the listener runs in the main thread and blocks, this loop isn't needed.
-            # If the listener runs in a background thread, we need to keep alive.
-            try:
-                transcribed_text = typing_queue.get(timeout=1)
-                type_text(transcribed_text)
-            except queue.Empty:
-                continue
-            except Exception as e:
-                logger.error(f"Error processing typing queue: {e}", exc_info=True)
-                break
+        def type_text_with_queue():
+            """Continuously checks the typing queue and types text."""
+            while True:
+                try:
+                    transcribed_text = typing_queue.get()
+                    type_text(transcribed_text)
+                except Exception as e:
+                    logger.error(f"Error processing typing queue: {e}", exc_info=True)
+                    break
+
+        threading.Thread(target=type_text_with_queue, daemon=True).start()
+
+        # Start the system tray icon (blocks until closed)
+        tray_icon.run()
 
     except KeyboardInterrupt:
         logger.info("Shutdown requested via KeyboardInterrupt.")
     except NotImplementedError as e:
         logger.error(f"Initialization failed: {e}")
     except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}", exc_info=True)
+        import traceback
+
+        logger.error(f"An unexpected error occurred: {e}\n{traceback.format_exc()}")
     finally:
         logger.info("Shutting down...")
         if hotkey_listener:

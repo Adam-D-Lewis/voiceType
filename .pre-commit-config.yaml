@@ -42,6 +42,7 @@ repos:
         args:
           [
             "--write",
+            "--skip", "*.svg,*.png",
           ]
         language: python
         additional_dependencies:

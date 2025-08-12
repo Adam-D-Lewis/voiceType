@@ -29,7 +29,7 @@
 
 ## 2. Audio Capture (Platform Independent)
 - [x] Capture audio from the system microphone (voice.py provides this logic).
-- [ ] Refactor Voice to allow starting/stopping recording based on external signals (hotkey events), not blocking prompt.
+- [ ] Refactor SpeechProcessor to allow starting/stopping recording based on external signals (hotkey events), not blocking prompt.
 - [ ] Enforce a 1-minute max duration for a single recording.
 - [ ] Ensure the default mic is used (voice.py already supports device selection).
 - [ ] (Optional) Stream audio to the speech-to-text model for lower latency.
