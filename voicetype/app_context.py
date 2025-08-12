@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from voicetype.state import AppState
 
 if TYPE_CHECKING:
-    from voicetype.audio_capture.audio_capture import SpeechProcessor
+    from voicetype.audio_capture import SpeechProcessor
     from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 
 

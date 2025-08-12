@@ -8,7 +8,7 @@ from loguru import logger
 
 from voicetype.app_context import AppContext
 from voicetype.assets.sounds import EMPTY_SOUND
-from voicetype.audio_capture.audio_capture import SpeechProcessor
+from voicetype.audio_capture import SpeechProcessor
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 from voicetype.settings import VoiceSettingsProvider, load_settings
 from voicetype.state import AppState, State
@@ -149,21 +149,21 @@ def main():
                     f"Hotkey released in unexpected state: {ctx.state.state if ctx else 'uninitialized'}"
                 )
 
-        listener = get_platform_listener(
+        hotkey_listener = get_platform_listener(
             on_press=on_hotkey_press, on_release=on_hotkey_release
         )
-        listener.set_hotkey(settings.hotkey.hotkey)
+        hotkey_listener.set_hotkey(settings.hotkey.hotkey)
 
         speech_processor = SpeechProcessor(settings=settings.voice)
 
         ctx = AppContext(
             state=AppState(),
             speech_processor=speech_processor,
-            hotkey_listener=listener,
+            hotkey_listener=hotkey_listener,
         )
         ctx.state.state = State.LISTENING
 
-        listener.start_listening()
+        hotkey_listener.start_listening()
 
         logger.info(f"Intended hotkey: {settings.hotkey.hotkey}")
         logger.info("Press Ctrl+C to exit.")
@@ -182,9 +182,9 @@ def main():
         logger.error(f"An unexpected error occurred: {e}\n{traceback.format_exc()}")
     finally:
         logger.info("Shutting down...")
-        if "listener" in locals() and listener:
+        if "listener" in locals() and hotkey_listener:
             try:
-                listener.stop_listening()
+                hotkey_listener.stop_listening()
                 logger.info("Hotkey listener stopped.")
             except Exception as e:
                 logger.error(f"Error stopping listener: {e}", exc_info=True)
