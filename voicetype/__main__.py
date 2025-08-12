@@ -132,12 +132,18 @@ def main():
                 ctx.state.state = State.PROCESSING
                 logger.debug("Hotkey released: State -> PROCESSING")
                 audio_file = ctx.speech_processor.stop_recording()
-                if audio_file:
-                    # TODO: This should run in a separate thread
-                    text = ctx.speech_processor.transcribe(audio_file)
-                    if text:
-                        type_text(text)
-                ctx.state.state = State.LISTENING
+
+                def transcribe_and_type():
+                    try:
+                        if audio_file:
+                            text = ctx.speech_processor.transcribe(audio_file)
+                            if text:
+                                type_text(text)
+                    finally:
+                        ctx.state.state = State.LISTENING
+                        logger.debug("State -> LISTENING")
+
+                threading.Thread(target=transcribe_and_type, daemon=True).start()
             else:
                 logger.warning(
                     f"Hotkey released in unexpected state: {ctx.state.state if ctx else 'uninitialized'}"

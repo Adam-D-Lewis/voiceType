@@ -246,9 +246,6 @@ class SpeechProcessor:
             return None
 
         logger.debug("Stopping recording...")
-        time.sleep(0.25)  # Some expected recording gets lost if we don't wait a bit
-        self._stop_event.set()  # Signal callback to stop processing queue
-
         if self.stream:
             try:
                 self.stream.stop()
@@ -261,17 +258,23 @@ class SpeechProcessor:
             finally:
                 self.stream = None
 
+        self._stop_event.set()  # Signal callback to stop processing queue
+
         # Process any remaining items in the queue after stopping the stream
         logger.debug(
             f"Processing remaining audio data (queue size: {self.q.qsize()})..."
         )
+
+        # Give a moment for the last chunks of audio to arrive in the queue
+        time.sleep(0.1)
+
         while not self.q.empty():
             try:
                 data = self.q.get_nowait()
                 if self.audio_file and not self.audio_file.closed:
                     self.audio_file.write(data)
             except queue.Empty:
-                break  # Should not happen with while not self.q.empty()
+                break  # Queue is empty
             except Exception as e:
                 logger.debug(f"Error writing remaining audio data: {e}")
 
