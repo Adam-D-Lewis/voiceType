@@ -343,7 +343,7 @@ class SpeechProcessor:
             language="en",
             init_options=faster_whisper.InitOptionalParameters(
                 device="cuda",
-                # compute_type="int8"  # reduces memory by around 50%
+                # compute_type="int8"  # reduces memory, esp for large-v3, but i think it's faster without this for the turbo model at least
             ),
             # didn't see much of an effect with the below
             # temperature=[0],  # Use deterministic decoding
