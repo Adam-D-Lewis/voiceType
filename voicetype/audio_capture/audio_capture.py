@@ -335,7 +335,20 @@ class SpeechProcessor:
         audio = sr.AudioData.from_file(filename)
 
         transcribed_text = faster_whisper.recognize(
-            None, audio_data=audio, model="large-v3", language="en"
+            None,
+            audio_data=audio,
+            # model="large-v3",
+            # model="distil-large-v3",
+            model="large-v3-turbo",
+            language="en",
+            init_options=faster_whisper.InitOptionalParameters(
+                device="cuda",
+                # compute_type="int8"  # reduces memory by around 50%
+            ),
+            # didn't see much of an effect with the below
+            # temperature=[0],  # Use deterministic decoding
+            # beam_size=1,
+            # without_timestamps=True,  # Disable timestamps for simplicity
         )
 
         # transcribed_text seems to come back with a leading space, so we strip it
