@@ -18,7 +18,7 @@ source = "vcs"
 version-file = "voicetype/_version.py"
 
 [project]
-name = "voicetype"
+name = "voiceType2"
 description = "Type with your voice using hotkey-activated speech recognition"
 readme = "README.md"
 authors = [{ name = "Adam Lewis" }]
