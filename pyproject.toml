@@ -27,6 +27,7 @@ dynamic = ["version"]
 
 [project.scripts]
 voicetype = "voicetype.install:main"
+run-voicetype = "voicetype.__main__:main"
 
 [project.optional-dependencies]
 dev = [
