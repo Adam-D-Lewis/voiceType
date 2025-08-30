@@ -8,7 +8,7 @@ authors = [{ name = "Adam Lewis" }]
 requires-python = "<=3.12"
 dependencies = [
     # "pyaudio",  # was causing me problems with audio
-    "pynput @ git+https://github.com/Adam-D-Lewis/pynput@26fe001ada956c0ad023ea0e3aa3c7dded3526ad",
+    "pynput @ git+https://github.com/moses-palmer/pynput@a101b3a990c751a7940c929590e8f66248350f98",
     "speechrecognition",
     "loguru",
     "pystray",
