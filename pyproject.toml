@@ -15,7 +15,7 @@ dependencies = [
     "prompt_toolkit",
     "dasbus", # wayland
     # "pygame",  # for sound
-    # "playsound3",        # for sound
+    # "playsound3", # for sound
     "soundfile",  # for sound
     "sounddevice",  # for sound
     "pydub",  # for sound

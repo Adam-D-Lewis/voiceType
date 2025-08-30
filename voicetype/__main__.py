@@ -72,30 +72,6 @@ def unload_stt_model():
     gc.collect()
 
 
-def load_stt_model():
-    """Load the local speech-to-text (STT) model"""
-    import speech_recognition as sr
-    from speech_recognition.recognizers.whisper_local import faster_whisper
-
-    r = sr.Recognizer()
-    audio = sr.AudioData.from_file(str(EMPTY_SOUND))
-
-    logger.info("Loading local model in background...")
-    try:
-        _ = faster_whisper.recognize(
-            r,
-            audio_data=audio,
-            model="large-v3",
-            language="en",
-        )
-        logger.info("Local model loaded.")
-    except Exception as e:
-        logger.error(f"Failed to load local model: {e}", exc_info=True)
-        raise NotImplementedError(
-            "Local model loading failed. Ensure the model is correctly installed."
-        )
-
-
 def main():
     """Main application entry point."""
     parser = argparse.ArgumentParser(description="VoiceType application.")
@@ -105,10 +81,6 @@ def main():
     args = parser.parse_args()
 
     settings = load_settings(args.settings_file)
-
-    # Load local model if configured
-    if settings.voice.provider == VoiceSettingsProvider.LOCAL:
-        threading.Thread(target=load_stt_model, daemon=True).start()
 
     logger.info("Starting VoiceType application...")
 
