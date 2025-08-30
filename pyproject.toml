@@ -15,7 +15,7 @@ dependencies = [
     "prompt_toolkit",
     "dasbus", # wayland
     # "pygame",  # for sound
-    # "playsound3",        # for sound
+    # "playsound3", # for sound
     "soundfile",  # for sound
     "sounddevice",  # for sound
     "pydub",  # for sound
@@ -26,7 +26,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.scripts]
-voicetype = "voicetype.__main__:main"
+voicetype = "voicetype.install:main"
 
 [project.optional-dependencies]
 dev = [

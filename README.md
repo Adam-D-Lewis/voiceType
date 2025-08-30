@@ -40,11 +40,11 @@ Type with your voice.
     This command reads `pyproject.toml`, installs all necessary dependencies, and makes the `voicetype` script available (callable as `python -m voicetype`).
 
 4.  **Run the installation script (for Linux with systemd):**
-    If you are on Linux and want to run VoiceType as a systemd user service (recommended for background operation and auto-start on login), use the `voicetype/install.py` script.  Be sure to run it in the correct environment (with deps installed).
+    If you are on Linux and want to run VoiceType as a systemd user service (recommended for background operation and auto-start on login), use the CLI entrypoint installed with the package. Ensure you're in the environment where you installed dependencies.
     ```bash
-    python voicetype/install.py install
+    voicetype install
     ```
-    You will be prompted to enter your `OPENAI_API_KEY`. This key will be stored securely in `~/.config/voicetype/.env`.
+    During install you'll be prompted to choose a provider [litellm, local]. If you choose `litellm` you'll then be prompted for your `OPENAI_API_KEY`. Values are stored in `~/.config/voicetype/.env` with restricted permissions.
 
     The script will:
     - Create a systemd service file at `~/.config/systemd/user/voicetype.service`.
@@ -70,11 +70,11 @@ Type with your voice.
 
 ## Managing the Service (Linux with systemd)
 
-If you used `voicetype/install.py install`:
+If you used `voicetype install`:
 
 -   **Check service status:**
     ```bash
-    python voicetype/install.py status
+    voicetype status
     ```
     Alternatively:
     ```bash
@@ -116,7 +116,7 @@ If you used `voicetype/install.py install`:
 
 To stop the service, disable auto-start, and remove the systemd service file and associated configuration:
 ```bash
-python voicetype/install.py uninstall
+voicetype uninstall
 ```
 This will:
 - Stop and disable the `voicetype.service`.
@@ -150,7 +150,7 @@ Setup Pixi
 Create and activate the environment
 - From the project root:
   - pixi install -e local
-  - pixi shell
+  - pixi shell -e local
 
 Run the application
 - pixi run voicetype
