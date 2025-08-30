@@ -19,8 +19,22 @@ version-file = "voicetype/_version.py"
 
 [project]
 name = "voicetype"
+description = "Type with your voice using hotkey-activated speech recognition"
+readme = "README.md"
 authors = [{ name = "Adam Lewis" }]
 requires-python = "<=3.12"
+keywords = ["speech-recognition", "voice-typing", "accessibility", "transcription"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Text Processing",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+    "License :: OSI Approved :: Apache Software License",
+]
 dependencies = [
     # "pyaudio",  # was causing me problems with audio
     "pynput @ git+https://github.com/Adam-D-Lewis/pynput@26fe001ada956c0ad023ea0e3aa3c7dded3526ad",
