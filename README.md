@@ -1,5 +1,7 @@
 # voiceType
 
+![voiceType Logo](voicetype/assets/yellow-splotch-logo.png)
+
 Type with your voice.
 
 ## Features
@@ -38,11 +40,11 @@ Type with your voice.
     This command reads `pyproject.toml`, installs all necessary dependencies, and makes the `voicetype` script available (callable as `python -m voicetype`).
 
 4.  **Run the installation script (for Linux with systemd):**
-    If you are on Linux and want to run VoiceType as a systemd user service (recommended for background operation and auto-start on login), use the `voicetype/install.py` script.
+    If you are on Linux and want to run VoiceType as a systemd user service (recommended for background operation and auto-start on login), use the CLI entrypoint installed with the package. Ensure you're in the environment where you installed dependencies.
     ```bash
-    python voicetype/install.py install
+    voicetype install
     ```
-    You will be prompted to enter your `OPENAI_API_KEY`. This key will be stored securely in `~/.config/voicetype/.env`.
+    During install you'll be prompted to choose a provider [litellm, local]. If you choose `litellm` you'll then be prompted for your `OPENAI_API_KEY`. Values are stored in `~/.config/voicetype/.env` with restricted permissions.
 
     The script will:
     - Create a systemd service file at `~/.config/systemd/user/voicetype.service`.
@@ -68,11 +70,11 @@ Type with your voice.
 
 ## Managing the Service (Linux with systemd)
 
-If you used `voicetype/install.py install`:
+If you used `voicetype install`:
 
 -   **Check service status:**
     ```bash
-    python voicetype/install.py status
+    voicetype status
     ```
     Alternatively:
     ```bash
@@ -114,7 +116,7 @@ If you used `voicetype/install.py install`:
 
 To stop the service, disable auto-start, and remove the systemd service file and associated configuration:
 ```bash
-python voicetype/install.py uninstall
+voicetype uninstall
 ```
 This will:
 - Stop and disable the `voicetype.service`.
@@ -130,5 +132,65 @@ pip uninstall voicetype
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
+## Development
+
+Preferred workflow: Pixi
+
+- Pixi is the preferred way to create and manage the development environment for this project. It ensures reproducible, cross-platform setups using the definitions in environment.yaml and pyproject.toml.
+
+Setup Pixi
+- Install Pixi:
+  - Linux/macOS (official installer):
+    - curl -fsSL https://pixi.sh/install.sh | bash
+  - macOS (Homebrew):
+    - brew install prefix-dev/pixi/pixi
+  - Verify:
+    - pixi --version
+
+Create and activate the environment
+- From the project root:
+  - pixi install -e local
+  - pixi shell -e local
+
+Run the application
+- pixi run voicetype
+  - Equivalent to:
+    - python -m voicetype
+
+Run tests
+- If a test task is defined:
+  - pixi run test
+- Otherwise (pytest directly):
+  - pixi run python -m pytest
+
+Lint and format
+- If tasks are defined:
+  - pixi run lint
+  - pixi run fmt
+- Or run tools directly:
+  - pixi run ruff format
+  - pixi run ruff check .
+
+Pre-commit hooks (recommended)
+- Install hooks:
+  - pixi run pre-commit install
+- Run on all files:
+  - pixi run pre-commit run --all-files
+
+Alternative: Python venv (fallback)
+- Ensure Python 3.11+ is installed.
+- Create and activate a venv:
+  - python -m venv .venv
+  - source .venv/bin/activate
+- Editable install with dev dependencies:
+  - pip install -U pip
+  - pip install -e ".[dev]"
+- Run the app:
+  - python -m voicetype
+
+Notes
+- Dependency definitions live in pyproject.toml; additional environment details may be in environment.yaml.
+- After changing dependencies, update pyproject.toml (and environment.yaml if needed), then run:
+  - pixi install
 ## License
 This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.

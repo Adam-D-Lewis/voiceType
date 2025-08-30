@@ -8,11 +8,10 @@ import time
 import warnings
 
 import numpy as np
-from aider.llm import litellm
 from loguru import logger
 
+from voicetype.audio_capture.dump import dump  # noqa: F401
 from voicetype.settings import VoiceSettings, VoiceSettingsProvider
-from voicetype.voice.dump import dump  # noqa: F401
 
 warnings.filterwarnings(
     "ignore",
@@ -31,10 +30,21 @@ except (OSError, ModuleNotFoundError):
 
 
 class SoundDeviceError(Exception):
+    """Exception raised for audio device and sound processing errors."""
+
     pass
 
 
-class Voice:
+class SpeechProcessor:
+    """Audio recording and transcription system.
+
+    Provides functionality for:
+    - Recording audio from microphones using sounddevice
+    - Real-time RMS calculation for volume monitoring
+    - Audio transcription using OpenAI Whisper API or local Whisper models
+    - Format conversion between wav, mp3, and webm
+    """
+
     max_rms = 0
     min_rms = 1e5
     pct = 0.0  # Initialize pct
@@ -42,6 +52,17 @@ class Voice:
     threshold = 0.15  # Threshold for RMS visualization (if needed later)
 
     def __init__(self, settings: VoiceSettings, audio_format="wav", device_name=None):
+        """Initialize SpeechProcessor with audio settings and device configuration.
+
+        Args:
+            settings: VoiceSettings instance containing provider and model config
+            audio_format: Audio format for recordings ("wav", "mp3", or "webm")
+            device_name: Specific audio device name to use, or None for default
+
+        Raises:
+            SoundDeviceError: If audio libraries are unavailable or device setup fails
+            ValueError: If unsupported audio format is specified
+        """
         self.settings = settings
         if sf is None:
             raise SoundDeviceError("SoundFile library not available.")
@@ -83,7 +104,18 @@ class Voice:
         )  # Used to signal the callback to stop processing
 
     def _find_device_id(self, device_name):
-        """Helper to find the input device ID."""
+        """Find the input device ID by name or return None for default.
+
+        Args:
+            device_name: Name of the audio device to search for, or None for default
+
+        Returns:
+            Device ID integer or None for default device
+
+        Raises:
+            SoundDeviceError: If no audio devices are found
+            ValueError: If specified device name is not found
+        """
         devices = self.sd.query_devices()
         if not devices:
             raise SoundDeviceError("No audio devices found.")
@@ -111,7 +143,17 @@ class Voice:
             return None
 
     def callback(self, indata, frames, time_info, status):
-        """This is called (from a separate thread) for each audio block."""
+        """Audio callback function called for each audio block during recording.
+
+        Calculates RMS values for volume monitoring and queues audio data for processing.
+        Called from a separate thread by sounddevice.
+
+        Args:
+            indata: Input audio data as numpy array
+            frames: Number of frames in the audio block
+            time_info: Timing information from sounddevice
+            status: Status flags from sounddevice
+        """
         if status:
             logger.debug(f"Audio callback status: {status}", file=sys.stderr)
         if self._stop_event.is_set():  # Check if stop signal received
@@ -138,7 +180,14 @@ class Voice:
     # def get_prompt(self): ...
 
     def start_recording(self):
-        """Starts recording audio."""
+        """Start recording audio from the configured input device.
+
+        Creates a temporary WAV file and begins streaming audio data.
+        Resets RMS tracking values for volume monitoring.
+
+        Raises:
+            SoundDeviceError: If audio stream cannot be started
+        """
         if self.is_recording:
             logger.debug("Already recording.")
             return
@@ -185,15 +234,18 @@ class Voice:
             raise  # Re-raise the exception
 
     def stop_recording(self):
-        """Stops recording audio and returns the path to the saved WAV file."""
+        """Stop recording audio and save to temporary file.
+
+        Processes any remaining audio data in the queue and closes the audio file.
+
+        Returns:
+            str: Path to the saved WAV file, or None if not recording
+        """
         if not self.is_recording:
             logger.debug("Not recording.")
             return None
 
         logger.debug("Stopping recording...")
-        time.sleep(0.25)  # Some expected recording gets lost if we don't wait a bit
-        self._stop_event.set()  # Signal callback to stop processing queue
-
         if self.stream:
             try:
                 self.stream.stop()
@@ -206,17 +258,23 @@ class Voice:
             finally:
                 self.stream = None
 
+        self._stop_event.set()  # Signal callback to stop processing queue
+
         # Process any remaining items in the queue after stopping the stream
         logger.debug(
             f"Processing remaining audio data (queue size: {self.q.qsize()})..."
         )
+
+        # Give a moment for the last chunks of audio to arrive in the queue
+        time.sleep(0.1)
+
         while not self.q.empty():
             try:
                 data = self.q.get_nowait()
                 if self.audio_file and not self.audio_file.closed:
                     self.audio_file.write(data)
             except queue.Empty:
-                break  # Should not happen with while not self.q.empty()
+                break  # Queue is empty
             except Exception as e:
                 logger.debug(f"Error writing remaining audio data: {e}")
 
@@ -237,7 +295,19 @@ class Voice:
         return recorded_filename
 
     def transcribe(self, filename, history=None, language=None):
-        """Transcribes the audio file using the configured model."""
+        """Transcribe audio file to text using the configured provider.
+
+        Args:
+            filename: Path to the audio file to transcribe
+            history: Optional context/history for better transcription accuracy
+            language: Optional language code for transcription
+
+        Returns:
+            str: Transcribed text, or None if transcription fails
+
+        Raises:
+            NotImplementedError: If provider is not supported
+        """
         provider = self.settings.provider
         logger.info(f"Using '{provider}' provider for transcription.")
 
@@ -249,20 +319,58 @@ class Voice:
             raise NotImplementedError(f"Provider '{provider}' is not supported.")
 
     def _transcribe_with_local(self, filename, history, language):
+        """Transcribe audio using local Whisper model via speech_recognition.
+
+        Args:
+            filename: Path to audio file
+            history: Unused in local transcription
+            language: Unused in local transcription (defaults to English)
+
+        Returns:
+            str: Transcribed text with leading/trailing whitespace removed
+        """
         import speech_recognition as sr
         from speech_recognition.recognizers.whisper_local import faster_whisper
 
         audio = sr.AudioData.from_file(filename)
 
         transcribed_text = faster_whisper.recognize(
-            None, audio_data=audio, model="large-v3", language="en"
+            None,
+            audio_data=audio,
+            # model="large-v3",
+            # model="distil-large-v3",
+            model="large-v3-turbo",
+            language="en",
+            init_options=faster_whisper.InitOptionalParameters(
+                device="cuda",
+                # compute_type="int8"  # reduces memory, esp for large-v3, but i think it's faster without this for the turbo model at least
+            ),
+            # didn't see much of an effect with the below
+            # temperature=[0],  # Use deterministic decoding
+            # beam_size=1,
+            # without_timestamps=True,  # Disable timestamps for simplicity
         )
 
         # transcribed_text seems to come back with a leading space, so we strip it
         return transcribed_text.strip()
 
     def _transcribe_with_litellm(self, filename, history=None, language=None):
-        """Transcribes the audio file using the litellm provider."""
+        """Transcribe audio using OpenAI's Whisper API via litellm.
+
+        Handles file size limits by converting large WAV files to MP3.
+        Automatically cleans up temporary files after transcription.
+
+        Args:
+            filename: Path to the audio file to transcribe
+            history: Optional context to improve transcription accuracy
+            language: Optional language code for transcription
+
+        Returns:
+            str: Transcribed text, or None if transcription fails
+
+        Raises:
+            SoundDeviceError: If OPENAI_API_KEY environment variable is not set
+        """
         if not os.getenv("OPENAI_API_KEY"):
             raise SoundDeviceError(
                 "OPENAI_API_KEY environment variable not set. Please set it to use the litellm provider."
@@ -314,6 +422,8 @@ class Voice:
         transcript_text = None
         try:
             with open(final_filename, "rb") as fh:
+                from aider.llm import litellm
+
                 transcript = litellm.transcription(
                     model="whisper-1", file=fh, prompt=history, language=language
                 )
