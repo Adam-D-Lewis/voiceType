@@ -18,7 +18,7 @@ source = "vcs"
 version-file = "voicetype/_version.py"
 
 [project]
-name = "voicetype2"
+name = "voicetype"
 authors = [{ name = "Adam Lewis" }]
 requires-python = "<=3.12"
 dependencies = [
