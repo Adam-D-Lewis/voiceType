@@ -118,6 +118,7 @@ pygobject = "*"
 
 # Map environments to feature sets
 [tool.pixi.environments]
+default = ["local"]
 
 [tool.pixi.environments.local]
 features = ["local"]
