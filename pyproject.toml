@@ -109,7 +109,7 @@ voicetype = { path = ".", editable = true }
 
 # Platform-scoped dependencies
 [tool.pixi.feature.local.target.linux-64.dependencies]
-libcublas = "*"
+libcublas = "<13"  # faster_whisper doesn't seem to support cuda 13 yet
 cudnn = "*"
 gtk3 = "*"
 gobject-introspection = "*"
