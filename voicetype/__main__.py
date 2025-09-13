@@ -108,7 +108,7 @@ def main():
 
                 def transcribe_and_type():
                     try:
-                        if not audio_file:
+                        if audio_file:
                             text = ctx.speech_processor.transcribe(audio_file)
                             if text:
                                 try:
