@@ -1,6 +1,6 @@
 # voiceType
 
-![voiceType Logo](voicetype/assets/yellow-splotch-logo.png)
+![voiceType Logo](voicetype/assets/imgs/yellow-splotch-logo.png)
 
 Type with your voice.
 
