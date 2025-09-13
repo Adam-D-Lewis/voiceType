@@ -46,10 +46,9 @@ dependencies = [
     "prompt_toolkit",
     "dasbus", # wayland
     # "pygame",  # for sound
-    # "playsound3", # for sound
-    "soundfile",  # for sound
-    "sounddevice",  # for sound
-    "pydub",  # for sound
+    "playsound3", # for sound
+    "soundfile",  # for sound recording
+    "sounddevice",  # for detecting input devices and recording sound
     "pydantic-settings",
     "toml",
     "aider-chat", # for litellm

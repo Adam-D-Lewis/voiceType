@@ -185,6 +185,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/cc/20/ff623b09d963f88bfde16306a54e12ee5ea43e9b597108672ff3a408aad6/pathspec-0.12.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/9e/c3/059298687310d527a58bb01f3b1965787ee3b40dce76752eda8b44e9a2c5/pexpect-4.9.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e4/c9/06dd4a38974e24f932ff5f98ea3c546ce3f8c995d3f0985f8e5ba48bba19/pillow-11.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/7b/ea/44040163f32d2602774737bf37d3bcb577e645b567f3e2da51a78f23425a/playsound3-3.2.6-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/9e/9f/cbeffe61002faf2c4fd935a283401c35b82505c012ba69240f0d09d095f0/posthog-6.4.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ce/4f/5249960887b1fbe561d9ff265496d170b55a735b76724f10ef19f9e40716/prompt_toolkit-3.0.51-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/37/7c/54fd5301ef38505ab235d98827207176a5c9b2aa61939b10a460ca53e123/propcache-0.3.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
@@ -431,6 +432,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/cc/20/ff623b09d963f88bfde16306a54e12ee5ea43e9b597108672ff3a408aad6/pathspec-0.12.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/9e/c3/059298687310d527a58bb01f3b1965787ee3b40dce76752eda8b44e9a2c5/pexpect-4.9.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e4/c9/06dd4a38974e24f932ff5f98ea3c546ce3f8c995d3f0985f8e5ba48bba19/pillow-11.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/7b/ea/44040163f32d2602774737bf37d3bcb577e645b567f3e2da51a78f23425a/playsound3-3.2.6-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/9e/9f/cbeffe61002faf2c4fd935a283401c35b82505c012ba69240f0d09d095f0/posthog-6.4.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ce/4f/5249960887b1fbe561d9ff265496d170b55a735b76724f10ef19f9e40716/prompt_toolkit-3.0.51-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/37/7c/54fd5301ef38505ab235d98827207176a5c9b2aa61939b10a460ca53e123/propcache-0.3.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
@@ -1791,7 +1793,7 @@ packages:
   version: 0.22.0
   sha256: 14ae0a53c1ba8f3d37e9e27cf37eabb0fb9980f435ba405d546948b009dd64dc
   requires_dist:
-  - pyparsing>=2.4.2,<3 ; python_full_version < '3.0'
+  - pyparsing>=2.4.2,<3 ; python_full_version < '3'
   - pyparsing>=2.4.2,!=3.0.0,!=3.0.1,!=3.0.2,!=3.0.3,<4 ; python_full_version >= '3.1'
   requires_python: '>=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*'
 - pypi: https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl
@@ -2897,6 +2899,17 @@ packages:
   purls: []
   size: 115175
   timestamp: 1720805894943
+- pypi: https://files.pythonhosted.org/packages/7b/ea/44040163f32d2602774737bf37d3bcb577e645b567f3e2da51a78f23425a/playsound3-3.2.6-py3-none-any.whl
+  name: playsound3
+  version: 3.2.6
+  sha256: 638c059cb7d2581ca6caf5ea561d801bbdb44b5346e1c888fb702fd15a88aa49
+  requires_dist:
+  - pywin32 ; sys_platform == 'win32'
+  - typing-extensions ; python_full_version < '3.8'
+  - pyright ; extra == 'dev'
+  - pytest ; extra == 'dev'
+  - ruff ; extra == 'dev'
+  requires_python: '>=3.7'
 - pypi: https://files.pythonhosted.org/packages/9e/9f/cbeffe61002faf2c4fd935a283401c35b82505c012ba69240f0d09d095f0/posthog-6.4.1-py3-none-any.whl
   name: posthog
   version: 6.4.1
@@ -3556,15 +3569,15 @@ packages:
   requires_python: '>=3.9'
 - pypi: ./
   name: voicetype
-  version: 0.1.4.dev5+g855bcd084.d20250913
-  sha256: f892daaefbbe7920aebf41b18ffc620729d0bc9154fa6d303c85bdda0904e639
+  version: 0.1.4.dev6+g0c641fe2c.d20250913
+  sha256: 8ca978642541dffc7783759bfa10c2bd70853572345979b098f328a71a68f9a2
   requires_dist:
   - aider-chat
   - dasbus
   - loguru
+  - playsound3
   - prompt-toolkit
   - pydantic-settings
-  - pydub
   - pynput @ git+https://github.com/Adam-D-Lewis/pynput@26fe001ada956c0ad023ea0e3aa3c7dded3526ad
   - pystray
   - sounddevice

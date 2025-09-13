@@ -7,13 +7,13 @@ from pathlib import Path
 from loguru import logger
 
 from voicetype.app_context import AppContext
-from voicetype.assets.sounds import EMPTY_SOUND
+from voicetype.assets.sounds import EMPTY_SOUND, ERROR_SOUND, START_RECORD_SOUND
 from voicetype.audio_capture import SpeechProcessor
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 from voicetype.settings import VoiceSettingsProvider, load_settings
 from voicetype.state import AppState, State
 from voicetype.trayicon import create_tray
-from voicetype.utils import type_text
+from voicetype.utils import play_sound, type_text
 
 HERE = Path(__file__).resolve().parent
 
@@ -93,6 +93,7 @@ def main():
             if ctx and ctx.state.state == State.LISTENING:
                 ctx.state.state = State.RECORDING
                 logger.debug("Hotkey pressed: State -> RECORDING")
+                play_sound(START_RECORD_SOUND)
                 ctx.speech_processor.start_recording()
             else:
                 logger.warning(
@@ -107,10 +108,23 @@ def main():
 
                 def transcribe_and_type():
                     try:
-                        if audio_file:
+                        if not audio_file:
                             text = ctx.speech_processor.transcribe(audio_file)
                             if text:
-                                type_text(text)
+                                try:
+                                    type_text(text)
+                                except Exception as e:
+                                    logger.error(f"Failed to type text: {e}")
+                                    play_sound(ERROR_SOUND)
+                            else:
+                                logger.warning("Transcription returned no text")
+                                play_sound(ERROR_SOUND)
+                        else:
+                            logger.warning("No audio file to transcribe")
+                            play_sound(ERROR_SOUND)
+                    except Exception as e:
+                        logger.error(f"Transcription failed: {e}")
+                        play_sound(ERROR_SOUND)
                     finally:
                         ctx.state.state = State.LISTENING
                         logger.debug("State -> LISTENING")
@@ -134,6 +148,9 @@ def main():
             hotkey_listener=hotkey_listener,
         )
         ctx.state.state = State.LISTENING
+
+        # Play empty sound to initialize audio system (workaround for first sound not playing)
+        play_sound(EMPTY_SOUND)
 
         hotkey_listener.start_listening()
 

@@ -19,10 +19,6 @@ warnings.filterwarnings(
 )
 warnings.filterwarnings("ignore", category=SyntaxWarning)
 
-
-from pydub import AudioSegment
-from pydub.exceptions import CouldntDecodeError, CouldntEncodeError
-
 try:
     import soundfile as sf
 except (OSError, ModuleNotFoundError):

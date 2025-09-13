@@ -1,5 +1,6 @@
 import time
 
+from loguru import logger
 from pynput.keyboard import Controller
 
 
@@ -52,10 +53,29 @@ def type_text(text):
 #         stream.close()
 #         pa.terminate()
 
-# def make_sound_thread(filepath):
-#     sound_file_path = str(filepath)
-#     thread = Thread(
-#         target=play_audio,
-#         args=(sound_file_path,)
-#     )
-#     return thread
+
+def play_sound(sound_path):
+    """Play a sound file using playsound3 with threading to avoid blocking.
+
+    Args:
+        sound_path: Path to the sound file to play
+    """
+    import threading
+    from pathlib import Path
+
+    def _play_sound_thread():
+        try:
+            from playsound3 import playsound
+
+            sound_file = Path(sound_path)
+            if not sound_file.exists():
+                logger.warning(f"Sound file does not exist: {sound_file}")
+                return
+
+            logger.debug(f"Playing sound: {sound_file}")
+            playsound(str(sound_file), block=True)
+        except Exception as e:
+            logger.error(f"Failed to play sound {sound_path}: {e}")
+
+    # Each sound gets its own thread - simpler and more reliable
+    threading.Thread(target=_play_sound_thread, daemon=True).start()
