@@ -66,17 +66,11 @@ dev = [
 ]
 local = [
     "faster-whisper",
-    # system deps on conda-forge
-    # "libcublas",
-    # "cudnn",
-
 ]
-[tool.setuptools.packages.find]
-include = ["voicetype*"]
-
-[tool.setuptools.package-data]
-"*" = ["*.wav"]
-# "*" = ["*.css", "*.png"]
+build = [
+    "hatch",
+    "hatch-vcs",
+]
 
 [tool.ruff]
 fix = true
@@ -121,9 +115,18 @@ gobject-introspection = "*"
 pygobject = "*"
 
 
+# Define the 'build' feature
+[tool.pixi.feature.build]
+channels = ["conda-forge"]
+
+# Conda packages for the build feature
+[tool.pixi.feature.build.dependencies]
+python = "<=3.12"
+
 # Map environments to feature sets
 [tool.pixi.environments]
 default = ["local"]
+build = ["build"]
 
 [tool.pixi.environments.local]
 features = ["local"]
