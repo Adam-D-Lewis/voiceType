@@ -69,15 +69,18 @@ dev = [
 fix = true
 
 [tool.ruff.lint]
-select = ["I"]
-
+select = [
+    "ALL",
+]
 ignore = [
-    "E501", # Ignore line too long, because due to black the error can only occur for strings
-    "D100", # Ignore missing docstring in public module
+    "E501",   # Ignore line too long, because due to black the error can only occur for strings
+    "D100",   # Ignore missing docstring in public module
     "BLE001", # Ignore bare except
     "EM101",
     "PTH110",
     "TRY003",
+    "C901",
+    "PLR0915", # Ignore too many statements in function
 ]
 
 [tool.pixi.project]
