@@ -1,31 +1,23 @@
-# import math # No longer needed directly
+from __future__ import annotations
+
 import os
 import queue
-import sys  # For stderr output
+import sys
 import tempfile
 import threading
 import time
-import warnings
+from pathlib import Path
+from typing import Any, Optional, tuple
 
 import numpy as np
+import soundfile as sf
 from loguru import logger
 
-from voicetype.audio_capture.dump import dump  # noqa: F401
 from voicetype.settings import VoiceSettings, VoiceSettingsProvider
-
-warnings.filterwarnings(
-    "ignore",
-    message="Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work",
-)
-warnings.filterwarnings("ignore", category=SyntaxWarning)
-
-import soundfile as sf
 
 
 class SoundDeviceError(Exception):
     """Exception raised for audio device and sound processing errors."""
-
-    pass
 
 
 class SpeechProcessor:
@@ -44,7 +36,12 @@ class SpeechProcessor:
 
     threshold = 0.15  # Threshold for RMS visualization (if needed later)
 
-    def __init__(self, settings: VoiceSettings, audio_format="wav", device_name=None):
+    def __init__(
+        self,
+        settings: VoiceSettings,
+        audio_format: str = "wav",
+        device_name: str | None = None,
+    ) -> None:
         """Initialize SpeechProcessor with audio settings and device configuration.
 
         Args:
@@ -55,10 +52,9 @@ class SpeechProcessor:
         Raises:
             SoundDeviceError: If audio libraries are unavailable or device setup fails
             ValueError: If unsupported audio format is specified
+
         """
         self.settings = settings
-        if sf is None:
-            raise SoundDeviceError("SoundFile library not available.")
         try:
             logger.debug("Initializing sound device...")
             import sounddevice as sd
@@ -80,7 +76,7 @@ class SpeechProcessor:
             logger.debug(f"Using sample rate: {self.sample_rate} Hz")
         except (TypeError, ValueError, KeyError) as e:
             logger.debug(
-                f"Warning: Could not query default sample rate ({e}), falling back to 16kHz."
+                f"Warning: Could not query default sample rate ({e}), falling back to 16kHz.",
             )
             self.sample_rate = 16000
         except self.sd.PortAudioError as e:
@@ -96,7 +92,7 @@ class SpeechProcessor:
             threading.Event()
         )  # Used to signal the callback to stop processing
 
-    def _find_device_id(self, device_name):
+    def _find_device_id(self, device_name: Optional[str]) -> Optional[int]:
         """Find the input device ID by name or return None for default.
 
         Args:
@@ -108,6 +104,7 @@ class SpeechProcessor:
         Raises:
             SoundDeviceError: If no audio devices are found
             ValueError: If specified device name is not found
+
         """
         devices = self.sd.query_devices()
         if not devices:
@@ -126,16 +123,21 @@ class SpeechProcessor:
                     return i
             available_names = [d["name"] for _, d in input_devices]
             raise ValueError(
-                f"Device '{device_name}' not found. Available input devices: {available_names}"
+                f"Device '{device_name}' not found. Available input devices: {available_names}",
             )
-        else:
-            # No specific device name provided, return None to let sounddevice pick the default input device.
-            logger.debug(
-                "No specific device name provided; sounddevice will use the system's default input device."
-            )
-            return None
+        # No specific device name provided, return None to let sounddevice pick the default input device.
+        logger.debug(
+            "No specific device name provided; sounddevice will use the system's default input device.",
+        )
+        return None
 
-    def callback(self, indata, frames, time_info, status):
+    def callback(
+        self,
+        indata: np.ndarray,
+        frames: int,
+        time_info: Any,
+        status: Any,
+    ) -> None:
         """Audio callback function called for each audio block during recording.
 
         Calculates RMS values for volume monitoring and queues audio data for processing.
@@ -146,6 +148,7 @@ class SpeechProcessor:
             frames: Number of frames in the audio block
             time_info: Timing information from sounddevice
             status: Status flags from sounddevice
+
         """
         if status:
             logger.debug(f"Audio callback status: {status}", file=sys.stderr)
@@ -169,10 +172,7 @@ class SpeechProcessor:
             # Decide if the error is critical enough to stop recording
             # For now, just print it.
 
-    # Removed get_prompt method as it's no longer used
-    # def get_prompt(self): ...
-
-    def start_recording(self):
+    def start_recording(self) -> None:
         """Start recording audio from the configured input device.
 
         Creates a temporary WAV file and begins streaming audio data.
@@ -180,6 +180,7 @@ class SpeechProcessor:
 
         Raises:
             SoundDeviceError: If audio stream cannot be started
+
         """
         if self.is_recording:
             logger.debug("Already recording.")
@@ -194,7 +195,10 @@ class SpeechProcessor:
         try:
             self.temp_wav = tempfile.mktemp(suffix=".wav")
             self.audio_file = sf.SoundFile(
-                self.temp_wav, mode="x", samplerate=self.sample_rate, channels=1
+                self.temp_wav,
+                mode="x",
+                samplerate=self.sample_rate,
+                channels=1,
             )
             self.stream = self.sd.InputStream(
                 samplerate=self.sample_rate,
@@ -226,13 +230,14 @@ class SpeechProcessor:
             logger.debug(f"An unexpected error occurred during start_recording: {e}")
             raise  # Re-raise the exception
 
-    def stop_recording(self):
+    def stop_recording(self) -> tuple[None | str, float]:
         """Stop recording audio and save to temporary file.
 
         Processes any remaining audio data in the queue and closes the audio file.
 
         Returns:
             tuple: (Path to the saved WAV file or None if not recording, duration in seconds)
+
         """
         if not self.is_recording:
             logger.debug("Not recording.")
@@ -255,7 +260,7 @@ class SpeechProcessor:
 
         # Process any remaining items in the queue after stopping the stream
         logger.debug(
-            f"Processing remaining audio data (queue size: {self.q.qsize()})..."
+            f"Processing remaining audio data (queue size: {self.q.qsize()})...",
         )
 
         while not self.q.empty():
@@ -285,7 +290,12 @@ class SpeechProcessor:
         logger.debug(f"Recording stopped. Duration: {duration:.2f}s")
         return recorded_filename, duration
 
-    def transcribe(self, filename, history=None, language=None):
+    def transcribe(
+        self,
+        filename: str,
+        history: Optional[str] = None,
+        language: Optional[str] = None,
+    ) -> Optional[str]:
         """Transcribe audio file to text using the configured provider.
 
         Args:
@@ -298,18 +308,23 @@ class SpeechProcessor:
 
         Raises:
             NotImplementedError: If provider is not supported
+
         """
         provider = self.settings.provider
         logger.info(f"Using '{provider}' provider for transcription.")
 
         if provider == VoiceSettingsProvider.LITELLM:
             return self._transcribe_with_litellm(filename, history, language)
-        elif provider == VoiceSettingsProvider.LOCAL:
+        if provider == VoiceSettingsProvider.LOCAL:
             return self._transcribe_with_local(filename, history, language)
-        else:
-            raise NotImplementedError(f"Provider '{provider}' is not supported.")
+        raise NotImplementedError(f"Provider '{provider}' is not supported.")
 
-    def _transcribe_with_local(self, filename, history, language):
+    def _transcribe_with_local(
+        self,
+        filename: str,
+        history: Optional[str],
+        language: Optional[str],
+    ) -> str:
         """Transcribe audio using local Whisper model via speech_recognition.
 
         Args:
@@ -319,6 +334,7 @@ class SpeechProcessor:
 
         Returns:
             str: Transcribed text with leading/trailing whitespace removed
+
         """
         import speech_recognition as sr
         from speech_recognition.recognizers.whisper_local import faster_whisper
@@ -328,24 +344,27 @@ class SpeechProcessor:
         transcribed_text = faster_whisper.recognize(
             None,
             audio_data=audio,
-            # model="large-v3",
-            # model="distil-large-v3",
-            model="large-v3-turbo",
+            model="large-v3-turbo",  # other models include large-v3, distil-large-v3, and others
             language="en",
             init_options=faster_whisper.InitOptionalParameters(
                 device="cuda",
-                # compute_type="int8"  # reduces memory, esp for large-v3, but i think it's faster without this for the turbo model at least
+                # setting compute_type="int8" reduces memory, esp for large-v3, but I think it's faster without this for the turbo model at least
             ),
-            # didn't see much of an effect with the below
-            # temperature=[0],  # Use deterministic decoding
-            # beam_size=1,
-            # without_timestamps=True,  # Disable timestamps for simplicity
+            # Additional settings which didn't seem to have much effect:
+            # temperature=[0] Use deterministic decoding
+            # beam_size=1  # noqa: ERA001
+            # without_timestamps=True - Disable timestamps for simplicity
         )
 
         # transcribed_text seems to come back with a leading space, so we strip it
         return transcribed_text.strip()
 
-    def _transcribe_with_litellm(self, filename, history=None, language=None):
+    def _transcribe_with_litellm(
+        self,
+        filename: str,
+        history: Optional[str] = None,
+        language: Optional[str] = None,
+    ) -> Optional[str]:
         """Transcribe audio using OpenAI's Whisper API via litellm.
 
         Handles file size limits by converting large WAV files to MP3.
@@ -361,10 +380,11 @@ class SpeechProcessor:
 
         Raises:
             SoundDeviceError: If OPENAI_API_KEY environment variable is not set
+
         """
         if not os.getenv("OPENAI_API_KEY"):
             raise SoundDeviceError(
-                "OPENAI_API_KEY environment variable not set. Please set it to use the litellm provider."
+                "OPENAI_API_KEY environment variable not set. Please set it to use the litellm provider.",
             )
 
         if not filename or not os.path.exists(filename):
@@ -379,14 +399,18 @@ class SpeechProcessor:
         file_size = os.path.getsize(filename)
         if file_size > 24.9 * 1024 * 1024 and self.audio_format == "wav":
             logger.debug(
-                f"\nWarning: {filename} ({file_size / (1024 * 1024):.1f} MB) may be too large for some APIs, converting to mp3."
+                f"\nWarning: {filename} ({file_size / (1024 * 1024):.1f} MB) may be too large for some APIs, converting to mp3.",
             )
             use_audio_format = "mp3"
 
         # Convert if necessary
         if use_audio_format != "wav":
             try:
-                new_filename = tempfile.mktemp(suffix=f".{use_audio_format}")
+                with tempfile.NamedTemporaryFile(
+                    suffix=f".{use_audio_format}",
+                    delete=False,
+                ) as tmp_file:
+                    new_filename = tmp_file.name
                 logger.debug(f"Converting {filename} to {use_audio_format}...")
                 audio = AudioSegment.from_wav(filename)
                 audio.export(new_filename, format=use_audio_format)
@@ -395,28 +419,31 @@ class SpeechProcessor:
                 final_filename = new_filename
             except (CouldntDecodeError, CouldntEncodeError) as e:
                 logger.debug(
-                    f"Error converting audio to {use_audio_format}: {e}. Will attempt transcription with original WAV."
+                    f"Error converting audio to {use_audio_format}: {e}. Will attempt transcription with original WAV.",
                 )
                 final_filename = filename  # Fallback to original wav
             except (OSError, FileNotFoundError) as e:
                 logger.debug(
-                    f"File system error during conversion: {e}. Will attempt transcription with original WAV."
+                    f"File system error during conversion: {e}. Will attempt transcription with original WAV.",
                 )
                 final_filename = filename
             except Exception as e:
                 logger.debug(
-                    f"Unexpected error during audio conversion: {e}. Will attempt transcription with original WAV."
+                    f"Unexpected error during audio conversion: {e}. Will attempt transcription with original WAV.",
                 )
                 final_filename = filename
 
         # Transcribe
         transcript_text = None
         try:
-            with open(final_filename, "rb") as fh:
-                from aider.llm import litellm
+            with Path.open(final_filename, "rb") as fh:
+                from aider.llm import litellm  # noqa: PLC0415
 
                 transcript = litellm.transcription(
-                    model="whisper-1", file=fh, prompt=history, language=language
+                    model="whisper-1",
+                    file=fh,
+                    prompt=history,
+                    language=language,
                 )
                 transcript_text = transcript.text
                 logger.debug("Transcription successful.")
@@ -429,20 +456,20 @@ class SpeechProcessor:
             final_filename != filename
         ):  # If conversion happened, remove the converted file
             try:
-                # os.remove(final_filename)
+                Path(final_filename).unlink(missing_ok=True)
                 logger.debug(f"Cleaned up temporary converted file: {final_filename}")
             except OSError as e:
                 logger.debug(
-                    f"Warning: Could not remove temporary converted file {final_filename}: {e}"
+                    f"Warning: Could not remove temporary converted file {final_filename}: {e}",
                 )
 
         # Always remove the original temporary WAV file
         try:
-            # os.remove(filename)
+            Path(filename).unlink(missing_ok=True)
             logger.debug(f"Cleaned up original recording file: {filename}")
         except OSError as e:
             logger.debug(
-                f"Warning: Could not remove original recording file {filename}: {e}"
+                f"Warning: Could not remove original recording file {filename}: {e}",
             )
 
         return transcript_text

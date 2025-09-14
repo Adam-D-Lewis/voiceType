@@ -79,13 +79,19 @@ include = ["voicetype*"]
 # "*" = ["*.css", "*.png"]
 
 [tool.ruff]
-select = ["ALL"]
-# Ignore line too long, because due to black the error can only occur for strings
-ignore = ["E501"]
 fix = true
 
 [tool.ruff.lint]
 select = ["I"]
+
+ignore = [
+    "E501", # Ignore line too long, because due to black the error can only occur for strings
+    "D100", # Ignore missing docstring in public module
+    "BLE001", # Ignore bare except
+    "EM101",
+    "PTH110",
+    "TRY003",
+]
 
 [tool.pixi.project]
 channels = ["conda-forge"]

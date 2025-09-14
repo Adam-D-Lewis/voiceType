@@ -3569,8 +3569,8 @@ packages:
   requires_python: '>=3.9'
 - pypi: ./
   name: voicetype
-  version: 0.1.4.dev6+g0c641fe2c.d20250913
-  sha256: 8ca978642541dffc7783759bfa10c2bd70853572345979b098f328a71a68f9a2
+  version: 0.1.4.dev11+g5113633d9.d20250914
+  sha256: 5c7e670318b6a8ac69496444407e798ea41469e14bfc54f806ddf83fc2617cda
   requires_dist:
   - aider-chat
   - dasbus

@@ -56,7 +56,7 @@ repos:
         args: ["--line-length=88", "--exclude=/src/_nebari/template/"]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.9
+    rev: 13a6bda8ea7612b3aec844ded16569d424b9a1ab # v0.13.0
     hooks:
       - id: ruff
         args: ["--fix"]
