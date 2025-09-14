@@ -17,43 +17,6 @@ def type_text(text):
     keyboard.release("\n")
 
 
-# def play_audio(filename):
-#     # Open the file for reading.
-#     with filename.open('rb') as f:
-#         wav = wave.open(f, 'rb')
-
-#         # Create an interface to PortAudio.
-#         pa = pyaudio.PyAudio()
-
-#         # Open a .Stream object to write the WAV file to.
-#         # 'output = True' indicates that the sound will be outputted to the speaker.
-#         # 'rate' is the sample rate from the wav file, which we set as the rate of the output stream.
-#         # 'channels' is also set using the method getnchannels().
-#         # 'format' we get from a lookup dictionary provided by PyAudio containing the appropriate format for the sample width returned from the wave file.
-#         stream = pa.open(
-#             format = pa.get_format_from_width(wav.getsampwidth()),
-#             channels = wav.getnchannels(),
-#             rate = wav.getframerate(),
-#             output = True
-#         )
-
-#         # CHUNK size
-#         CHUNK = 1024
-
-#         # Read data in chunks
-#         data = wav.readframes(CHUNK)
-
-#         # Play the sound by writing the audio data to the stream.
-#         while data != b'':
-#             stream.write(data)
-#             data = wav.readframes(CHUNK)
-
-#         # Close and terminate everything properly.
-#         stream.stop_stream()
-#         stream.close()
-#         pa.terminate()
-
-
 def play_sound(sound_path):
     """Play a sound file using playsound3 with threading to avoid blocking.
 
