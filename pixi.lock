@@ -3569,8 +3569,8 @@ packages:
   requires_python: '>=3.9'
 - pypi: ./
   name: voicetype
-  version: 0.1.4.dev11+g5113633d9.d20250914
-  sha256: 5c7e670318b6a8ac69496444407e798ea41469e14bfc54f806ddf83fc2617cda
+  version: 0.1.4.dev12+g3c1352e34.d20250914
+  sha256: d56fb1537c6c467c9f131da636d30f049e820474c971bb49e4c78edc736193f7
   requires_dist:
   - aider-chat
   - dasbus
@@ -3578,6 +3578,7 @@ packages:
   - playsound3
   - prompt-toolkit
   - pydantic-settings
+  - pydub
   - pynput @ git+https://github.com/Adam-D-Lewis/pynput@26fe001ada956c0ad023ea0e3aa3c7dded3526ad
   - pystray
   - sounddevice

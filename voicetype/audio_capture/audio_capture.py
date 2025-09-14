@@ -12,6 +12,8 @@ from typing import Any, Optional, tuple
 import numpy as np
 import soundfile as sf
 from loguru import logger
+from pydub import AudioSegment
+from pydub.exceptions import CouldntDecodeError, CouldntEncodeError
 
 from voicetype.settings import VoiceSettings, VoiceSettingsProvider
 
