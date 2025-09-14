@@ -19,10 +19,7 @@ warnings.filterwarnings(
 )
 warnings.filterwarnings("ignore", category=SyntaxWarning)
 
-try:
-    import soundfile as sf
-except (OSError, ModuleNotFoundError):
-    sf = None
+import soundfile as sf
 
 
 class SoundDeviceError(Exception):
@@ -235,11 +232,11 @@ class SpeechProcessor:
         Processes any remaining audio data in the queue and closes the audio file.
 
         Returns:
-            str: Path to the saved WAV file, or None if not recording
+            tuple: (Path to the saved WAV file or None if not recording, duration in seconds)
         """
         if not self.is_recording:
             logger.debug("Not recording.")
-            return None
+            return None, 0.0
 
         logger.debug("Stopping recording...")
         if self.stream:
@@ -261,9 +258,6 @@ class SpeechProcessor:
             f"Processing remaining audio data (queue size: {self.q.qsize()})..."
         )
 
-        # Give a moment for the last chunks of audio to arrive in the queue
-        time.sleep(0.1)
-
         while not self.q.empty():
             try:
                 data = self.q.get_nowait()
@@ -283,12 +277,13 @@ class SpeechProcessor:
             finally:
                 self.audio_file = None
 
+        duration = time.time() - self.start_time if self.start_time else 0.0
         recorded_filename = self.temp_wav
         self.temp_wav = None  # Clear temp path
         self.is_recording = False
         self.start_time = None
-        logger.debug("Recording stopped.")
-        return recorded_filename
+        logger.debug(f"Recording stopped. Duration: {duration:.2f}s")
+        return recorded_filename, duration
 
     def transcribe(self, filename, history=None, language=None):
         """Transcribe audio file to text using the configured provider.

@@ -104,11 +104,11 @@ def main():
             if ctx and ctx.state.state == State.RECORDING:
                 ctx.state.state = State.PROCESSING
                 logger.debug("Hotkey released: State -> PROCESSING")
-                audio_file = ctx.speech_processor.stop_recording()
+                audio_file, duration = ctx.speech_processor.stop_recording()
 
                 def transcribe_and_type():
                     try:
-                        if audio_file:
+                        if audio_file and duration >= settings.voice.minimum_duration:
                             text = ctx.speech_processor.transcribe(audio_file)
                             if text:
                                 try:
@@ -119,6 +119,11 @@ def main():
                             else:
                                 logger.warning("Transcription returned no text")
                                 play_sound(ERROR_SOUND)
+                        elif audio_file and duration < settings.voice.minimum_duration:
+                            logger.debug(
+                                f"Audio duration ({duration:.2f}s) shorter than minimum ({settings.voice.minimum_duration}s), ignoring"
+                            )
+                            play_sound(ERROR_SOUND)
                         else:
                             logger.warning("No audio file to transcribe")
                             play_sound(ERROR_SOUND)
