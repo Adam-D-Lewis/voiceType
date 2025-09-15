@@ -197,11 +197,15 @@ class SpeechProcessor:
         self._stop_event.clear()  # Ensure stop event is clear
 
         try:
-            with tempfile.TemporaryFile(suffix=".wav") as temp_wav:
-                self.temp_wav = temp_wav.name
+            temp_wav = tempfile.NamedTemporaryFile(  # noqa: SIM115
+                suffix=".wav",
+                delete=False,
+            )
+            self.temp_wav = temp_wav.name
+            temp_wav.close()
             self.audio_file = sf.SoundFile(
                 self.temp_wav,
-                mode="x",
+                mode="w",
                 samplerate=self.sample_rate,
                 channels=1,
             )
