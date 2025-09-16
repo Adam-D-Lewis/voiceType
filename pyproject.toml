@@ -36,6 +36,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
 ]
 dependencies = [
     # "pyaudio",  # was causing me problems with audio
@@ -44,14 +45,14 @@ dependencies = [
     "loguru",
     "pystray",
     "prompt_toolkit",
-    "dasbus", # wayland
+    "dasbus; sys_platform == 'linux'", # wayland - Linux only
     "pydub",  # for sound
     "playsound3", # for sound
     "soundfile",  # for sound recording
     "sounddevice",  # for detecting input devices and recording sound
     "pydantic-settings",
     "toml",
-    "aider-chat", # for litellm
+    # "aider-chat", # for litellm
 ]
 dynamic = ["version"]
 
@@ -84,8 +85,8 @@ ignore = [
 ]
 
 [tool.pixi.project]
-channels = ["conda-forge"]
-platforms = ["linux-64"]
+channels = ["conda-forge", "nvidia"]
+platforms = ["linux-64", "win-64"]
 
 [tool.pixi.dependencies]
 # conda-forge dependencies
@@ -98,18 +99,24 @@ channels = ["conda-forge"]
 # PyPI packages for this feature
 [tool.pixi.feature.local.pypi-dependencies]
 voicetype = { path = ".", editable = true }
+faster-whisper = "*"
 
 # Conda packages common across all platforms
 [tool.pixi.feature.local.dependencies]
-faster-whisper = "*"
 
 # Platform-scoped dependencies
 [tool.pixi.feature.local.target.linux-64.dependencies]
-libcublas = "<13"  # faster_whisper doesn't seem to support cuda 13 yet
+
+libcublas = "=12"  # faster_whisper doesn't seem to support cuda 13 yet
 cudnn = "*"
 gtk3 = "*"
 gobject-introspection = "*"
 pygobject = "*"
+
+# Windows-specific dependencies
+[tool.pixi.feature.local.target.win-64.dependencies]
+libcublas = "=12"
+cudnn = "*"
 
 
 # Define the 'build' feature

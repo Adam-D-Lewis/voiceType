@@ -21,6 +21,7 @@ HERE = Path(__file__).resolve().parent
 def get_platform_listener(on_press: callable, on_release: callable) -> HotkeyListener:
     """Detect the platform/session and return a listener instance (callbacks bound later)."""
     system = platform.system()
+
     if system == "Linux":
         session_type = os.environ.get("XDG_SESSION_TYPE", "unknown").lower()
         logger.info(f"Detected Linux with session type: {session_type}")
@@ -35,26 +36,47 @@ def get_platform_listener(on_press: callable, on_release: callable) -> HotkeyLis
                     "Wayland hotkey listener only currently implemented for XWayland."
                 )
 
-        # Default to X11/pynput listener if session is not Wayland or Wayland init failed
-        logger.info("Using X11 (pynput) listener.")
+        # Default to pynput listener for Linux X11
+        logger.info("Using pynput listener for Linux.")
         try:
-            from voicetype.hotkey_listener.linux_x11_hotkey_listener import (
-                LinuxX11HotkeyListener,
+            from voicetype.hotkey_listener.pynput_hotkey_listener import (
+                PynputHotkeyListener,
             )
 
-            return LinuxX11HotkeyListener(
+            return PynputHotkeyListener(
                 on_hotkey_press=on_press, on_hotkey_release=on_release
             )
         except Exception as e:
-            logger.error(f"Failed to initialize X11 listener: {e}", exc_info=True)
-            raise RuntimeError("Could not initialize any Linux hotkey listener.") from e
+            logger.error(f"Failed to initialize pynput listener: {e}", exc_info=True)
+            raise RuntimeError("Could not initialize Linux hotkey listener.") from e
 
     elif system == "Windows":
-        logger.warning("Windows detected, but listener not implemented.")
-        raise NotImplementedError("Windows hotkey listener not yet implemented.")
+        logger.info("Using pynput listener for Windows.")
+        try:
+            from voicetype.hotkey_listener.pynput_hotkey_listener import (
+                PynputHotkeyListener,
+            )
+
+            return PynputHotkeyListener(
+                on_hotkey_press=on_press, on_hotkey_release=on_release
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize pynput listener: {e}", exc_info=True)
+            raise RuntimeError("Could not initialize Windows hotkey listener.") from e
+
     elif system == "Darwin":  # macOS
-        logger.warning("macOS detected, but listener not implemented.")
-        raise NotImplementedError("macOS hotkey listener not yet implemented.")
+        logger.info("Using pynput listener for macOS.")
+        try:
+            from voicetype.hotkey_listener.pynput_hotkey_listener import (
+                PynputHotkeyListener,
+            )
+
+            return PynputHotkeyListener(
+                on_hotkey_press=on_press, on_hotkey_release=on_release
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize pynput listener: {e}", exc_info=True)
+            raise RuntimeError("Could not initialize macOS hotkey listener.") from e
     else:
         raise OSError(f"Unsupported operating system: {system}")
 
@@ -111,6 +133,7 @@ def main():
                         if audio_file and duration >= settings.voice.minimum_duration:
                             text = ctx.speech_processor.transcribe(audio_file)
                             if text:
+                                logger.info(f"Text: {text}")
                                 try:
                                     type_text(text)
                                 except Exception as e:
@@ -130,6 +153,7 @@ def main():
                     except Exception as e:
                         logger.error(f"Transcription failed: {e}")
                         play_sound(ERROR_SOUND)
+                        raise Exception('Broken: ') from e
                     finally:
                         ctx.state.state = State.LISTENING
                         logger.debug("State -> LISTENING")

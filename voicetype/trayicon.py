@@ -6,7 +6,8 @@ from typing import Tuple
 from PIL import Image, ImageDraw
 
 # Valid values: 'gtk', 'appindicator', 'xorg', 'dummy' (fallback/test)
-os.environ.setdefault("PYSTRAY_BACKEND", "gtk")
+if sys.platform == 'linux':
+    os.environ.setdefault("PYSTRAY_BACKEND", "gtk")
 
 import pystray
 from pystray import Menu
