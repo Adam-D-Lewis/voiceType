@@ -4463,8 +4463,8 @@ packages:
   timestamp: 1755111905876
 - pypi: ./
   name: voicetype
-  version: 0.1.4.dev21+gfbb81ac37.d20250929
-  sha256: ba602751c7bdf7abb48e805e48f6d664de05525d99d97aa2f659275b40d156f4
+  version: 0.1.4.dev23+g818933028.d20250929
+  sha256: 6aa4d0e1949570ef74c0d935f45a8dfb31f566939bdd00946b59f3b6917853fa
   requires_dist:
   - pre-commit ; extra == 'dev'
   - pytest ; extra == 'dev'
