@@ -2,7 +2,7 @@ import time
 
 from loguru import logger
 
-from voicetype.vendored_pkgs import pynput
+from voicetype._vendor import pynput
 
 
 def type_text(text):
