@@ -1,16 +1,17 @@
 import time
 
 from loguru import logger
-from pynput.keyboard import Controller
+
+from voicetype._vendor import pynput
 
 
 def type_text(text):
-    keyboard = Controller()
+    keyboard = pynput.keyboard.Controller()
 
     # Type each character in the text
     for char in text:
         keyboard.tap(char)
-        time.sleep(0.001)  # Adjust the delay between keypresses if needed  # noqa: F821
+        time.sleep(0.001)  # Adjust the delay between keypresses if needed
 
     # Press Enter key at the end
     keyboard.press("\n")
@@ -22,6 +23,7 @@ def play_sound(sound_path):
 
     Args:
         sound_path: Path to the sound file to play
+
     """
     import threading
     from pathlib import Path

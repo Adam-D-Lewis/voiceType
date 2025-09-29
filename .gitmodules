@@ -1,0 +1,3 @@
+[submodule "voicetype/_vendor/pynput"]
+	path = voicetype/_vendor/pynput
+	url = https://github.com/Adam-D-Lewis/pynput.git
