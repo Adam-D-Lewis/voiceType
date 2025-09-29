@@ -40,7 +40,6 @@ classifiers = [
 ]
 dependencies = [
     # "pyaudio",  # was causing me problems with audio
-    "pynput @ git+https://github.com/Adam-D-Lewis/pynput@26fe001ada956c0ad023ea0e3aa3c7dded3526ad",
     "speechrecognition",
     "loguru",
     "pystray",
@@ -52,7 +51,13 @@ dependencies = [
     "sounddevice",  # for detecting input devices and recording sound
     "pydantic-settings",
     "toml",
-    # "aider-chat", # for litellm
+
+    # the following dependencies come from vendoring in pynput
+    "six",
+    "pyobjc-framework-ApplicationServices>=8.0; sys_platform == 'darwin'",
+    "pyobjc-framework-Quartz>=8.0; sys_platform == 'darwin'",
+    "evdev>=1.3; sys_platform == 'linux'",
+    "python-xlib>=0.17; sys_platform == 'linux'",
 ]
 dynamic = ["version"]
 
@@ -71,7 +76,7 @@ fix = true
 
 [tool.ruff.lint]
 select = [
-    "ALL",
+    "I",
 ]
 ignore = [
     "E501",   # Ignore line too long, because due to black the error can only occur for strings

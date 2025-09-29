@@ -2,14 +2,16 @@ import threading
 from typing import Callable, Optional, Set
 
 from loguru import logger
-from pynput import keyboard
+
+from voicetype._vendor import pynput
 
 from .hotkey_listener import HotkeyListener
 
+keyboard = pynput.keyboard
+
 
 class LinuxX11HotkeyListener(HotkeyListener):
-    """
-    Hotkey listener implementation for Linux X11 using pynput.
+    """Hotkey listener implementation for Linux X11 using pynput.
 
     This class handles keyboard events to detect when a specific hotkey
     combination is pressed and released.
@@ -20,12 +22,12 @@ class LinuxX11HotkeyListener(HotkeyListener):
         on_hotkey_press: Optional[Callable[[], None]] = None,
         on_hotkey_release: Optional[Callable[[], None]] = None,
     ):
-        """
-        Initialize the Linux X11 hotkey listener.
+        """Initialize the Linux X11 hotkey listener.
 
         Args:
             on_press: Callback function to execute when the hotkey is pressed.
             on_release: Callback function to execute when the hotkey is released.
+
         """
         super().__init__(on_hotkey_press, on_hotkey_release)
         self._hotkey_combination: Optional[Set[keyboard.Key | keyboard.KeyCode]] = None
@@ -35,8 +37,7 @@ class LinuxX11HotkeyListener(HotkeyListener):
         self._lock = threading.Lock()
 
     def set_hotkey(self, hotkey: str) -> None:
-        """
-        Sets the hotkey combination to listen for.
+        """Sets the hotkey combination to listen for.
 
         Args:
             hotkey: A string representation of the hotkey (e.g., "<ctrl>+<alt>+x").
@@ -44,6 +45,7 @@ class LinuxX11HotkeyListener(HotkeyListener):
 
         Raises:
             ValueError: If the hotkey string cannot be parsed.
+
         """
         try:
             self._hotkey_combination = set(keyboard.HotKey.parse(hotkey))
@@ -54,11 +56,11 @@ class LinuxX11HotkeyListener(HotkeyListener):
             raise ValueError(f"Invalid hotkey format: {hotkey}") from e
 
     def _on_key_press(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
-        """
-        Internal handler for key press events.
+        """Internal handler for key press events.
 
         Args:
             key: The key that was pressed.
+
         """
         if key is None or self._hotkey_combination is None:
             return
@@ -69,18 +71,18 @@ class LinuxX11HotkeyListener(HotkeyListener):
             self._pressed_keys.add(canonical_key)
 
             if not self._hotkey_pressed and self._hotkey_combination.issubset(
-                self._pressed_keys
+                self._pressed_keys,
             ):
                 logger.debug(f"Hotkey detected: {canonical_key}")
                 self._hotkey_pressed = True
                 self._trigger_hotkey_press()
 
     def _on_key_release(self, key: Optional[keyboard.Key | keyboard.KeyCode]):
-        """
-        Internal handler for key release events.
+        """Internal handler for key release events.
 
         Args:
             key: The key that was released.
+
         """
         if key is None or self._hotkey_combination is None:
             return
@@ -107,11 +109,11 @@ class LinuxX11HotkeyListener(HotkeyListener):
                 self._pressed_keys.remove(canonical_key)
 
     def start_listening(self) -> None:
-        """
-        Starts the hotkey listener.
+        """Starts the hotkey listener.
 
         Raises:
             ValueError: If hotkey is not set before starting listener.
+
         """
         if self._listener is not None and self._listener.is_alive():
             logger.info("Listener already running.")
@@ -139,9 +141,7 @@ class LinuxX11HotkeyListener(HotkeyListener):
         logger.info("X11 Hotkey listener started.")
 
     def stop_listening(self) -> None:
-        """
-        Stops the hotkey listener and cleans up resources.
-        """
+        """Stops the hotkey listener and cleans up resources."""
         if self._listener and self._listener.is_alive():
             logger.info("Stopping X11 hotkey listener...")
             self._listener.stop()

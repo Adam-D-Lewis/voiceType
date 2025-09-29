@@ -1,0 +1,4 @@
+[submodule "voicetype/vendored_pkgs/pynput"]
+	path = voicetype/vendored_pkgs/pynput
+	url = https://github.com/moses-palmer/pynput.git
+	branch = fixup/xorg
