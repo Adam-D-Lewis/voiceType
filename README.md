@@ -20,10 +20,15 @@ Type with your voice.
 
 ## Installation
 
-1.  **Clone the repository:**
+1.  **Clone the repository (including submodules):**
     ```bash
-    git clone https://github.com/Adam-D-Lewis/voicetype.git
+    git clone --recurse-submodules https://github.com/Adam-D-Lewis/voicetype.git
     cd voicetype
+    ```
+
+    If you already cloned without `--recurse-submodules`, initialize the submodules:
+    ```bash
+    git submodule update --init --recursive
     ```
 
 2.  **Set up a Python virtual environment (recommended):**
@@ -53,6 +58,36 @@ Type with your voice.
 
     For other operating systems, or if you prefer not to use the systemd service on Linux, you can run the application directly after installation (see Usage).
 
+## Configuration
+
+VoiceType can be configured using a `settings.toml` file. The application looks for configuration files in the following locations (in priority order):
+
+1. `./settings.toml` - Current directory
+2. `~/.config/voicetype/settings.toml` - User config directory
+3. `/etc/voicetype/settings.toml` - System-wide config
+
+### Available Settings
+
+Create a `settings.toml` file with any of the following options:
+
+```toml
+[voice]
+# Provider for voice transcription (default: "local")
+# Options: "litellm" (requires OpenAI API key) or "local" (uses faster-whisper locally)
+provider = "local"
+
+# Minimum duration (in seconds) of audio to process (default: 0.25)
+# Filters out accidental hotkey presses
+minimum_duration = 0.25
+
+[hotkey]
+# Global hotkey to trigger recording (default: "<pause>")
+# Use pynput format, e.g., "<f12>", "<ctrl>+<alt>+r", "<pause>"
+hotkey = "<pause>"
+```
+
+**Note:** If you used `voicetype install` and configured litellm during installation, your API key is stored separately in `~/.config/voicetype/.env`.
+
 ## Usage
 
 -   **If using the Linux systemd service:** The service will start automatically on login. VoiceType will be listening for the hotkey in the background.
@@ -63,7 +98,7 @@ Type with your voice.
     ```
 
 **Using the Hotkey:**
-1.  Press and hold the configured hotkey (default is the `Pause/Break` key, as specified in `voicetype/__main__.py`).
+1.  Press and hold the configured hotkey (default is `Pause/Break`).
 2.  Speak clearly.
 3.  Release the hotkey to stop recording.
 4.  The transcribed text should then be typed into your currently active application.
