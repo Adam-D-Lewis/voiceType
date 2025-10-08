@@ -166,3 +166,4 @@ voicetype/_version.py
 # pixi environments
 .pixi
 *.egg-info
+settings.toml

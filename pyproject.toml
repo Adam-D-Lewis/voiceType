@@ -81,6 +81,9 @@ platforms = ["linux-64", "win-64", "osx-64"]
 [tool.pixi.dependencies]
 # conda-forge dependencies
 python = "<=3.12"
+gtk3 = "*"
+gobject-introspection = "*"
+pygobject = "*"
 
 [tool.pixi.pypi-dependencies]
 # "pyaudio",  # was causing me problems with audio
@@ -110,6 +113,18 @@ faster-whisper = "*"
 # Conda packages common across all platforms
 [tool.pixi.feature.local.dependencies]
 
+# Define the 'litellm' feature (for OpenAI/cloud transcription)
+[tool.pixi.feature.litellm]
+channels = ["conda-forge"]
+
+# PyPI packages for this feature
+[tool.pixi.feature.litellm.pypi-dependencies]
+voicetype = { path = ".", editable = true }
+aider-chat = "*"  # Includes litellm
+
+# Conda packages for this feature
+[tool.pixi.feature.litellm.dependencies]
+
 # Platform-scoped dependencies
 [tool.pixi.target.osx-64.pypi-dependencies]
 # the following dependencies come from vendoring in pynput
@@ -126,9 +141,6 @@ python-xlib = ">=0.17"
 
 libcublas = "=12"  # faster_whisper doesn't seem to support cuda 13 yet
 cudnn = "*"
-gtk3 = "*"
-gobject-introspection = "*"
-pygobject = "*"
 
 # Windows-specific dependencies
 [tool.pixi.feature.local.target.win-64.dependencies]
@@ -149,7 +161,6 @@ hatch-vcs = "*"
 # Map environments to feature sets
 [tool.pixi.environments]
 default = ["local"]
+local = ["local"]
 build = ["build"]
-
-[tool.pixi.environments.local]
-features = ["local"]
+litellm = ["litellm"]
