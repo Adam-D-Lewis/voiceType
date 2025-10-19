@@ -15,11 +15,11 @@ hotkey = "<pause>"  # Pause/Break key
 
 [[pipelines.stages]]
 func = "record_audio"
+minimum_duration = 0.25  # Minimum audio duration in seconds
 
 [[pipelines.stages]]
 func = "transcribe"
 provider = "local"  # Use local faster-whisper model
-minimum_duration = 0.25  # Minimum audio duration in seconds
 
 [[pipelines.stages]]
 func = "type_text"
@@ -37,24 +37,9 @@ func = "type_text"
 # [[pipelines.stages]]
 # func = "transcribe"
 # provider = "litellm"  # Use cloud-based transcription
-# minimum_duration = 0.5
 #
 # [[pipelines.stages]]
 # func = "type_text"
-
-
-# =============================================================================
-# LEGACY CONFIGURATION (for backward compatibility)
-# =============================================================================
-# If no pipelines are defined above, these settings will be automatically
-# migrated to a default pipeline configuration.
-
-[voice]
-provider = "local"  # Options: "local" or "litellm"
-minimum_duration = 0.25  # Minimum duration in seconds
-
-[hotkey]
-hotkey = "<pause>"  # Hotkey to trigger recording
 
 
 # =============================================================================

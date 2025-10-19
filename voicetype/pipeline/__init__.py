@@ -1,11 +1,9 @@
 """Pipeline system for configurable voice typing workflows."""
 
-# Import stages to trigger registration
-from . import stages  # noqa: F401
 from .context import IconController, PipelineContext
-from .hotkey_manager import HotkeyManager
+from .hotkey_manager import HotkeyDispatcher
 from .pipeline_executor import PipelineExecutor
-from .pipeline_manager import PipelineConfig, PipelineManager, migrate_legacy_settings
+from .pipeline_manager import PipelineConfig, PipelineManager
 from .resource_manager import Resource, ResourceManager
 from .stage_registry import STAGE_REGISTRY, StageMetadata, StageRegistry
 from .trigger_events import (
@@ -18,11 +16,10 @@ from .trigger_events import (
 __all__ = [
     "IconController",
     "PipelineContext",
-    "HotkeyManager",
+    "HotkeyDispatcher",
     "PipelineExecutor",
     "PipelineConfig",
     "PipelineManager",
-    "migrate_legacy_settings",
     "Resource",
     "ResourceManager",
     "STAGE_REGISTRY",
@@ -34,3 +31,6 @@ __all__ = [
     "TriggerEvent",
     "stages",
 ]
+
+# Import stages to trigger registration (must be after Resource is defined)
+from . import stages  # noqa: F401

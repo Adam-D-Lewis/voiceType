@@ -4,7 +4,6 @@ The PipelineManager:
 - Loads pipeline configurations from settings
 - Validates pipeline compatibility at startup
 - Manages pipeline execution via PipelineExecutor
-- Provides backward compatibility with legacy settings
 """
 
 from typing import Any, Dict, List, Optional
@@ -55,7 +54,6 @@ class PipelineManager:
     - Load and validate pipeline configurations
     - Detect hotkey conflicts
     - Execute pipelines via PipelineExecutor
-    - Provide backward compatibility
     """
 
     def __init__(
@@ -207,46 +205,3 @@ class PipelineManager:
         logger.info("Shutting down pipeline manager...")
         self.executor.shutdown(timeout)
         logger.info("Pipeline manager shutdown complete")
-
-
-def migrate_legacy_settings(settings_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Convert old settings format to new pipeline format.
-
-    Provides backward compatibility with legacy [voice] and [hotkey] sections.
-
-    Args:
-        settings_dict: Settings dictionary from TOML file
-
-    Returns:
-        Settings dictionary with pipelines section
-    """
-    if "pipelines" in settings_dict:
-        # Already using new format
-        return settings_dict
-
-    logger.info("Migrating legacy settings to pipeline format")
-
-    voice_config = settings_dict.get("voice", {})
-    hotkey_config = settings_dict.get("hotkey", {})
-
-    # Create default pipeline from legacy settings
-    default_pipeline = {
-        "name": "default",
-        "enabled": True,
-        "hotkey": hotkey_config.get("hotkey", "<pause>"),
-        "stages": [
-            {"func": "record_audio"},
-            {
-                "func": "transcribe",
-                "provider": voice_config.get("provider", "local"),
-                "minimum_duration": voice_config.get("minimum_duration", 0.25),
-            },
-            {"func": "type_text"},
-        ],
-    }
-
-    # Add pipelines section while preserving other sections
-    migrated = {**settings_dict, "pipelines": [default_pipeline]}
-
-    logger.info("Legacy settings migrated successfully")
-    return migrated

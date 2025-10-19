@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, Mock
 import pytest
 
 from voicetype.pipeline import (
-    HotkeyManager,
+    HotkeyDispatcher,
     PipelineManager,
     ResourceManager,
 )
@@ -106,7 +106,7 @@ def test_pipeline_manager_with_metadata():
 
 
 def test_hotkey_manager_integration():
-    """Test HotkeyManager integration with PipelineManager."""
+    """Test HotkeyDispatcher integration with PipelineManager."""
     # Create mock icon controller
     icon_controller = MockIconController()
 
@@ -137,11 +137,13 @@ def test_hotkey_manager_integration():
 
     pipeline_manager.load_pipelines(pipeline_config)
 
-    # Create hotkey manager with metadata
+    # Create hotkey dispatcher with metadata
     default_metadata = {"speech_processor": speech_processor}
-    hotkey_manager = HotkeyManager(pipeline_manager, default_metadata=default_metadata)
+    hotkey_manager = HotkeyDispatcher(
+        pipeline_manager, default_metadata=default_metadata
+    )
 
-    # Verify hotkey manager initialized
+    # Verify hotkey dispatcher initialized
     assert hotkey_manager.pipeline_manager == pipeline_manager
     assert hotkey_manager.default_metadata == default_metadata
 
@@ -176,9 +178,11 @@ def test_full_integration_mock():
 
     pipeline_manager.load_pipelines(pipeline_config)
 
-    # Create hotkey manager
+    # Create hotkey dispatcher
     default_metadata = {"speech_processor": speech_processor}
-    hotkey_manager = HotkeyManager(pipeline_manager, default_metadata=default_metadata)
+    hotkey_manager = HotkeyDispatcher(
+        pipeline_manager, default_metadata=default_metadata
+    )
 
     # Simulate hotkey press/release
     hotkey_string = "<pause>"
@@ -202,34 +206,6 @@ def test_full_integration_mock():
 
     # Shutdown
     pipeline_manager.shutdown(timeout=2.0)
-
-
-def test_legacy_settings_migration():
-    """Test that legacy settings are properly migrated to pipeline format."""
-    from voicetype.pipeline import migrate_legacy_settings
-
-    # Legacy settings format
-    legacy_settings = {
-        "voice": {"provider": "local", "minimum_duration": 0.25},
-        "hotkey": {"hotkey": "<pause>"},
-    }
-
-    # Migrate
-    migrated = migrate_legacy_settings(legacy_settings)
-
-    # Verify migration
-    assert "pipelines" in migrated
-    assert len(migrated["pipelines"]) == 1
-
-    pipeline = migrated["pipelines"][0]
-    assert pipeline["name"] == "default"
-    assert pipeline["enabled"] is True
-    assert pipeline["hotkey"] == "<pause>"
-    assert len(pipeline["stages"]) == 3
-    assert pipeline["stages"][0]["func"] == "record_audio"
-    assert pipeline["stages"][1]["func"] == "transcribe"
-    assert pipeline["stages"][1]["provider"] == "local"
-    assert pipeline["stages"][2]["func"] == "type_text"
 
 
 if __name__ == "__main__":

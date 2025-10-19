@@ -1,6 +1,6 @@
-"""Hotkey manager for pipeline trigger registration.
+"""Hotkey dispatcher for pipeline trigger registration.
 
-The HotkeyManager bridges hotkey events to pipeline execution, managing:
+The HotkeyDispatcher bridges hotkey events to pipeline execution, managing:
 - Hotkey registration for multiple pipelines
 - Press/release event handling
 - TriggerEvent creation and lifecycle
@@ -14,8 +14,8 @@ from .pipeline_manager import PipelineManager
 from .trigger_events import HotkeyTriggerEvent
 
 
-class HotkeyManager:
-    """Manages hotkey registration and triggers pipeline execution.
+class HotkeyDispatcher:
+    """Dispatches hotkey events to pipeline execution.
 
     This class is responsible for:
     - Registering hotkeys from pipeline configurations
@@ -27,7 +27,7 @@ class HotkeyManager:
     def __init__(
         self, pipeline_manager: PipelineManager, default_metadata: Optional[Dict] = None
     ):
-        """Initialize the hotkey manager.
+        """Initialize the hotkey dispatcher.
 
         Args:
             pipeline_manager: Manager for pipeline execution

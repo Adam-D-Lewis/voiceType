@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import os
 import queue
 import sys
@@ -16,7 +17,13 @@ from loguru import logger
 from pydub import AudioSegment
 from pydub.exceptions import CouldntDecodeError, CouldntEncodeError
 
-from voicetype.settings import VoiceSettings, VoiceSettingsProvider
+
+class VoiceSettingsProvider(enum.Enum):
+    """Speech-to-text provider options."""
+
+    LITELLM = "litellm"
+    LOCAL = "local"
+
 
 # Audio processing constants
 MIN_RMS_RANGE = 0.001  # Minimum RMS range to avoid division by zero
@@ -44,14 +51,12 @@ class SpeechProcessor:
 
     def __init__(
         self,
-        settings: VoiceSettings,
         audio_format: str = "wav",
         device_name: str | None = None,
     ) -> None:
-        """Initialize SpeechProcessor with audio settings and device configuration.
+        """Initialize SpeechProcessor with audio device configuration.
 
         Args:
-            settings: VoiceSettings instance containing provider and model config
             audio_format: Audio format for recordings ("wav", "mp3", or "webm")
             device_name: Specific audio device name to use, or None for default
 
@@ -60,7 +65,6 @@ class SpeechProcessor:
             ValueError: If unsupported audio format is specified
 
         """
-        self.settings = settings
         logger.debug("Initializing sound device...")
         self.sd = sd
 
@@ -303,13 +307,15 @@ class SpeechProcessor:
     def transcribe(
         self,
         filename: str,
+        provider: str = "local",
         history: None | str = None,
         language: None | str = None,
     ) -> None | str:
-        """Transcribe audio file to text using the configured provider.
+        """Transcribe audio file to text using the specified provider.
 
         Args:
             filename: Path to the audio file to transcribe
+            provider: STT provider ("local" or "litellm", default: "local")
             history: Optional context/history for better transcription accuracy
             language: Optional language code for transcription
 
@@ -320,15 +326,27 @@ class SpeechProcessor:
             NotImplementedError: If provider is not supported
 
         """
-        provider = self.settings.provider
         logger.info(f"Using '{provider}' provider for transcription.")
 
-        if provider == VoiceSettingsProvider.LITELLM:
+        # Convert string to enum if needed
+        if isinstance(provider, str):
+            provider = provider.lower()
+            if provider == "litellm":
+                provider_enum = VoiceSettingsProvider.LITELLM
+            elif provider == "local":
+                provider_enum = VoiceSettingsProvider.LOCAL
+            else:
+                error_message = f"Provider '{provider}' is not supported."
+                raise NotImplementedError(error_message)
+        else:
+            provider_enum = provider
+
+        if provider_enum == VoiceSettingsProvider.LITELLM:
             return self._transcribe_with_litellm(filename, history, language)
-        if provider == VoiceSettingsProvider.LOCAL:
+        if provider_enum == VoiceSettingsProvider.LOCAL:
             return self._transcribe_with_local(filename, history, language)
 
-        error_message = f"Provider '{provider}' is not supported."
+        error_message = f"Provider '{provider_enum}' is not supported."
         raise NotImplementedError(error_message)
 
     def _transcribe_with_local(

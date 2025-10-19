@@ -1,42 +1,14 @@
-import enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import toml
-from pydantic import Field
+from loguru import logger
 from pydantic_settings import BaseSettings
 
 
-class VoiceSettingsProvider(enum.Enum):
-    LITELLM = "litellm"
-    LOCAL = "local"
-
-
-class VoiceSettings(BaseSettings):
-    """Settings related to the voice transcription service."""
-
-    provider: VoiceSettingsProvider = VoiceSettingsProvider.LOCAL
-    minimum_duration: float = Field(
-        0.25,
-        ge=0.0,
-        description="Minimum duration (in seconds) of audio to process. Intended to filter out accidental hotkey presses.",
-    )
-
-
-class HotkeySettings(BaseSettings):
-    """Settings for the global hotkey."""
-
-    hotkey: str = "<pause>"
-
-
 class Settings(BaseSettings):
-    """Main application settings.
+    """Main application settings."""
 
-    Supports both legacy format ([voice], [hotkey]) and new format ([pipelines]).
-    """
-
-    voice: VoiceSettings = VoiceSettings()
-    hotkey: HotkeySettings = HotkeySettings()
     pipelines: Optional[List[Dict[str, Any]]] = None
 
 
@@ -47,8 +19,6 @@ def load_settings(settings_file: Path | None = None) -> Settings:
     1. ./settings.toml (current directory)
     2. ~/.config/voicetype/settings.toml (user config)
     3. /etc/voicetype/settings.toml (system-wide)
-
-    Automatically migrates legacy settings format to new pipeline format.
     """
     if settings_file is None:
         # Search default locations
@@ -66,10 +36,40 @@ def load_settings(settings_file: Path | None = None) -> Settings:
     if settings_file and settings_file.is_file():
         data = toml.load(settings_file)
 
-        # Migrate legacy settings if needed
-        from voicetype.pipeline import migrate_legacy_settings
-
-        data = migrate_legacy_settings(data)
+        # Check for legacy settings format and provide helpful error
+        if "voice" in data or "hotkey" in data:
+            logger.error(
+                f"Legacy settings format detected in {settings_file}\n"
+                f"The [voice] and [hotkey] sections are no longer supported.\n"
+                f"Please update your settings file to use the [[pipelines]] format.\n"
+                f"See settings.example.toml for the new format.\n"
+                f"\nExample migration:\n"
+                f"  [voice]\n"
+                f'  provider = "local"\n'
+                f"  minimum_duration = 0.25\n"
+                f"  [hotkey]\n"
+                f'  hotkey = "<pause>"\n'
+                f"\n"
+                f"  Becomes:\n"
+                f"\n"
+                f"  [[pipelines]]\n"
+                f'  name = "default"\n'
+                f"  enabled = true\n"
+                f'  hotkey = "<pause>"\n'
+                f"  [[pipelines.stages]]\n"
+                f'  func = "record_audio"\n'
+                f"  minimum_duration = 0.25\n"
+                f"  [[pipelines.stages]]\n"
+                f'  func = "transcribe"\n'
+                f'  provider = "local"\n'
+                f"  [[pipelines.stages]]\n"
+                f'  func = "type_text"\n'
+            )
+            raise ValueError(
+                f"Legacy settings format no longer supported. "
+                f"Please update {settings_file} to use [[pipelines]] format. "
+                f"See settings.example.toml for details."
+            )
 
         return Settings(**data)
     return Settings()

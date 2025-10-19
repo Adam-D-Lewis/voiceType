@@ -63,6 +63,7 @@ def transcribe(
     # The pipeline manager will clean up the file later
     text = speech_processor.transcribe(
         filename=input_data.filepath,
+        provider=context.config.get("provider", "local"),
         history=context.config.get("history"),
         language=context.config.get("language", "en"),
     )

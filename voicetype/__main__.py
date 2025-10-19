@@ -11,11 +11,11 @@ from voicetype.assets.sounds import EMPTY_SOUND, ERROR_SOUND, START_RECORD_SOUND
 from voicetype.audio_capture import SpeechProcessor
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 from voicetype.pipeline import (
-    HotkeyManager,
+    HotkeyDispatcher,
     PipelineManager,
     ResourceManager,
 )
-from voicetype.settings import VoiceSettingsProvider, load_settings
+from voicetype.settings import load_settings
 from voicetype.state import AppState, State
 from voicetype.trayicon import TrayIconController, create_tray
 from voicetype.utils import play_sound, type_text
@@ -103,7 +103,9 @@ def main():
     """Main application entry point."""
     parser = argparse.ArgumentParser(description="VoiceType application.")
     parser.add_argument(
-        "--settings-file", type=Path, help="Path to the settings TOML file."
+        "--settings-file",
+        type=Path,
+        help="Path to the settings TOML file.",
     )
     args = parser.parse_args()
 
@@ -113,14 +115,14 @@ def main():
 
     # Initialize managers
     pipeline_manager = None
-    hotkey_manager = None
+    hotkey_dispatcher = None
     hotkey_listener = None
     tray = None
     icon_controller = None
 
     try:
         # Initialize speech processor (needed by pipeline stages)
-        speech_processor = SpeechProcessor(settings=settings.voice)
+        speech_processor = SpeechProcessor()
 
         # Create app context for tray icon compatibility
         ctx = AppContext(
@@ -144,16 +146,16 @@ def main():
             max_workers=4,
         )
 
-        # Load pipelines (migrated from legacy settings if needed)
+        # Load pipelines
         if settings.pipelines:
             pipeline_manager.load_pipelines(settings.pipelines)
         else:
             logger.warning("No pipelines configured")
 
-        # Initialize hotkey manager with default metadata
+        # Initialize hotkey dispatcher with default metadata
         # This metadata will be passed to all pipeline executions
         default_metadata = {"speech_processor": speech_processor}
-        hotkey_manager = HotkeyManager(
+        hotkey_dispatcher = HotkeyDispatcher(
             pipeline_manager, default_metadata=default_metadata
         )
 
@@ -172,15 +174,15 @@ def main():
             first_pipeline = pipeline_manager.pipelines[enabled_pipelines[0]]
             hotkey_string = first_pipeline.hotkey
 
-            # Create hotkey callbacks that delegate to HotkeyManager
+            # Create hotkey callbacks that delegate to HotkeyDispatcher
             def on_hotkey_press():
                 """Hotkey press handler - delegates to pipeline manager."""
                 if ctx.state.state == State.LISTENING:
                     ctx.state.state = State.RECORDING
                     logger.debug("Hotkey pressed: State -> RECORDING")
                     play_sound(START_RECORD_SOUND)
-                    # Trigger pipeline via hotkey manager
-                    hotkey_manager._on_press(hotkey_string)
+                    # Trigger pipeline via hotkey dispatcher
+                    hotkey_dispatcher._on_press(hotkey_string)
                 else:
                     logger.warning(
                         f"Hotkey pressed in unexpected state: {ctx.state.state}"
@@ -191,8 +193,8 @@ def main():
                 if ctx.state.state == State.RECORDING:
                     ctx.state.state = State.PROCESSING
                     logger.debug("Hotkey released: State -> PROCESSING")
-                    # Signal release to hotkey manager
-                    hotkey_manager._on_release(hotkey_string)
+                    # Signal release to hotkey dispatcher
+                    hotkey_dispatcher._on_release(hotkey_string)
 
                     # State will be reset to LISTENING by pipeline stages
                     # Use a short delay to allow pipeline to complete
@@ -216,8 +218,8 @@ def main():
             )
             hotkey_listener.set_hotkey(hotkey_string)
 
-            # Set the listener in hotkey manager (for compatibility)
-            hotkey_manager.set_hotkey_listener(hotkey_listener)
+            # Set the listener in hotkey dispatcher (for compatibility)
+            hotkey_dispatcher.set_hotkey_listener(hotkey_listener)
 
             # Update context with listener
             ctx.hotkey_listener = hotkey_listener
