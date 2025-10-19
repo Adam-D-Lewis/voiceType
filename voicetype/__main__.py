@@ -10,9 +10,14 @@ from voicetype.app_context import AppContext
 from voicetype.assets.sounds import EMPTY_SOUND, ERROR_SOUND, START_RECORD_SOUND
 from voicetype.audio_capture import SpeechProcessor
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
+from voicetype.pipeline import (
+    HotkeyManager,
+    PipelineManager,
+    ResourceManager,
+)
 from voicetype.settings import VoiceSettingsProvider, load_settings
 from voicetype.state import AppState, State
-from voicetype.trayicon import create_tray
+from voicetype.trayicon import TrayIconController, create_tray
 from voicetype.utils import play_sound, type_text
 
 HERE = Path(__file__).resolve().parent
@@ -106,88 +111,127 @@ def main():
 
     logger.info("Starting VoiceType application...")
 
+    # Initialize managers
+    pipeline_manager = None
+    hotkey_manager = None
+    hotkey_listener = None
+    tray = None
+    icon_controller = None
+
     try:
-        # Forward-declare context so callbacks can use it.
-        # It will be properly initialized before the listener is started.
-        ctx = None
-
-        def on_hotkey_press():
-            if ctx and ctx.state.state == State.LISTENING:
-                ctx.state.state = State.RECORDING
-                logger.debug("Hotkey pressed: State -> RECORDING")
-                play_sound(START_RECORD_SOUND)
-                ctx.speech_processor.start_recording()
-            else:
-                logger.warning(
-                    f"Hotkey pressed in unexpected state: {ctx.state.state if ctx else 'uninitialized'}"
-                )
-
-        def on_hotkey_release():
-            if ctx and ctx.state.state == State.RECORDING:
-                ctx.state.state = State.PROCESSING
-                logger.debug("Hotkey released: State -> PROCESSING")
-                audio_file, duration = ctx.speech_processor.stop_recording()
-
-                def transcribe_and_type():
-                    try:
-                        if audio_file and duration >= settings.voice.minimum_duration:
-                            text = ctx.speech_processor.transcribe(audio_file)
-                            if text:
-                                logger.info(f"Text: {text}")
-                                try:
-                                    type_text(text)
-                                except Exception as e:
-                                    logger.error(f"Failed to type text: {e}")
-                                    play_sound(ERROR_SOUND)
-                            else:
-                                logger.warning("Transcription returned no text")
-                                play_sound(ERROR_SOUND)
-                        elif audio_file and duration < settings.voice.minimum_duration:
-                            logger.debug(
-                                f"Audio duration ({duration:.2f}s) shorter than minimum ({settings.voice.minimum_duration}s), ignoring"
-                            )
-                            play_sound(ERROR_SOUND)
-                        else:
-                            logger.warning("No audio file to transcribe")
-                            play_sound(ERROR_SOUND)
-                    except Exception as e:
-                        logger.error(f"Transcription failed: {e}")
-                        play_sound(ERROR_SOUND)
-                        raise Exception('Broken: ') from e
-                    finally:
-                        ctx.state.state = State.LISTENING
-                        logger.debug("State -> LISTENING")
-
-                threading.Thread(target=transcribe_and_type, daemon=True).start()
-            else:
-                logger.warning(
-                    f"Hotkey released in unexpected state: {ctx.state.state if ctx else 'uninitialized'}"
-                )
-
-        hotkey_listener = get_platform_listener(
-            on_press=on_hotkey_press, on_release=on_hotkey_release
-        )
-        hotkey_listener.set_hotkey(settings.hotkey.hotkey)
-
+        # Initialize speech processor (needed by pipeline stages)
         speech_processor = SpeechProcessor(settings=settings.voice)
 
+        # Create app context for tray icon compatibility
         ctx = AppContext(
             state=AppState(),
             speech_processor=speech_processor,
-            hotkey_listener=hotkey_listener,
+            hotkey_listener=None,  # Will be set later
         )
         ctx.state.state = State.LISTENING
 
-        # Play empty sound to initialize audio system (workaround for first sound not playing)
-        play_sound(EMPTY_SOUND)
+        # Create tray icon (but don't run it yet)
+        tray = create_tray(ctx)
 
-        hotkey_listener.start_listening()
+        # Wrap tray icon with IconController interface
+        icon_controller = TrayIconController(tray)
 
-        logger.info(f"Intended hotkey: {settings.hotkey.hotkey}")
-        logger.info("Press Ctrl+C to exit.")
+        # Initialize pipeline system
+        resource_manager = ResourceManager()
+        pipeline_manager = PipelineManager(
+            resource_manager=resource_manager,
+            icon_controller=icon_controller,
+            max_workers=4,
+        )
+
+        # Load pipelines (migrated from legacy settings if needed)
+        if settings.pipelines:
+            pipeline_manager.load_pipelines(settings.pipelines)
+        else:
+            logger.warning("No pipelines configured")
+
+        # Initialize hotkey manager with default metadata
+        # This metadata will be passed to all pipeline executions
+        default_metadata = {"speech_processor": speech_processor}
+        hotkey_manager = HotkeyManager(
+            pipeline_manager, default_metadata=default_metadata
+        )
+
+        # Check if we have any enabled pipelines
+        enabled_pipelines = pipeline_manager.list_enabled_pipelines()
+        if not enabled_pipelines:
+            logger.warning("No enabled pipelines found")
+        else:
+            logger.info(
+                f"Found {len(enabled_pipelines)} enabled pipeline(s): {', '.join(enabled_pipelines)}"
+            )
+
+            # Get the first enabled pipeline's hotkey for the listener
+            # NOTE: Current HotkeyListener only supports single hotkey
+            # For multi-hotkey support, we'd need to extend the listener
+            first_pipeline = pipeline_manager.pipelines[enabled_pipelines[0]]
+            hotkey_string = first_pipeline.hotkey
+
+            # Create hotkey callbacks that delegate to HotkeyManager
+            def on_hotkey_press():
+                """Hotkey press handler - delegates to pipeline manager."""
+                if ctx.state.state == State.LISTENING:
+                    ctx.state.state = State.RECORDING
+                    logger.debug("Hotkey pressed: State -> RECORDING")
+                    play_sound(START_RECORD_SOUND)
+                    # Trigger pipeline via hotkey manager
+                    hotkey_manager._on_press(hotkey_string)
+                else:
+                    logger.warning(
+                        f"Hotkey pressed in unexpected state: {ctx.state.state}"
+                    )
+
+            def on_hotkey_release():
+                """Hotkey release handler - delegates to pipeline manager."""
+                if ctx.state.state == State.RECORDING:
+                    ctx.state.state = State.PROCESSING
+                    logger.debug("Hotkey released: State -> PROCESSING")
+                    # Signal release to hotkey manager
+                    hotkey_manager._on_release(hotkey_string)
+
+                    # State will be reset to LISTENING by pipeline stages
+                    # Use a short delay to allow pipeline to complete
+                    def reset_state():
+                        import time
+
+                        time.sleep(0.5)
+                        if ctx.state.state == State.PROCESSING:
+                            ctx.state.state = State.LISTENING
+                            logger.debug("State -> LISTENING")
+
+                    threading.Thread(target=reset_state, daemon=True).start()
+                else:
+                    logger.warning(
+                        f"Hotkey released in unexpected state: {ctx.state.state}"
+                    )
+
+            # Create platform-specific listener
+            hotkey_listener = get_platform_listener(
+                on_press=on_hotkey_press, on_release=on_hotkey_release
+            )
+            hotkey_listener.set_hotkey(hotkey_string)
+
+            # Set the listener in hotkey manager (for compatibility)
+            hotkey_manager.set_hotkey_listener(hotkey_listener)
+
+            # Update context with listener
+            ctx.hotkey_listener = hotkey_listener
+
+            # Play empty sound to initialize audio system
+            play_sound(EMPTY_SOUND)
+
+            # Start listening
+            hotkey_listener.start_listening()
+
+            logger.info(f"Listening for hotkey: {hotkey_string}")
+            logger.info("Press Ctrl+C to exit.")
 
         # Start the system tray icon (blocks until closed)
-        tray = create_tray(ctx)
         tray.run()
 
     except KeyboardInterrupt:
@@ -200,12 +244,24 @@ def main():
         logger.error(f"An unexpected error occurred: {e}\n{traceback.format_exc()}")
     finally:
         logger.info("Shutting down...")
-        if "listener" in locals() and hotkey_listener:
+
+        # Stop hotkey listener
+        if hotkey_listener:
             try:
                 hotkey_listener.stop_listening()
                 logger.info("Hotkey listener stopped.")
             except Exception as e:
                 logger.error(f"Error stopping listener: {e}", exc_info=True)
+
+        # Shutdown pipeline manager
+        if pipeline_manager:
+            try:
+                pipeline_manager.shutdown(timeout=5.0)
+            except Exception as e:
+                logger.error(
+                    f"Error shutting down pipeline manager: {e}", exc_info=True
+                )
+
         logger.info("VoiceType application finished.")
 
 

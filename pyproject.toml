@@ -84,6 +84,7 @@ python = "<=3.12"
 gtk3 = "*"
 gobject-introspection = "*"
 pygobject = "*"
+loguru = ">=0.7.3,<0.8"
 
 [tool.pixi.pypi-dependencies]
 # "pyaudio",  # was causing me problems with audio
@@ -107,7 +108,7 @@ channels = ["conda-forge"]
 
 # PyPI packages for this feature
 [tool.pixi.feature.local.pypi-dependencies]
-voicetype = { path = ".", editable = true }
+voiceType2 = { path = "." }
 faster-whisper = "*"
 
 # Conda packages common across all platforms
@@ -119,7 +120,7 @@ channels = ["conda-forge"]
 
 # PyPI packages for this feature
 [tool.pixi.feature.litellm.pypi-dependencies]
-voicetype = { path = ".", editable = true }
+voiceType2 = { path = "." }
 aider-chat = "*"  # Includes litellm
 
 # Conda packages for this feature
@@ -158,9 +159,29 @@ python = "<=3.12"
 hatch = "*"
 hatch-vcs = "*"
 
+# Define the 'dev' feature
+[tool.pixi.feature.dev]
+channels = ["conda-forge"]
+
+# PyPI packages for the dev feature
+[tool.pixi.feature.dev.pypi-dependencies]
+voiceType2 = { path = ".", editable = true }
+faster-whisper = "*"
+
+# Conda packages for the dev feature
+[tool.pixi.feature.dev.dependencies]
+pre-commit = "*"
+
+# Linux-specific dev dependencies
+[tool.pixi.feature.dev.target.linux-64.dependencies]
+pytest = "*"
+libcublas = "=12"  # faster_whisper doesn't seem to support cuda 13 yet
+cudnn = "*"
+
 # Map environments to feature sets
 [tool.pixi.environments]
 default = ["local"]
 local = ["local"]
 build = ["build"]
 litellm = ["litellm"]
+dev = ["dev"]

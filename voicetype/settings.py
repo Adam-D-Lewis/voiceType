@@ -1,5 +1,6 @@
 import enum
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import toml
 from pydantic import Field
@@ -29,10 +30,14 @@ class HotkeySettings(BaseSettings):
 
 
 class Settings(BaseSettings):
-    """Main application settings."""
+    """Main application settings.
+
+    Supports both legacy format ([voice], [hotkey]) and new format ([pipelines]).
+    """
 
     voice: VoiceSettings = VoiceSettings()
     hotkey: HotkeySettings = HotkeySettings()
+    pipelines: Optional[List[Dict[str, Any]]] = None
 
 
 def load_settings(settings_file: Path | None = None) -> Settings:
@@ -42,6 +47,8 @@ def load_settings(settings_file: Path | None = None) -> Settings:
     1. ./settings.toml (current directory)
     2. ~/.config/voicetype/settings.toml (user config)
     3. /etc/voicetype/settings.toml (system-wide)
+
+    Automatically migrates legacy settings format to new pipeline format.
     """
     if settings_file is None:
         # Search default locations
@@ -58,5 +65,11 @@ def load_settings(settings_file: Path | None = None) -> Settings:
 
     if settings_file and settings_file.is_file():
         data = toml.load(settings_file)
+
+        # Migrate legacy settings if needed
+        from voicetype.pipeline import migrate_legacy_settings
+
+        data = migrate_legacy_settings(data)
+
         return Settings(**data)
     return Settings()

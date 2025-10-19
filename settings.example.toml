@@ -1,0 +1,81 @@
+# VoiceType Configuration File - Example
+# Copy this file to settings.toml and customize as needed
+
+# =============================================================================
+# PIPELINE CONFIGURATION
+# =============================================================================
+# Pipelines define sequences of stages that process voice input.
+# Multiple pipelines can be configured with different hotkeys.
+
+# Example 1: Default voice-to-text pipeline
+[[pipelines]]
+name = "default"
+enabled = true
+hotkey = "<pause>"  # Pause/Break key
+
+[[pipelines.stages]]
+func = "record_audio"
+
+[[pipelines.stages]]
+func = "transcribe"
+provider = "local"  # Use local faster-whisper model
+minimum_duration = 0.25  # Minimum audio duration in seconds
+
+[[pipelines.stages]]
+func = "type_text"
+
+
+# Example 2: Alternative pipeline with different hotkey (commented out)
+# [[pipelines]]
+# name = "alt_transcribe"
+# enabled = false
+# hotkey = "<f12>"
+#
+# [[pipelines.stages]]
+# func = "record_audio"
+#
+# [[pipelines.stages]]
+# func = "transcribe"
+# provider = "litellm"  # Use cloud-based transcription
+# minimum_duration = 0.5
+#
+# [[pipelines.stages]]
+# func = "type_text"
+
+
+# =============================================================================
+# LEGACY CONFIGURATION (for backward compatibility)
+# =============================================================================
+# If no pipelines are defined above, these settings will be automatically
+# migrated to a default pipeline configuration.
+
+[voice]
+provider = "local"  # Options: "local" or "litellm"
+minimum_duration = 0.25  # Minimum duration in seconds
+
+[hotkey]
+hotkey = "<pause>"  # Hotkey to trigger recording
+
+
+# =============================================================================
+# CONFIGURATION NOTES
+# =============================================================================
+#
+# Available Stages:
+#   - record_audio: Records audio while hotkey is held down
+#   - transcribe: Converts audio to text using speech recognition
+#   - type_text: Types the transcribed text at the current cursor position
+#
+# Hotkey Format:
+#   - Special keys: <pause>, <f1>, <f12>, etc.
+#   - Modifiers: <ctrl>+<alt>+p, <shift>+<f1>, etc.
+#   - Regular keys: a, b, 1, 2, etc.
+#
+# Provider Options:
+#   - "local": Uses faster-whisper for local transcription (faster, offline)
+#   - "litellm": Uses cloud-based transcription (requires API key)
+#
+# File Locations (searched in order):
+#   1. ./settings.toml (current directory)
+#   2. ~/.config/voicetype/settings.toml (user config)
+#   3. /etc/voicetype/settings.toml (system-wide)

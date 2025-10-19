@@ -1,17 +1,19 @@
 import os
 import subprocess
 import sys
-from typing import Tuple
+import threading
+from typing import Optional, Tuple
 
 from PIL import Image, ImageDraw
 
 # Valid values: 'gtk', 'appindicator', 'xorg', 'dummy' (fallback/test)
-if sys.platform == 'linux':
+if sys.platform == "linux":
     os.environ.setdefault("PYSTRAY_BACKEND", "gtk")
 
 import pystray
 from pystray import Menu
 from pystray import MenuItem as Item
+
 from voicetype.app_context import AppContext
 from voicetype.assets.imgs import YELLOW_BG_MIC
 from voicetype.state import State
@@ -256,6 +258,126 @@ def _backup_mic_icon(
     )
 
     return img
+
+
+class TrayIconController:
+    """Wrapper for pystray.Icon that implements the IconController protocol.
+
+    This class adapts the existing tray icon to the IconController interface
+    required by the pipeline system.
+    """
+
+    def __init__(self, icon: pystray.Icon):
+        """Initialize the controller with a pystray Icon instance.
+
+        Args:
+            icon: The pystray.Icon instance to control
+        """
+        self.icon = icon
+        self._flashing = False
+        self._flash_thread: Optional[threading.Thread] = None
+        self._stop_flash = threading.Event()
+
+    def set_icon(self, state: str, duration: Optional[float] = None) -> None:
+        """Set the system tray icon to a specific state.
+
+        Args:
+            state: Icon state ("idle", "recording", "processing", "error")
+            duration: Optional duration in seconds before reverting (not implemented)
+        """
+        # Stop any flashing when explicitly setting icon
+        if self._flashing:
+            self.stop_flashing()
+
+        try:
+            if state == "idle":
+                _apply_enabled_icon(self.icon)
+            elif state == "recording":
+                img = create_mic_icon_variant(circle_color="red", alpha=255)
+                self.icon.icon = img
+                try:
+                    self.icon.update_icon()
+                except Exception:
+                    pass
+            elif state == "processing":
+                img = create_mic_icon_variant(circle_color="yellow", alpha=255)
+                self.icon.icon = img
+                try:
+                    self.icon.update_icon()
+                except Exception:
+                    pass
+            elif state == "error":
+                set_error_icon(self.icon)
+            elif state == "disabled":
+                _apply_disabled_icon(self.icon)
+        except Exception:
+            # Silently fail on icon updates to avoid breaking pipeline
+            pass
+
+    def start_flashing(self, state: str) -> None:
+        """Start flashing the icon in the specified state.
+
+        Args:
+            state: Icon state to flash (e.g., "recording")
+        """
+        if self._flashing:
+            self.stop_flashing()
+
+        self._flashing = True
+        self._stop_flash.clear()
+
+        def flash_loop():
+            """Toggle between state and dimmed version."""
+            visible = True
+            while not self._stop_flash.is_set():
+                try:
+                    if state == "recording":
+                        if visible:
+                            img = create_mic_icon_variant(circle_color="red", alpha=255)
+                        else:
+                            img = create_mic_icon_variant(circle_color="red", alpha=128)
+                    elif state == "processing":
+                        if visible:
+                            img = create_mic_icon_variant(
+                                circle_color="yellow", alpha=255
+                            )
+                        else:
+                            img = create_mic_icon_variant(
+                                circle_color="yellow", alpha=128
+                            )
+                    else:
+                        # Default to idle for unknown states
+                        if visible:
+                            img = create_mic_icon_variant(
+                                circle_color="green", alpha=255
+                            )
+                        else:
+                            img = create_mic_icon_variant(
+                                circle_color="green", alpha=128
+                            )
+
+                    self.icon.icon = img
+                    try:
+                        self.icon.update_icon()
+                    except Exception:
+                        pass
+
+                    visible = not visible
+                    self._stop_flash.wait(0.5)  # Flash every 0.5 seconds
+                except Exception:
+                    break
+
+        self._flash_thread = threading.Thread(target=flash_loop, daemon=True)
+        self._flash_thread.start()
+
+    def stop_flashing(self) -> None:
+        """Stop flashing and return to the current non-flashing state."""
+        if self._flashing:
+            self._flashing = False
+            self._stop_flash.set()
+            if self._flash_thread:
+                self._flash_thread.join(timeout=1.0)
+                self._flash_thread = None
 
 
 def create_tray(ctx: AppContext) -> pystray.Icon:
