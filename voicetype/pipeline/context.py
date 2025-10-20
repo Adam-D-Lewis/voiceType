@@ -66,15 +66,10 @@ class PipelineContext:
             icon_controller: Interface to update system tray icon
             trigger_event: Optional trigger event (hotkey/timer)
             cancel_requested: Event set when pipeline should be cancelled
-            metadata: Shared data between stages
+            metadata: Shared data between stages (e.g., speech_processor)
         """
         self.config = config
         self.icon_controller = icon_controller
         self.trigger_event = trigger_event
         self.cancel_requested = cancel_requested or threading.Event()
         self.metadata = metadata or {}
-
-        # Special metadata key for temporary resources that need cleanup
-        # but were not returned by stages (e.g., filtered out files)
-        if "_temp_resources" not in self.metadata:
-            self.metadata["_temp_resources"] = []

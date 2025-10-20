@@ -9,28 +9,18 @@ from typing import Optional
 from loguru import logger
 
 from voicetype.pipeline.context import PipelineContext
-from voicetype.pipeline.stage_registry import STAGE_REGISTRY
-
-from .record_audio import TemporaryAudioFile
+from voicetype.pipeline.stage_registry import STAGE_REGISTRY, PipelineStage
 
 
-@STAGE_REGISTRY.register(
-    name="transcribe",
-    input_type=Optional[TemporaryAudioFile],
-    output_type=Optional[str],
-    description="Transcribe audio file to text",
-    required_resources=set(),  # No exclusive resources needed
-)
-def transcribe(
-    input_data: Optional[TemporaryAudioFile], context: PipelineContext
-) -> Optional[str]:
-    """Transcribe audio stage implementation.
+@STAGE_REGISTRY.register
+class Transcribe(PipelineStage[Optional[str], Optional[str]]):
+    """Transcribe audio file to text.
 
     Transcribes the audio file to text using the configured STT provider.
     If input is None (e.g., recording was too short), returns None.
 
-    Type signature: StageFunction[Optional[TemporaryAudioFile], Optional[str]]
-    - Input: Optional[TemporaryAudioFile] (audio file wrapper or None)
+    Type signature: PipelineStage[Optional[str], Optional[str]]
+    - Input: Optional[str] (filepath to audio file or None)
     - Output: Optional[str] (transcribed text or None)
 
     Config parameters:
@@ -38,39 +28,53 @@ def transcribe(
     - model: Model name (optional, provider-specific)
     - language: Language code (default: "en")
     - history: Optional context for better accuracy
-
-    Args:
-        input_data: TemporaryAudioFile wrapper or None
-        context: PipelineContext with config
-
-    Returns:
-        Transcribed text or None if no input
     """
-    if input_data is None:
-        logger.info("No audio to transcribe (input is None)")
-        return None
 
-    # Get speech processor from metadata
-    speech_processor = context.metadata.get("speech_processor")
-    if not speech_processor:
-        raise RuntimeError("Speech processor not found in pipeline metadata")
+    required_resources = set()  # No exclusive resources needed
 
-    # Update icon to processing state
-    context.icon_controller.set_icon("processing")
-    logger.debug(f"Transcribing audio file: {input_data.filepath}")
+    def __init__(self, config: dict, metadata: dict):
+        """Initialize the transcribe stage.
 
-    # Transcribe the audio file
-    # The pipeline manager will clean up the file later
-    text = speech_processor.transcribe(
-        filename=input_data.filepath,
-        provider=context.config.get("provider", "local"),
-        history=context.config.get("history"),
-        language=context.config.get("language", "en"),
-    )
+        Args:
+            config: Stage-specific configuration
+            metadata: Shared pipeline metadata containing speech_processor
+        """
+        self.config = config
+        self.speech_processor = metadata.get("speech_processor")
+        if not self.speech_processor:
+            raise RuntimeError("Speech processor not found in pipeline metadata")
 
-    if text:
-        logger.info(f"Transcription result: {text}")
-    else:
-        logger.warning("Transcription returned no text")
+    def execute(
+        self, input_data: Optional[str], context: PipelineContext
+    ) -> Optional[str]:
+        """Execute transcription.
 
-    return text
+        Args:
+            input_data: Filepath to audio file or None
+            context: PipelineContext with config
+
+        Returns:
+            Transcribed text or None if no input
+        """
+        if input_data is None:
+            logger.info("No audio to transcribe (input is None)")
+            return None
+
+        # Update icon to processing state
+        context.icon_controller.set_icon("processing")
+        logger.debug(f"Transcribing audio file: {input_data}")
+
+        # Transcribe the audio file
+        text = self.speech_processor.transcribe(
+            filename=input_data,
+            provider=self.config.get("provider", "local"),
+            history=self.config.get("history"),
+            language=self.config.get("language", "en"),
+        )
+
+        if text:
+            logger.info(f"Transcription result: {text}")
+        else:
+            logger.warning("Transcription returned no text")
+
+        return text

@@ -1,18 +1,25 @@
 """Pipeline stages for voice typing workflows.
 
 This module contains the core stages for the voice typing pipeline:
-- record_audio: Record audio from microphone
-- transcribe: Transcribe audio to text
-- type_text: Type text via virtual keyboard
+- RecordAudio: Record audio from microphone
+- Transcribe: Transcribe audio to text
+- TypeText: Type text via virtual keyboard
 """
 
-from .record_audio import TemporaryAudioFile, record_audio
-from .transcribe import transcribe
-from .type_text import type_text
+from .record_audio import RecordAudio
+from .transcribe import Transcribe
+from .type_text import TypeText
+
+# Export both old names (for compatibility) and new names
+RecordAudioStage = RecordAudio  # Compatibility alias
+TranscribeStage = Transcribe  # Compatibility alias
+TypeTextStage = TypeText  # Compatibility alias
 
 __all__ = [
-    "TemporaryAudioFile",
-    "record_audio",
-    "transcribe",
-    "type_text",
+    "RecordAudio",
+    "RecordAudioStage",  # Keep for compatibility
+    "Transcribe",
+    "TranscribeStage",  # Keep for compatibility
+    "TypeText",
+    "TypeTextStage",  # Keep for compatibility
 ]

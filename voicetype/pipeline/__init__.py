@@ -5,7 +5,7 @@ from .hotkey_dispatcher import HotkeyDispatcher
 from .pipeline_executor import PipelineExecutor
 from .pipeline_manager import PipelineConfig, PipelineManager
 from .resource_manager import Resource, ResourceManager
-from .stage_registry import STAGE_REGISTRY, StageMetadata, StageRegistry
+from .stage_registry import STAGE_REGISTRY, PipelineStage, StageMetadata, StageRegistry
 from .trigger_events import (
     HotkeyTriggerEvent,
     ProgrammaticTriggerEvent,
@@ -23,6 +23,7 @@ __all__ = [
     "Resource",
     "ResourceManager",
     "STAGE_REGISTRY",
+    "PipelineStage",
     "StageMetadata",
     "StageRegistry",
     "HotkeyTriggerEvent",

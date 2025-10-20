@@ -142,7 +142,7 @@ class PipelineExecutor:
         )
 
         result = None
-        cleanup_tasks = []  # Track all cleanup tasks
+        stage_instances = []  # Track stage instances for cleanup
 
         try:
             for stage_config in stages:
@@ -154,30 +154,27 @@ class PipelineExecutor:
                 stage_name = stage_config["func"]
                 logger.debug(f"[{pipeline_name}] Starting stage: {stage_name}")
 
-                # Get stage function from registry
+                # Get stage class from registry
                 stage_metadata = STAGE_REGISTRY.get(stage_name)
-                stage_func = stage_metadata.function
+                stage_class = stage_metadata.stage_class
+
+                # Extract stage-specific config (remove 'func' key)
+                stage_specific_config = {
+                    k: v for k, v in stage_config.items() if k != "func"
+                }
+
+                # Instantiate stage with config and dependencies from metadata
+                # Each stage is responsible for extracting what it needs from metadata
+                stage_instance = stage_class(
+                    config=stage_specific_config, metadata=metadata
+                )
+                stage_instances.append(stage_instance)
 
                 # Update context with stage-specific config
-                # Remove 'func' key and pass rest as config
-                context.config = {k: v for k, v in stage_config.items() if k != "func"}
+                context.config = stage_specific_config
 
                 # Execute stage (may block for seconds)
-                result = stage_func(result, context)
-
-                # Track cleanup if the result has a cleanup method
-                if hasattr(result, "cleanup") and callable(result.cleanup):
-                    if result.cleanup not in cleanup_tasks:
-                        cleanup_tasks.append(result.cleanup)
-
-                # Collect temporary resources from metadata
-                if "_temp_resources" in context.metadata:
-                    for resource in context.metadata["_temp_resources"]:
-                        if hasattr(resource, "cleanup") and callable(resource.cleanup):
-                            if resource.cleanup not in cleanup_tasks:
-                                cleanup_tasks.append(resource.cleanup)
-                    # Clear the list after collecting
-                    context.metadata["_temp_resources"] = []
+                result = stage_instance.execute(result, context)
 
                 logger.debug(f"[{pipeline_name}] Stage {stage_name} completed")
 
@@ -192,14 +189,16 @@ class PipelineExecutor:
             raise
 
         finally:
-            # CRITICAL: Cleanup temporary resources
-            # This ALWAYS runs, even if stage raised exception or pipeline cancelled
-            for cleanup in cleanup_tasks:
-                try:
-                    cleanup()
-                except Exception as e:
-                    # Don't let cleanup failures mask the original error
-                    logger.warning(f"Cleanup failed: {e}", exc_info=True)
+            # CRITICAL: Cleanup stage instances in reverse order
+            # Stages own their resources and handle cleanup via cleanup() method
+            for stage_instance in reversed(stage_instances):
+                if hasattr(stage_instance, "cleanup") and callable(
+                    stage_instance.cleanup
+                ):
+                    try:
+                        stage_instance.cleanup()
+                    except Exception as e:
+                        logger.warning(f"Stage cleanup failed: {e}", exc_info=True)
 
             # Release acquired resources
             self.resource_manager.release(pipeline_id)

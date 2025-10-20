@@ -1,14 +1,14 @@
 """Stage registry for type-safe pipeline stage registration and validation.
 
 The stage registry provides:
-- Type-safe registration of pipeline stages
-- Validation of stage function signatures
+- Type-safe registration of pipeline stage classes
+- Validation of stage execute() method signatures
 - Pipeline type compatibility checking
 - Resource requirement tracking
 """
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Protocol, Set, TypeVar, get_type_hints
+from typing import Any, Dict, Optional, Protocol, Set, TypeVar, get_type_hints
 
 from loguru import logger
 
@@ -19,17 +19,16 @@ TInput = TypeVar("TInput")
 TOutput = TypeVar("TOutput")
 
 
-class StageFunction(Protocol[TInput, TOutput]):
+class PipelineStage(Protocol[TInput, TOutput]):
     """Protocol for type-safe pipeline stages.
 
-    All stage functions must follow this signature:
-    - Take input_data from the previous stage (or None for first stage)
-    - Take a PipelineContext containing configuration and shared state
-    - Return output data to pass to the next stage
+    All pipeline stages must implement this protocol:
+    - execute() method that takes input_data and context, returns output
+    - Optional cleanup() method for resource cleanup
     """
 
-    def __call__(self, input_data: TInput, context: Any) -> TOutput:
-        """Execute a pipeline stage.
+    def execute(self, input_data: TInput, context: Any) -> TOutput:
+        """Execute the stage logic.
 
         Args:
             input_data: Output from the previous stage (None for first stage)
@@ -43,16 +42,24 @@ class StageFunction(Protocol[TInput, TOutput]):
         """
         ...
 
+    def cleanup(self) -> None:
+        """Clean up any resources held by this stage (optional).
+
+        Called by pipeline manager in finally block after pipeline completes.
+        Stages should implement this if they create resources that need cleanup.
+        """
+        ...
+
 
 @dataclass
 class StageMetadata:
     """Metadata about a registered stage.
 
-    Tracks the stage function, type information, description, and resource requirements.
+    Tracks the stage class, type information, description, and resource requirements.
     """
 
     name: str
-    function: Callable
+    stage_class: type  # Changed from 'function' to 'stage_class'
     input_type: type
     output_type: type
     description: str
@@ -62,93 +69,102 @@ class StageMetadata:
 class StageRegistry:
     """Registry for pipeline stages with type validation.
 
-    Provides decorator-based registration and validates stage signatures
-    at registration time. Also validates pipeline type compatibility at
-    startup.
+    Provides decorator-based registration and validates stage class execute()
+    method signatures at registration time. Also validates pipeline type
+    compatibility at startup.
     """
 
     def __init__(self):
         """Initialize an empty stage registry."""
         self._stages: Dict[str, StageMetadata] = {}
 
-    def register(
-        self,
-        name: str,
-        input_type: type,
-        output_type: type,
-        description: str = "",
-        required_resources: Optional[Set[Resource]] = None,
-    ):
-        """Decorator to register a stage with type information.
+    def register(self, stage_class: type = None):
+        """Decorator to register a stage class, auto-inferring type information.
 
-        Args:
-            name: Unique name for the stage
-            input_type: Expected input type for the stage
-            output_type: Output type produced by the stage
-            description: Human-readable description of what the stage does
-            required_resources: Set of resources this stage requires
+        The decorator automatically infers:
+        - name: From the class name directly (no transformation)
+        - input_type: From execute() method's input_data parameter type hint
+        - output_type: From execute() method's return type hint
+        - description: From the class docstring
+        - required_resources: From the class variable 'required_resources'
 
         Returns:
-            Decorator function that registers the stage
+            Decorator function that registers the stage class
 
         Raises:
-            TypeError: If function signature doesn't match declared types
+            TypeError: If execute() method is missing or has invalid signature
             ValueError: If stage name is already registered
 
         Example:
-            @STAGE_REGISTRY.register(
-                name="record_audio",
-                input_type=type(None),
-                output_type=Optional[TemporaryAudioFile],
-                description="Record audio until trigger completes",
-                required_resources={Resource.AUDIO_INPUT}
-            )
-            def record_audio(input_data: None, context: PipelineContext) -> Optional[TemporaryAudioFile]:
-                ...
+            @STAGE_REGISTRY.register
+            class RecordAudio:
+                '''Record audio until trigger completes'''
+                required_resources = {Resource.AUDIO_INPUT}
+
+                def execute(self, input_data: None, context: PipelineContext) -> Optional[str]:
+                    ...
         """
 
-        def decorator(func: Callable) -> Callable:
+        def decorator(cls: type) -> type:
+            # Use class name directly - no transformation
+            name = cls.__name__
+
             # Check if stage already registered
             if name in self._stages:
+                existing = self._stages[name]
                 raise ValueError(
                     f"Stage '{name}' is already registered. "
-                    f"Existing: {self._stages[name].function.__module__}.{self._stages[name].function.__name__}"
+                    f"Existing: {existing.stage_class.__module__}.{existing.stage_class.__name__}"
                 )
 
-            # Validate function signature matches declared types
-            hints = get_type_hints(func)
-
-            declared_input = hints.get("input_data")
-            if declared_input != input_type:
+            # Validate that the class has an execute() method
+            execute_method = getattr(cls, "execute", None)
+            if not execute_method or not callable(execute_method):
                 raise TypeError(
-                    f"Stage {name}: declared input_type {input_type} doesn't match "
-                    f"function signature {declared_input}"
+                    f"Stage class {cls.__name__} must have an execute() method"
                 )
 
-            declared_output = hints.get("return")
-            if declared_output != output_type:
+            # Get type hints from execute() method
+            hints = get_type_hints(execute_method)
+            input_type = hints.get("input_data")
+            output_type = hints.get("return")
+
+            if input_type is None:
                 raise TypeError(
-                    f"Stage {name}: declared output_type {output_type} doesn't match "
-                    f"function signature {declared_output}"
+                    f"Stage class {cls.__name__} execute() method must have "
+                    f"type hint for 'input_data' parameter"
+                )
+            if output_type is None:
+                raise TypeError(
+                    f"Stage class {cls.__name__} execute() method must have "
+                    f"return type hint"
                 )
 
-            # Register the stage
+            # Get metadata from class attributes
+            required_resources = getattr(cls, "required_resources", set())
+            description = cls.__doc__ or ""
+
+            # Register the stage class
             self._stages[name] = StageMetadata(
                 name=name,
-                function=func,
+                stage_class=cls,
                 input_type=input_type,
                 output_type=output_type,
-                description=description,
-                required_resources=required_resources or set(),
+                description=description.strip(),
+                required_resources=required_resources,
             )
 
             logger.debug(
-                f"Registered stage '{name}' with input={input_type}, output={output_type}, "
-                f"resources={required_resources or set()}"
+                f"Registered stage class '{name}' with "
+                f"input={input_type}, output={output_type}, "
+                f"resources={required_resources}"
             )
 
-            return func
+            return cls
 
+        # Allow both @register and @register()
+        if stage_class is not None:
+            return decorator(stage_class)
         return decorator
 
     def get(self, name: str) -> StageMetadata:

@@ -119,14 +119,18 @@ class TestPipelineContext:
         assert context.icon_controller is icon_controller
         assert context.trigger_event is trigger
         assert isinstance(context.cancel_requested, threading.Event)
-        assert context.metadata == {"_temp_resources": []}
+        assert context.metadata == {}
 
-    def test_context_temp_resources_list(self):
-        """Test context initializes _temp_resources list."""
-        context = PipelineContext(config={}, icon_controller=MockIconController())
+    def test_context_with_metadata(self):
+        """Test context accepts custom metadata."""
+        context = PipelineContext(
+            config={},
+            icon_controller=MockIconController(),
+            metadata={"speech_processor": "mock_processor"},
+        )
 
-        assert "_temp_resources" in context.metadata
-        assert isinstance(context.metadata["_temp_resources"], list)
+        assert "speech_processor" in context.metadata
+        assert context.metadata["speech_processor"] == "mock_processor"
 
 
 class TestResourceManager:
@@ -234,18 +238,20 @@ class TestStageRegistry:
         """Test registering a stage with decorator."""
         registry = StageRegistry()
 
-        @registry.register(
-            name="test_stage",
-            input_type=type(None),
-            output_type=str,
-            description="Test stage",
-            required_resources={Resource.AUDIO_INPUT},
-        )
-        def test_stage(input_data: None, context: PipelineContext) -> str:
-            return "test"
+        @registry.register
+        class TestStage:
+            """Test stage"""
 
-        metadata = registry.get("test_stage")
-        assert metadata.name == "test_stage"
+            required_resources = {Resource.AUDIO_INPUT}
+
+            def __init__(self, config: dict, metadata: dict):
+                pass
+
+            def execute(self, input_data: None, context: PipelineContext) -> str:
+                return "test"
+
+        metadata = registry.get("TestStage")
+        assert metadata.name == "TestStage"
         assert metadata.input_type == type(None)
         assert metadata.output_type == str
         assert metadata.description == "Test stage"
@@ -255,15 +261,23 @@ class TestStageRegistry:
         """Test registering duplicate stage name fails."""
         registry = StageRegistry()
 
-        @registry.register(name="duplicate", input_type=type(None), output_type=str)
-        def stage1(input_data: None, context: PipelineContext) -> str:
-            return "test"
+        @registry.register
+        class DuplicateStage:
+            def __init__(self, config: dict, metadata: dict):
+                pass
+
+            def execute(self, input_data: None, context: PipelineContext) -> str:
+                return "test"
 
         with pytest.raises(ValueError, match="already registered"):
 
-            @registry.register(name="duplicate", input_type=type(None), output_type=str)
-            def stage2(input_data: None, context: PipelineContext) -> str:
-                return "test"
+            @registry.register
+            class DuplicateStage:
+                def __init__(self, config: dict, metadata: dict):
+                    pass
+
+                def execute(self, input_data: None, context: PipelineContext) -> str:
+                    return "test"
 
     def test_get_unknown_stage_fails(self):
         """Test getting unknown stage raises error."""
@@ -276,32 +290,48 @@ class TestStageRegistry:
         """Test validating a compatible pipeline succeeds."""
         registry = StageRegistry()
 
-        @registry.register(name="stage1", input_type=type(None), output_type=str)
-        def stage1(input_data: None, context: PipelineContext) -> str:
-            return "test"
+        @registry.register
+        class Stage1:
+            def __init__(self, config: dict, metadata: dict):
+                pass
 
-        @registry.register(name="stage2", input_type=str, output_type=int)
-        def stage2(input_data: str, context: PipelineContext) -> int:
-            return len(input_data)
+            def execute(self, input_data: None, context: PipelineContext) -> str:
+                return "test"
+
+        @registry.register
+        class Stage2:
+            def __init__(self, config: dict, metadata: dict):
+                pass
+
+            def execute(self, input_data: str, context: PipelineContext) -> int:
+                return len(input_data)
 
         # Should not raise
-        registry.validate_pipeline(["stage1", "stage2"])
+        registry.validate_pipeline(["Stage1", "Stage2"])
 
     def test_validate_incompatible_pipeline_fails(self):
         """Test validating incompatible pipeline fails."""
         registry = StageRegistry()
 
-        @registry.register(name="stage1", input_type=type(None), output_type=str)
-        def stage1(input_data: None, context: PipelineContext) -> str:
-            return "test"
+        @registry.register
+        class Stage1:
+            def __init__(self, config: dict, metadata: dict):
+                pass
 
-        @registry.register(name="stage2", input_type=int, output_type=str)
-        def stage2(input_data: int, context: PipelineContext) -> str:
-            return str(input_data)
+            def execute(self, input_data: None, context: PipelineContext) -> str:
+                return "test"
+
+        @registry.register
+        class Stage2:
+            def __init__(self, config: dict, metadata: dict):
+                pass
+
+            def execute(self, input_data: int, context: PipelineContext) -> str:
+                return str(input_data)
 
         # Should raise type mismatch error
         with pytest.raises(TypeError, match="Type mismatch"):
-            registry.validate_pipeline(["stage1", "stage2"])
+            registry.validate_pipeline(["Stage1", "Stage2"])
 
     def test_validate_empty_pipeline_fails(self):
         """Test validating empty pipeline fails."""
@@ -314,15 +344,23 @@ class TestStageRegistry:
         """Test listing all registered stages."""
         registry = StageRegistry()
 
-        @registry.register(name="stage1", input_type=type(None), output_type=str)
-        def stage1(input_data: None, context: PipelineContext) -> str:
-            return "test"
+        @registry.register
+        class Stage1:
+            def __init__(self, config: dict, metadata: dict):
+                pass
 
-        @registry.register(name="stage2", input_type=str, output_type=int)
-        def stage2(input_data: str, context: PipelineContext) -> int:
-            return 42
+            def execute(self, input_data: None, context: PipelineContext) -> str:
+                return "test"
+
+        @registry.register
+        class Stage2:
+            def __init__(self, config: dict, metadata: dict):
+                pass
+
+            def execute(self, input_data: str, context: PipelineContext) -> int:
+                return 42
 
         stages = registry.list_stages()
-        assert "stage1" in stages
-        assert "stage2" in stages
+        assert "Stage1" in stages
+        assert "Stage2" in stages
         assert len(stages) == 2
