@@ -167,6 +167,14 @@ pip uninstall voicetype
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
+## Architecture
+
+VoiceType uses a pipeline-based architecture with resource-based concurrency control. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for:
+- Complete system architecture diagram (Mermaid UML)
+- Component descriptions and responsibilities
+- Execution flow and lifecycle
+- Design principles and extension points
+
 ## Development
 
 Preferred workflow: Pixi

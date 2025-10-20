@@ -105,7 +105,7 @@ def test_pipeline_manager_with_metadata():
     assert "test_pipeline" in pipeline_manager.pipelines
 
 
-def test_hotkey_manager_integration():
+def test_hotkey_dispatcher_integration():
     """Test HotkeyDispatcher integration with PipelineManager."""
     # Create mock icon controller
     icon_controller = MockIconController()
@@ -139,13 +139,13 @@ def test_hotkey_manager_integration():
 
     # Create hotkey dispatcher with metadata
     default_metadata = {"speech_processor": speech_processor}
-    hotkey_manager = HotkeyDispatcher(
+    hotkey_dispatcher = HotkeyDispatcher(
         pipeline_manager, default_metadata=default_metadata
     )
 
     # Verify hotkey dispatcher initialized
-    assert hotkey_manager.pipeline_manager == pipeline_manager
-    assert hotkey_manager.default_metadata == default_metadata
+    assert hotkey_dispatcher.pipeline_manager == pipeline_manager
+    assert hotkey_dispatcher.default_metadata == default_metadata
 
 
 def test_full_integration_mock():
@@ -180,7 +180,7 @@ def test_full_integration_mock():
 
     # Create hotkey dispatcher
     default_metadata = {"speech_processor": speech_processor}
-    hotkey_manager = HotkeyDispatcher(
+    hotkey_dispatcher = HotkeyDispatcher(
         pipeline_manager, default_metadata=default_metadata
     )
 
@@ -188,16 +188,16 @@ def test_full_integration_mock():
     hotkey_string = "<pause>"
 
     # Press
-    hotkey_manager._on_press(hotkey_string)
+    hotkey_dispatcher._on_press(hotkey_string)
 
     # Verify trigger event created
-    assert hotkey_string in hotkey_manager.active_events
+    assert hotkey_string in hotkey_dispatcher.active_events
 
     # Release
-    hotkey_manager._on_release(hotkey_string)
+    hotkey_dispatcher._on_release(hotkey_string)
 
     # Verify trigger event removed
-    assert hotkey_string not in hotkey_manager.active_events
+    assert hotkey_string not in hotkey_dispatcher.active_events
 
     # Wait a bit for pipeline to complete
     import time

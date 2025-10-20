@@ -1,7 +1,7 @@
 """Pipeline system for configurable voice typing workflows."""
 
 from .context import IconController, PipelineContext
-from .hotkey_manager import HotkeyDispatcher
+from .hotkey_dispatcher import HotkeyDispatcher
 from .pipeline_executor import PipelineExecutor
 from .pipeline_manager import PipelineConfig, PipelineManager
 from .resource_manager import Resource, ResourceManager
