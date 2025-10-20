@@ -14,15 +14,15 @@ enabled = true
 hotkey = "<pause>"  # Pause/Break key
 
 [[pipelines.stages]]
-func = "record_audio"
+stage = "RecordAudio"
 minimum_duration = 0.25  # Minimum audio duration in seconds
 
 [[pipelines.stages]]
-func = "transcribe"
+stage = "Transcribe"
 provider = "local"  # Use local faster-whisper model
 
 [[pipelines.stages]]
-func = "type_text"
+stage = "TypeText"
 
 
 # Example 2: Alternative pipeline with different hotkey (commented out)
@@ -32,14 +32,14 @@ func = "type_text"
 # hotkey = "<f12>"
 #
 # [[pipelines.stages]]
-# func = "record_audio"
+# stage = "RecordAudio"
 #
 # [[pipelines.stages]]
-# func = "transcribe"
+# stage = "Transcribe"
 # provider = "litellm"  # Use cloud-based transcription
 #
 # [[pipelines.stages]]
-# func = "type_text"
+# stage = "TypeText"
 
 
 # =============================================================================
@@ -47,9 +47,9 @@ func = "type_text"
 # =============================================================================
 #
 # Available Stages:
-#   - record_audio: Records audio while hotkey is held down
-#   - transcribe: Converts audio to text using speech recognition
-#   - type_text: Types the transcribed text at the current cursor position
+#   - RecordAudio: Records audio while hotkey is held down
+#   - Transcribe: Converts audio to text using speech recognition
+#   - TypeText: Types the transcribed text at the current cursor position
 #
 # Hotkey Format:
 #   - Special keys: <pause>, <f1>, <f12>, etc.

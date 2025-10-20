@@ -102,7 +102,7 @@ class PipelineManager:
                 )
 
             # Extract stage names for validation
-            stage_names = [stage["func"] for stage in stages]
+            stage_names = [stage["stage"] for stage in stages]
 
             # Validate pipeline type compatibility
             STAGE_REGISTRY.validate_pipeline(stage_names)

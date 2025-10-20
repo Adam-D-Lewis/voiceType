@@ -91,9 +91,9 @@ def test_pipeline_manager_with_metadata():
             "enabled": True,
             "hotkey": "<pause>",
             "stages": [
-                {"func": "record_audio"},
-                {"func": "transcribe", "provider": "local"},
-                {"func": "type_text"},
+                {"stage": "RecordAudio"},
+                {"stage": "Transcribe", "provider": "local"},
+                {"stage": "TypeText"},
             ],
         }
     ]
@@ -128,9 +128,9 @@ def test_hotkey_dispatcher_integration():
             "enabled": True,
             "hotkey": "<pause>",
             "stages": [
-                {"func": "record_audio"},
-                {"func": "transcribe", "provider": "local"},
-                {"func": "type_text"},
+                {"stage": "RecordAudio"},
+                {"stage": "Transcribe", "provider": "local"},
+                {"stage": "TypeText"},
             ],
         }
     ]
@@ -169,9 +169,9 @@ def test_full_integration_mock():
             "enabled": True,
             "hotkey": "<pause>",
             "stages": [
-                {"func": "record_audio"},
-                {"func": "transcribe", "provider": "local"},
-                {"func": "type_text"},
+                {"stage": "RecordAudio"},
+                {"stage": "Transcribe", "provider": "local"},
+                {"stage": "TypeText"},
             ],
         }
     ]

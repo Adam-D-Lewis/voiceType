@@ -168,10 +168,10 @@ class StageRegistry:
         return decorator
 
     def get(self, name: str) -> StageMetadata:
-        """Get stage metadata by name.
+        """Get stage metadata by name (PascalCase).
 
         Args:
-            name: Stage name to look up
+            name: Stage name to look up (e.g., 'RecordAudio', 'Transcribe')
 
         Returns:
             StageMetadata for the stage

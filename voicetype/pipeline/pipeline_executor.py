@@ -76,8 +76,8 @@ class PipelineExecutor:
         # Generate unique ID for this pipeline execution
         pipeline_id = str(uuid.uuid4())
 
-        # Extract stage function names
-        stage_names = [stage["func"] for stage in stages]
+        # Extract stage names
+        stage_names = [stage["stage"] for stage in stages]
 
         # Determine required resources
         required_resources = self.resource_manager.get_required_resources(stage_names)
@@ -151,7 +151,7 @@ class PipelineExecutor:
                     logger.info(f"Pipeline '{pipeline_name}' cancelled")
                     return
 
-                stage_name = stage_config["func"]
+                stage_name = stage_config["stage"]
                 logger.debug(f"[{pipeline_name}] Starting stage: {stage_name}")
 
                 # Get stage class from registry
