@@ -20,6 +20,14 @@ Type with your voice.
 
 ## Installation
 
+### Option 1: Install from PyPI
+
+```bash
+pip install voicetype2
+```
+
+### Option 2: Install from Source
+
 1.  **Clone the repository (including submodules):**
     ```bash
     git clone --recurse-submodules https://github.com/Adam-D-Lewis/voicetype.git
