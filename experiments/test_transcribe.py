@@ -1,5 +1,6 @@
-from faster_whisper import WhisperModel
 import sys
+
+from faster_whisper import WhisperModel
 
 print("Testing faster_whisper CUDA...")
 try:
@@ -36,4 +37,5 @@ try:
 except Exception as e:
     print(f"[ERROR] Speech recognition error: {e}")
     import traceback
+
     traceback.print_exc()

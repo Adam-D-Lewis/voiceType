@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable, Tuple
 
+import pystray
+
 # Third-party
 from loguru import logger
 
@@ -18,8 +20,6 @@ from loguru import logger
 # GI_TYPELIB_PATH='/usr/lib/x86_64-linux-gnu/girepository-1.0' python
 # pystray imports must happen after setting PYSTRAY_BACKEND
 from PIL import Image, ImageDraw
-
-import pystray
 from pystray import Menu
 from pystray import MenuItem as Item
 

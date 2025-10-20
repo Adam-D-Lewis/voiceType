@@ -1,0 +1,66 @@
+# VoiceType Configuration File - Example
+# Copy this file to settings.toml and customize as needed
+
+# =============================================================================
+# PIPELINE CONFIGURATION
+# =============================================================================
+# Pipelines define sequences of stages that process voice input.
+# Multiple pipelines can be configured with different hotkeys.
+
+# Example 1: Default voice-to-text pipeline
+[[pipelines]]
+name = "default"
+enabled = true
+hotkey = "<pause>"  # Pause/Break key
+
+[[pipelines.stages]]
+stage = "RecordAudio"
+minimum_duration = 0.25  # Minimum audio duration in seconds
+
+[[pipelines.stages]]
+stage = "Transcribe"
+provider = "local"  # Use local faster-whisper model
+
+[[pipelines.stages]]
+stage = "TypeText"
+
+
+# Example 2: Alternative pipeline with different hotkey (commented out)
+# [[pipelines]]
+# name = "alt_transcribe"
+# enabled = false
+# hotkey = "<f12>"
+#
+# [[pipelines.stages]]
+# stage = "RecordAudio"
+#
+# [[pipelines.stages]]
+# stage = "Transcribe"
+# provider = "litellm"  # Use cloud-based transcription
+#
+# [[pipelines.stages]]
+# stage = "TypeText"
+
+
+# =============================================================================
+# CONFIGURATION NOTES
+# =============================================================================
+#
+# Available Stages:
+#   - RecordAudio: Records audio while hotkey is held down
+#   - Transcribe: Converts audio to text using speech recognition
+#   - TypeText: Types the transcribed text at the current cursor position
+#
+# Hotkey Format:
+#   - Special keys: <pause>, <f1>, <f12>, etc.
+#   - Modifiers: <ctrl>+<alt>+p, <shift>+<f1>, etc.
+#   - Regular keys: a, b, 1, 2, etc.
+#
+# Provider Options:
+#   - "local": Uses faster-whisper for local transcription (faster, offline)
+#   - "litellm": Uses cloud-based transcription (requires API key)
+#
+# File Locations (searched in order):
+#   1. ./settings.toml (current directory)
+#   2. ~/.config/voicetype/settings.toml (user config)
+#   3. /etc/voicetype/settings.toml (system-wide)

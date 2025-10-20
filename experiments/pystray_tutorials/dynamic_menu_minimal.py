@@ -6,9 +6,8 @@ from typing import Iterable
 # This avoids backend differences and we sequence menu init safely.
 os.environ["PYSTRAY_BACKEND"] = "gtk"
 
-from PIL import Image, ImageDraw
-
 import pystray
+from PIL import Image, ImageDraw
 from pystray import Menu
 from pystray import MenuItem as Item
 

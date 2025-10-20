@@ -1,10 +1,9 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from voicetype.state import AppState
 
 if TYPE_CHECKING:
-    from voicetype.audio_capture import SpeechProcessor
     from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 
 
@@ -15,5 +14,4 @@ class AppContext:
     """
 
     state: AppState
-    speech_processor: "SpeechProcessor"
-    hotkey_listener: "HotkeyListener"
+    hotkey_listener: Optional["HotkeyListener"]
