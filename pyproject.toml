@@ -30,7 +30,7 @@ license-files = [
     "LICENSE",
     "voicetype/_vendor/pynput/COPYING.LGPL",
 ]
-requires-python = "<=3.12"
+requires-python = ">=3.11"
 keywords = ["speech-recognition", "voice-typing", "accessibility", "transcription"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -41,6 +41,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: POSIX :: Linux",
     "Operating System :: Microsoft :: Windows",
 ]
@@ -80,7 +82,7 @@ platforms = ["linux-64", "win-64", "osx-64"]
 
 [tool.pixi.dependencies]
 # conda-forge dependencies
-python = "<=3.12"
+python = ">=3.11"
 gtk3 = "*"
 gobject-introspection = "*"
 pygobject = "*"
@@ -155,7 +157,7 @@ channels = ["conda-forge"]
 
 # Conda packages for the build feature
 [tool.pixi.feature.build.dependencies]
-python = "<=3.12"
+python = ">=3.11"
 hatch = "*"
 hatch-vcs = "*"
 

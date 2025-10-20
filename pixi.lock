@@ -9493,20 +9493,20 @@ packages:
   timestamp: 1760134237380
 - pypi: ./
   name: voicetype2
-  version: 0.1.4.dev32+g33fc52edd.d20251019
-  sha256: fd7b88666f9748597e1318f8ed63ff6daa844e91628cbb6f93cf884bc2c1e8c4
+  version: 0.1.7.dev1+gd929bbf47.d20251020
+  sha256: 600d99216e39a0c2cb713d35a4cc783e4dad55c9fd2a34a45d06d06c9826d68f
   requires_dist:
   - pre-commit ; extra == 'dev'
   - pytest ; extra == 'dev'
-  requires_python: <=3.12
+  requires_python: '>=3.11'
 - pypi: ./
   name: voicetype2
-  version: 0.1.4.dev32+g33fc52edd.d20251019
-  sha256: fd7b88666f9748597e1318f8ed63ff6daa844e91628cbb6f93cf884bc2c1e8c4
+  version: 0.1.7.dev1+gd929bbf47.d20251020
+  sha256: 600d99216e39a0c2cb713d35a4cc783e4dad55c9fd2a34a45d06d06c9826d68f
   requires_dist:
   - pre-commit ; extra == 'dev'
   - pytest ; extra == 'dev'
-  requires_python: <=3.12
+  requires_python: '>=3.11'
   editable: true
 - pypi: https://files.pythonhosted.org/packages/3f/d3/3ae9d5124ec75143bdf088d436cba39812122edc47709cd2caafeac3266f/watchfiles-1.1.0-cp312-cp312-win_amd64.whl
   name: watchfiles
