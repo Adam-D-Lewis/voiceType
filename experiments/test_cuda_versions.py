@@ -3,7 +3,7 @@ import sys
 
 # Add CUDA 11 libraries to PATH
 cuda_path = r"C:\Users\Adam Lewis\voiceType\.pixi\envs\default\Library\bin"
-os.environ['PATH'] = cuda_path + os.pathsep + os.environ.get('PATH', '')
+os.environ["PATH"] = cuda_path + os.pathsep + os.environ.get("PATH", "")
 
 print(f"Added to PATH: {cuda_path}")
 
@@ -18,7 +18,9 @@ try:
             model = WhisperModel("tiny", device="cuda", compute_type=compute_type)
             print(f"  [OK] Model loaded with {compute_type}")
 
-            segments, info = model.transcribe("voicetype/assets/sounds/start-record.wav")
+            segments, info = model.transcribe(
+                "voicetype/assets/sounds/start-record.wav"
+            )
             print(f"  [OK] Transcription successful with {compute_type}")
             break
         except Exception as e:
@@ -27,4 +29,5 @@ try:
 except Exception as e:
     print(f"[ERROR] Overall error: {e}")
     import traceback
+
     traceback.print_exc()

@@ -8,7 +8,6 @@ from loguru import logger
 
 from voicetype.app_context import AppContext
 from voicetype.assets.sounds import EMPTY_SOUND, ERROR_SOUND, START_RECORD_SOUND
-from voicetype.audio_capture import SpeechProcessor
 from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
 from voicetype.pipeline import (
     HotkeyDispatcher,
@@ -121,13 +120,9 @@ def main():
     icon_controller = None
 
     try:
-        # Initialize speech processor (needed by pipeline stages)
-        speech_processor = SpeechProcessor()
-
         # Create app context for tray icon compatibility
         ctx = AppContext(
             state=AppState(),
-            speech_processor=speech_processor,
             hotkey_listener=None,  # Will be set later
         )
         ctx.state.state = State.LISTENING
@@ -152,12 +147,9 @@ def main():
         else:
             logger.warning("No pipelines configured")
 
-        # Initialize hotkey dispatcher with default metadata
-        # This metadata will be passed to all pipeline executions
-        default_metadata = {"speech_processor": speech_processor}
-        hotkey_dispatcher = HotkeyDispatcher(
-            pipeline_manager, default_metadata=default_metadata
-        )
+        # Initialize hotkey dispatcher
+        # Stages are now self-contained and don't need shared metadata
+        hotkey_dispatcher = HotkeyDispatcher(pipeline_manager, default_metadata={})
 
         # Check if we have any enabled pipelines
         enabled_pipelines = pipeline_manager.list_enabled_pipelines()
