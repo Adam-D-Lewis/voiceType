@@ -9493,16 +9493,16 @@ packages:
   timestamp: 1760134237380
 - pypi: ./
   name: voicetype2
-  version: 0.1.7.dev1+gd929bbf47.d20251020
-  sha256: 600d99216e39a0c2cb713d35a4cc783e4dad55c9fd2a34a45d06d06c9826d68f
+  version: 0.1.7.dev3+gf0e1ebcec.d20251029
+  sha256: a1283fc8835d08883e178c9c6f74720cda8b4c6cd0bb2e0fa4052492d20b6b21
   requires_dist:
   - pre-commit ; extra == 'dev'
   - pytest ; extra == 'dev'
   requires_python: '>=3.11'
 - pypi: ./
   name: voicetype2
-  version: 0.1.7.dev1+gd929bbf47.d20251020
-  sha256: 600d99216e39a0c2cb713d35a4cc783e4dad55c9fd2a34a45d06d06c9826d68f
+  version: 0.1.7.dev3+gf0e1ebcec.d20251029
+  sha256: a1283fc8835d08883e178c9c6f74720cda8b4c6cd0bb2e0fa4052492d20b6b21
   requires_dist:
   - pre-commit ; extra == 'dev'
   - pytest ; extra == 'dev'

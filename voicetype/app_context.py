@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from voicetype.state import AppState
@@ -15,3 +16,4 @@ class AppContext:
 
     state: AppState
     hotkey_listener: Optional["HotkeyListener"]
+    log_file_path: Optional[Path] = None

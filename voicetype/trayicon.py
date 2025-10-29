@@ -65,30 +65,51 @@ def _apply_disabled_icon(icon: pystray.Icon):
         pass
 
 
-def _open_logs(icon: pystray._base.Icon, item: Item):
-    log_path = os.path.join(os.path.dirname(__file__), "error_log.txt")
-    if not os.path.exists(log_path):
-        try:
-            with open(log_path, "a", encoding="utf-8"):
-                pass
-        except Exception:
-            return
-    try:
-        if sys.platform.startswith("linux"):
-            subprocess.Popen(["xdg-open", log_path])
-        elif sys.platform == "darwin":
-            subprocess.Popen(["open", log_path])
-        elif os.name == "nt":
-            os.startfile(log_path)  # type: ignore[attr-defined]
-    except Exception:
-        pass
-
-
 def _quit(icon: pystray._base.Icon, item: Item):
     icon.stop()
 
 
 def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
+    def _open_logs(_icon: pystray._base.Icon, _item: Item):
+        """Open the log file in the default application."""
+        from pathlib import Path
+
+        # Use log file path from context if available
+        if ctx.log_file_path:
+            log_path = ctx.log_file_path
+        else:
+            # Fallback to platform defaults if not in context
+            if sys.platform == "win32":
+                config_dir = Path(os.environ.get("APPDATA", "~/.config")) / "voicetype"
+            elif sys.platform == "darwin":
+                config_dir = (
+                    Path.home() / "Library" / "Application Support" / "voicetype"
+                )
+            else:  # Linux and other Unix-like systems
+                config_dir = (
+                    Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")).expanduser()
+                    / "voicetype"
+                )
+            log_path = config_dir / "voicetype.log"
+
+        # Create log file if it doesn't exist
+        if not log_path.exists():
+            try:
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                log_path.touch()
+            except Exception:
+                return
+
+        try:
+            if sys.platform.startswith("linux"):
+                subprocess.Popen(["xdg-open", str(log_path)])
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(log_path)])
+            elif sys.platform == "win32":
+                os.startfile(str(log_path))  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
     def _toggle_enabled(_icon: pystray._base.Icon, _item: Item):
         # Thread-safe toggling via State
         is_enabled = ctx.state.state != State.IDLE

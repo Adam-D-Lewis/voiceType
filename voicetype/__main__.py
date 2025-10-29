@@ -1,6 +1,7 @@
 import argparse
 import os
 import platform
+import sys
 import threading
 from pathlib import Path
 
@@ -20,6 +21,55 @@ from voicetype.trayicon import TrayIconController, create_tray
 from voicetype.utils import play_sound, type_text
 
 HERE = Path(__file__).resolve().parent
+
+
+def get_log_file_path() -> Path:
+    """Get the default path to the log file in the user's config directory."""
+    if sys.platform == "win32":
+        config_dir = Path(os.environ.get("APPDATA", "~/.config")) / "voicetype"
+    elif sys.platform == "darwin":
+        config_dir = Path.home() / "Library" / "Application Support" / "voicetype"
+    else:  # Linux and other Unix-like systems
+        config_dir = (
+            Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")).expanduser()
+            / "voicetype"
+        )
+
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir / "voicetype.log"
+
+
+def configure_logging(log_file: Path | None = None) -> Path:
+    """Configure loguru to log to both stderr and a rotating file.
+
+    Args:
+        log_file: Optional custom path to log file. If None, uses platform defaults.
+
+    Returns:
+        The path to the log file being used.
+    """
+    if log_file is None:
+        log_file = get_log_file_path()
+    else:
+        # Ensure parent directory exists for custom log file
+        log_file = Path(log_file).expanduser().resolve()
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Keep the default stderr handler for systemd/console output
+    # Add a rotating file handler
+    logger.add(
+        log_file,
+        rotation="10 MB",  # Rotate when file reaches 10 MB
+        retention=3,  # Keep 3 old log files
+        compression="zip",  # Compress rotated logs
+        level="DEBUG",
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+        backtrace=True,
+        diagnose=True,
+    )
+
+    logger.info(f"Logging to file: {log_file}")
+    return log_file
 
 
 def get_platform_listener(on_press: callable, on_release: callable) -> HotkeyListener:
@@ -110,6 +160,9 @@ def main():
 
     settings = load_settings(args.settings_file)
 
+    # Configure logging to file + stderr (using custom path from settings if provided)
+    log_file_path = configure_logging(settings.log_file)
+
     logger.info("Starting VoiceType application...")
 
     # Initialize managers
@@ -124,6 +177,7 @@ def main():
         ctx = AppContext(
             state=AppState(),
             hotkey_listener=None,  # Will be set later
+            log_file_path=log_file_path,
         )
         ctx.state.state = State.LISTENING
 

@@ -29,6 +29,9 @@ class Settings(BaseSettings):
         }
     ]
 
+    # Path to log file (uses platform defaults if not specified)
+    log_file: Optional[Path] = None
+
 
 def load_settings(settings_file: Path | None = None) -> Settings:
     """Loads settings from a TOML file, falling back to environment variables.
