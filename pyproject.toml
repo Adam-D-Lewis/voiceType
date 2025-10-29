@@ -7,12 +7,14 @@ packages = [
     "voicetype"
 ]
 exclude = [
-    "voicetype/_vendor/pynput/setup.py"
+    "voicetype/_vendor/pynput/setup.py",
+    "voicetype/_vendor/pynput/docs/**",
+    "voicetype/_vendor/pynput/tests/**",
+    "voicetype/_vendor/pynput/tools/**"
 ]
 
-[tool.hatch.metadata]
-# Necessary for my pynput fork
-allow-direct-references = true
+[tool.hatch.build.targets.wheel.force-include]
+"voicetype/_vendor" = "voicetype/_vendor"
 
 [tool.hatch.version]
 source = "vcs"

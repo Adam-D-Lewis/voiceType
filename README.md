@@ -183,6 +183,10 @@ VoiceType uses a pipeline-based architecture with resource-based concurrency con
 - Execution flow and lifecycle
 - Design principles and extension points
 
+### Vendored Dependencies
+
+VoiceType includes a vendored version of [pynput](https://github.com/moses-palmer/pynput) located in `voicetype/_vendor/pynput/`. This vendored version includes a not-yet-merged bug fix and allows for better control over keyboard/mouse input handling functionality across different platforms
+
 ## Development
 
 Preferred workflow: Pixi
