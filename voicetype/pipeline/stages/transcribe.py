@@ -176,7 +176,7 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         transcript_text = None
         try:
             with Path.open(final_filename, "rb") as fh:
-                from aider.llm import litellm
+                import litellm
 
                 transcript = litellm.transcription(
                     model="whisper-1",
