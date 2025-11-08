@@ -60,6 +60,10 @@ dev = [
     "pre-commit",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["experiments", ".git", ".pixi", "build", "dist"]
+
 [tool.ruff]
 fix = true
 
@@ -102,6 +106,7 @@ soundfile = "*"  # for sound recording
 sounddevice = "*"  # for detecting input devices and recording sound
 pydantic-settings = "*"
 toml = "*"
+pydantic-ai = ">=1"
 
 # the following dependencies come from vendoring in pynput
 six = "*"
@@ -125,7 +130,8 @@ channels = ["conda-forge"]
 # PyPI packages for this feature
 [tool.pixi.feature.litellm.pypi-dependencies]
 voiceType2 = { path = "." }
-aider-chat = "*"  # Includes litellm
+# aider-chat = "*"  # Includes litellm
+litellm = ">=1.75"
 
 # Conda packages for this feature
 [tool.pixi.feature.litellm.dependencies]

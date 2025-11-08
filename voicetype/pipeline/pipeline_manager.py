@@ -165,13 +165,20 @@ class PipelineManager:
             if stage_ref in stage_definitions:
                 stage_def = stage_definitions[stage_ref]
 
-                # Check if this is a named instance (has "stage_class" field) or direct class reference
-                if "stage_class" in stage_def:
+                # Check if this is a named instance (has "stage_class" or "class" field) or direct class reference
+                # Support both "stage_class" and "class" for flexibility
+                stage_class_key = (
+                    "stage_class"
+                    if "stage_class" in stage_def
+                    else "class" if "class" in stage_def else None
+                )
+
+                if stage_class_key:
                     # Named instance - use the specific configuration with different class name
-                    stage_class = stage_def["stage_class"]
+                    stage_class = stage_def[stage_class_key]
                     stage_config = {"stage": stage_class}
                     stage_config.update(
-                        {k: v for k, v in stage_def.items() if k != "stage_class"}
+                        {k: v for k, v in stage_def.items() if k != stage_class_key}
                     )
                 else:
                     # Direct class reference with default config

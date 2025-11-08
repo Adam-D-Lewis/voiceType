@@ -48,6 +48,28 @@ corrections = [
 [stage_configs.TypeText_default]
 stage_class = "TypeText"
 
+[stage_configs.LLMAgent_jarvis]
+stage_class = "LLMAgent"
+provider = "openai:gpt-4o-mini"  # or "ollama:llama3.2", "anthropic:claude-sonnet-4-5", etc.
+system_prompt = """You are a text transformation assistant.
+When you see a trigger word like 'jarvis' or 'hey assistant' in the input:
+- Text BEFORE the trigger word is the content to transform
+- Text AFTER the trigger word is the instruction for how to transform it
+- Apply the instruction and return ONLY the transformed text
+
+If there's no trigger word in the input, return the original text unchanged.
+
+Examples:
+- Input: "This is my email jarvis make it professional"
+  Output: "Dear [Recipient],\n\nThis is my email.\n\nBest regards"
+- Input: "Just regular typing"
+  Output: "Just regular typing"
+"""
+temperature = 0.3
+# max_tokens = 500  # Optional: limit response length
+# timeout = 30  # Optional: request timeout in seconds
+# fallback_on_error = true  # Optional: return original text on error (default: true)
+
 # =============================================================================
 # PIPELINE CONFIGURATION
 # =============================================================================
@@ -79,7 +101,19 @@ stages = [
 #     "TypeText_default",
 # ]
 
-# Example 3: Pipeline with multiple instances of same stage
+# Example 3: Voice assistant mode with LLM processing
+# [[pipelines]]
+# name = "jarvis_mode"
+# enabled = false
+# hotkey = "<ctrl>+<pause>"
+# stages = [
+#     "RecordAudio_default",
+#     "Transcribe_local",
+#     "LLMAgent_jarvis",  # Process with LLM agent
+#     "TypeText_default",
+# ]
+
+# Example 4: Pipeline with multiple instances of same stage
 # To use a stage twice with different configs, create separate named instances
 # [stage_configs.CorrectTypos_slang]
 # stage_class = "CorrectTypos"
@@ -110,6 +144,7 @@ stages = [
 #   - RecordAudio: Records audio while hotkey is held down
 #   - Transcribe: Converts audio to text using speech recognition
 #   - CorrectTypos: Corrects configured typos and common speech-to-text errors
+#   - LLMAgent: Processes text through an LLM agent (local or remote)
 #   - TypeText: Types the transcribed text at the current cursor position
 #
 # Hotkey Format:
@@ -117,9 +152,14 @@ stages = [
 #   - Modifiers: <ctrl>+<alt>+p, <shift>+<f1>, etc.
 #   - Regular keys: a, b, 1, 2, etc.
 #
-# Provider Options:
+# Transcription Provider Options:
 #   - "local": Uses faster-whisper for local transcription (faster, offline)
 #   - "litellm": Uses cloud-based transcription (requires API key)
+#
+# LLM Provider Options (for LLMAgent stage):
+#   - Local: "ollama:llama3.2", "ollama:mistral", "ollama:phi3" (requires Ollama installed)
+#   - Remote: "openai:gpt-4o", "anthropic:claude-sonnet-4-5", "gemini:gemini-2.0-flash", etc.
+#   - See Pydantic AI docs for full list: https://ai.pydantic.dev/models/
 #
 # File Locations (searched in order):
 #   1. ./settings.toml (current directory)
