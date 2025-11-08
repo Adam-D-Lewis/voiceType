@@ -5,6 +5,10 @@ The stage registry provides:
 - Validation of stage execute() method signatures
 - Pipeline type compatibility checking
 - Resource requirement tracking
+
+IMPORTANT: 'stage_class' is a reserved configuration field name used to identify
+which stage class to instantiate in named stage instances. Stage implementations
+must NOT use 'stage_class' as a parameter name in their __init__ methods.
 """
 
 from dataclasses import dataclass
@@ -139,6 +143,18 @@ class StageRegistry:
                     f"Stage class {cls.__name__} execute() method must have "
                     f"return type hint"
                 )
+
+            # Check that __init__ doesn't use reserved parameter name 'stage_class'
+            init_method = getattr(cls, "__init__", None)
+            if init_method:
+                import inspect
+
+                sig = inspect.signature(init_method)
+                if "stage_class" in sig.parameters:
+                    raise ValueError(
+                        f"Stage class {cls.__name__} cannot use 'stage_class' as a parameter name. "
+                        f"'stage_class' is reserved for stage configuration metadata."
+                    )
 
             # Get metadata from class attributes
             required_resources = getattr(cls, "required_resources", set())

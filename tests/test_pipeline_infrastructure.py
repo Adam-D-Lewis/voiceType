@@ -364,3 +364,22 @@ class TestStageRegistry:
         assert "Stage1" in stages
         assert "Stage2" in stages
         assert len(stages) == 2
+
+    def test_register_stage_with_stage_class_parameter_fails(self):
+        """Test that registering a stage with 'stage_class' parameter fails."""
+        registry = StageRegistry()
+
+        with pytest.raises(
+            ValueError, match="cannot use 'stage_class' as a parameter name"
+        ):
+
+            @registry.register
+            class InvalidStage:
+                """Stage with invalid parameter name"""
+
+                def __init__(self, config: dict, metadata: dict, stage_class: str):
+                    # stage_class is a reserved parameter name
+                    self.stage_class = stage_class
+
+                def execute(self, input_data: None, context: PipelineContext) -> str:
+                    return "test"

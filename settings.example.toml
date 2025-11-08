@@ -2,44 +2,104 @@
 # Copy this file to settings.toml and customize as needed
 
 # =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+# Optional: Specify a custom path for the log file.
+# If not specified, uses platform defaults:
+#   - Linux: ~/.config/voicetype/voicetype.log
+#   - macOS: ~/Library/Application Support/voicetype/voicetype.log
+#   - Windows: %APPDATA%/voicetype/voicetype.log
+
+# log_file = "/path/to/custom/voicetype.log"
+# log_file = "~/custom/logs/voicetype.log"  # Tilde expansion supported
+
+# =============================================================================
+# STAGE DEFINITIONS
+# =============================================================================
+# Define named stage instances with their configurations.
+# Stages can be referenced by name in pipelines and reused across pipelines.
+#
+# IMPORTANT: 'stage_class' is a RESERVED field name used to specify which
+# stage class to instantiate. Stage implementations cannot use 'stage_class'
+# as a configuration parameter name.
+
+[stage_configs.RecordAudio_default]
+stage_class = "RecordAudio"
+minimum_duration = 0.25  # Minimum audio duration in seconds
+
+[stage_configs.Transcribe_local]
+stage_class = "Transcribe"
+provider = "local"  # Use local faster-whisper model
+
+[stage_configs.Transcribe_cloud]
+stage_class = "Transcribe"
+provider = "litellm"  # Use cloud-based transcription (requires API key)
+
+[stage_configs.CorrectTypos_default]
+stage_class = "CorrectTypos"
+case_sensitive = false
+whole_word_only = true
+corrections = [
+    ["machinelearning", "machine learning"],
+    ["air quotes", "error codes"],
+    ["Python", "python", "case_sensitive=true"],
+]
+
+[stage_configs.TypeText_default]
+stage_class = "TypeText"
+
+# =============================================================================
 # PIPELINE CONFIGURATION
 # =============================================================================
 # Pipelines define sequences of stages that process voice input.
 # Multiple pipelines can be configured with different hotkeys.
+#
+# Pipelines reference stage instances by name (easier to override/reuse).
 
 # Example 1: Default voice-to-text pipeline
 [[pipelines]]
 name = "default"
 enabled = true
 hotkey = "<pause>"  # Pause/Break key
+stages = [
+    "RecordAudio_default",
+    "Transcribe_local",
+    "CorrectTypos_default",
+    "TypeText_default",
+]
 
-[[pipelines.stages]]
-stage = "RecordAudio"
-minimum_duration = 0.25  # Minimum audio duration in seconds
-
-[[pipelines.stages]]
-stage = "Transcribe"
-provider = "local"  # Use local faster-whisper model
-
-[[pipelines.stages]]
-stage = "TypeText"
-
-
-# Example 2: Alternative pipeline with different hotkey (commented out)
+# Example 2: Alternative pipeline with cloud transcription (commented out)
 # [[pipelines]]
-# name = "alt_transcribe"
+# name = "cloud_transcribe"
 # enabled = false
 # hotkey = "<f12>"
+# stages = [
+#     "RecordAudio_default",
+#     "Transcribe_cloud",  # Different transcription provider
+#     "TypeText_default",
+# ]
+
+# Example 3: Pipeline with multiple instances of same stage
+# To use a stage twice with different configs, create separate named instances
+# [stage_configs.CorrectTypos_slang]
+# stage_class = "CorrectTypos"
+# corrections = [["gonna", "going to"], ["wanna", "want to"]]
 #
-# [[pipelines.stages]]
-# stage = "RecordAudio"
+# [stage_configs.CorrectTypos_technical]
+# stage_class = "CorrectTypos"
+# corrections = [["machinelearning", "machine learning"]]
 #
-# [[pipelines.stages]]
-# stage = "Transcribe"
-# provider = "litellm"  # Use cloud-based transcription
-#
-# [[pipelines.stages]]
-# stage = "TypeText"
+# [[pipelines]]
+# name = "multi_correct"
+# enabled = false
+# hotkey = "<ctrl>+<pause>"
+# stages = [
+#     "RecordAudio_default",
+#     "Transcribe_local",
+#     "CorrectTypos_slang",      # First correction pass
+#     "CorrectTypos_technical",  # Second correction pass
+#     "TypeText_default",
+# ]
 
 
 # =============================================================================
@@ -49,6 +109,7 @@ stage = "TypeText"
 # Available Stages:
 #   - RecordAudio: Records audio while hotkey is held down
 #   - Transcribe: Converts audio to text using speech recognition
+#   - CorrectTypos: Corrects configured typos and common speech-to-text errors
 #   - TypeText: Types the transcribed text at the current cursor position
 #
 # Hotkey Format:

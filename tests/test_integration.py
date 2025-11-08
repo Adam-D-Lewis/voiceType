@@ -34,25 +34,6 @@ class MockIconController:
         self.flashing = False
 
 
-class MockSpeechProcessor:
-    """Mock speech processor for testing."""
-
-    def __init__(self):
-        self.recording = False
-        self.recorded_file = "/tmp/test_audio.wav"
-        self.recorded_duration = 2.0
-
-    def start_recording(self):
-        self.recording = True
-
-    def stop_recording(self):
-        self.recording = False
-        return self.recorded_file, self.recorded_duration
-
-    def transcribe(self, filename, history=None, language="en"):
-        return "test transcription"
-
-
 def test_icon_controller_mock():
     """Test that MockIconController implements the IconController protocol."""
     controller = MockIconController()
@@ -85,20 +66,24 @@ def test_pipeline_manager_with_metadata():
     )
 
     # Load a simple pipeline
+    stage_definitions = {
+        "RecordAudio": {},
+        "Transcribe": {"provider": "local"},
+        "TypeText": {},
+    }
+
     pipeline_config = [
         {
             "name": "test_pipeline",
             "enabled": True,
             "hotkey": "<pause>",
-            "stages": [
-                {"stage": "RecordAudio"},
-                {"stage": "Transcribe", "provider": "local"},
-                {"stage": "TypeText"},
-            ],
+            "stages": ["RecordAudio", "Transcribe", "TypeText"],
         }
     ]
 
-    pipeline_manager.load_pipelines(pipeline_config)
+    pipeline_manager.load_pipelines(
+        pipeline_config, stage_definitions=stage_definitions
+    )
 
     # Verify pipeline loaded
     assert len(pipeline_manager.pipelines) == 1
@@ -110,9 +95,6 @@ def test_hotkey_dispatcher_integration():
     # Create mock icon controller
     icon_controller = MockIconController()
 
-    # Create mock speech processor
-    speech_processor = MockSpeechProcessor()
-
     # Create resource manager and pipeline manager
     resource_manager = ResourceManager()
     pipeline_manager = PipelineManager(
@@ -122,37 +104,36 @@ def test_hotkey_dispatcher_integration():
     )
 
     # Load a pipeline
+    stage_definitions = {
+        "RecordAudio": {},
+        "Transcribe": {"provider": "local"},
+        "TypeText": {},
+    }
+
     pipeline_config = [
         {
             "name": "test_pipeline",
             "enabled": True,
             "hotkey": "<pause>",
-            "stages": [
-                {"stage": "RecordAudio"},
-                {"stage": "Transcribe", "provider": "local"},
-                {"stage": "TypeText"},
-            ],
+            "stages": ["RecordAudio", "Transcribe", "TypeText"],
         }
     ]
 
-    pipeline_manager.load_pipelines(pipeline_config)
-
-    # Create hotkey dispatcher with metadata
-    default_metadata = {"speech_processor": speech_processor}
-    hotkey_dispatcher = HotkeyDispatcher(
-        pipeline_manager, default_metadata=default_metadata
+    pipeline_manager.load_pipelines(
+        pipeline_config, stage_definitions=stage_definitions
     )
+
+    # Create hotkey dispatcher
+    hotkey_dispatcher = HotkeyDispatcher(pipeline_manager)
 
     # Verify hotkey dispatcher initialized
     assert hotkey_dispatcher.pipeline_manager == pipeline_manager
-    assert hotkey_dispatcher.default_metadata == default_metadata
 
 
 def test_full_integration_mock():
     """Test full integration with mocked components."""
     # Create mock components
     icon_controller = MockIconController()
-    speech_processor = MockSpeechProcessor()
 
     # Create managers
     resource_manager = ResourceManager()
@@ -163,26 +144,27 @@ def test_full_integration_mock():
     )
 
     # Load pipeline
+    stage_definitions = {
+        "RecordAudio": {},
+        "Transcribe": {"provider": "local"},
+        "TypeText": {},
+    }
+
     pipeline_config = [
         {
             "name": "default",
             "enabled": True,
             "hotkey": "<pause>",
-            "stages": [
-                {"stage": "RecordAudio"},
-                {"stage": "Transcribe", "provider": "local"},
-                {"stage": "TypeText"},
-            ],
+            "stages": ["RecordAudio", "Transcribe", "TypeText"],
         }
     ]
 
-    pipeline_manager.load_pipelines(pipeline_config)
+    pipeline_manager.load_pipelines(
+        pipeline_config, stage_definitions=stage_definitions
+    )
 
     # Create hotkey dispatcher
-    default_metadata = {"speech_processor": speech_processor}
-    hotkey_dispatcher = HotkeyDispatcher(
-        pipeline_manager, default_metadata=default_metadata
-    )
+    hotkey_dispatcher = HotkeyDispatcher(pipeline_manager)
 
     # Simulate hotkey press/release
     hotkey_string = "<pause>"
