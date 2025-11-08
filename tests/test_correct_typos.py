@@ -121,7 +121,7 @@ class TestCorrectTypos:
 
         result = stage.execute("This is a test and testing", context)
         # Should replace both "test" and "test" in "testing"
-        assert result == "This is a exam and examining"  # typos: ignore
+        assert result == "This is a exam and examing"  # typos: ignore
 
     def test_multiple_overrides(self):
         """Test multiple overrides in one correction."""
