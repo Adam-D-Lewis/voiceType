@@ -84,7 +84,7 @@ platforms = ["linux-64", "win-64", "osx-64"]
 
 [tool.pixi.dependencies]
 # conda-forge dependencies
-python = ">=3.11"
+python = ">=3.11, <3.14"  # some deps didn't support 3.14 yet, but otherwise we should be good to go
 gtk3 = "*"
 gobject-introspection = "*"
 pygobject = "*"

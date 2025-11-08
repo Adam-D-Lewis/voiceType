@@ -259,6 +259,9 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         else:
             raise NotImplementedError(f"Provider '{provider_enum}' is not supported.")
 
+        # replace multiple spaces with single space
+        text = " ".join(text.split())
+
         if text:
             logger.info(f"Transcription result: {text}")
         else:
