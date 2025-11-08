@@ -24,23 +24,17 @@ class HotkeyDispatcher:
     - Triggering pipeline execution via PipelineManager
     """
 
-    def __init__(
-        self, pipeline_manager: PipelineManager, default_metadata: Optional[Dict] = None
-    ):
+    def __init__(self, pipeline_manager: PipelineManager):
         """Initialize the hotkey dispatcher.
 
         Args:
             pipeline_manager: Manager for pipeline execution
-            default_metadata: Optional default metadata to pass to all pipelines
         """
         self.pipeline_manager = pipeline_manager
         self.active_events: Dict[str, HotkeyTriggerEvent] = (
             {}
         )  # hotkey -> trigger event
         self.hotkey_listener = None  # Will be set by application
-        self.default_metadata = (
-            default_metadata or {}
-        )  # Default metadata for all pipelines
 
     def register_hotkey(
         self,
@@ -95,9 +89,8 @@ class HotkeyDispatcher:
         logger.debug(f"Hotkey pressed: {hotkey} -> pipeline '{pipeline.name}'")
 
         # Execute pipeline on thread pool (non-blocking)
-        # Pass default metadata to the pipeline
         pipeline_id = self.pipeline_manager.trigger_pipeline(
-            pipeline.name, trigger_event, metadata=self.default_metadata
+            pipeline.name, trigger_event
         )
 
         if pipeline_id is None:

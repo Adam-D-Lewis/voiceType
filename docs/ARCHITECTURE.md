@@ -73,7 +73,6 @@ classDiagram
         -pipeline_manager: PipelineManager
         -active_events: Dict[str, HotkeyTriggerEvent]
         -hotkey_listener: HotkeyListener
-        -default_metadata: Dict
         +register_hotkey(hotkey, on_press, on_release)
         +set_hotkey_listener(listener)
         -_on_press(hotkey)
@@ -318,7 +317,7 @@ Bridges hotkey events to pipeline execution:
 - Registers hotkeys for enabled pipelines
 - Creates `HotkeyTriggerEvent` instances on key press
 - Signals trigger completion on key release
-- Passes default metadata (like `speech_processor`) to pipelines
+- Triggers pipeline execution via PipelineManager
 
 #### HotkeyListener (Interface)
 Platform-agnostic hotkey listening interface. Implementations:
@@ -431,7 +430,7 @@ Legacy context for tray icon compatibility:
 3. **Initialize Pipeline System**
    - Create `PipelineManager` with resource manager and icon controller
    - Load and validate all pipeline configurations
-   - Create `HotkeyDispatcher` with default metadata
+   - Create `HotkeyDispatcher`
 
 4. **Setup Hotkeys**
    - Create platform-specific `HotkeyListener`

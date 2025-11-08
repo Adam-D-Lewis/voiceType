@@ -8,23 +8,33 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Main application settings."""
 
+    # Named stage configurations (new format)
+    # Format: {stage_instance_name: {class: stage_class_name, **config}}
+    stage_configs: Optional[Dict[str, Dict[str, Any]]] = {
+        "RecordAudio": {
+            "minimum_duration": 0.25,
+        },
+        "Transcribe": {
+            "provider": "local",
+        },
+        "CorrectTypos": {
+            "case_sensitive": False,
+            "whole_word_only": True,
+            "corrections": [],
+        },
+        "TypeText": {},
+    }
+
     pipelines: Optional[List[Dict[str, Any]]] = [
         {
             "name": "default",
             "enabled": True,
             "hotkey": "<pause>",
             "stages": [
-                {
-                    "stage": "RecordAudio",
-                    "minimum_duration": 0.25,
-                },
-                {
-                    "stage": "Transcribe",
-                    "provider": "local",
-                },
-                {
-                    "stage": "TypeText",
-                },
+                "RecordAudio",
+                "Transcribe",
+                "CorrectTypos",
+                "TypeText",
             ],
         }
     ]

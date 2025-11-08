@@ -197,13 +197,14 @@ def main():
 
         # Load pipelines
         if settings.pipelines:
-            pipeline_manager.load_pipelines(settings.pipelines)
+            pipeline_manager.load_pipelines(
+                settings.pipelines, stage_definitions=settings.stage_configs
+            )
         else:
             logger.warning("No pipelines configured")
 
         # Initialize hotkey dispatcher
-        # Stages are now self-contained and don't need shared metadata
-        hotkey_dispatcher = HotkeyDispatcher(pipeline_manager, default_metadata={})
+        hotkey_dispatcher = HotkeyDispatcher(pipeline_manager)
 
         # Check if we have any enabled pipelines
         enabled_pipelines = pipeline_manager.list_enabled_pipelines()

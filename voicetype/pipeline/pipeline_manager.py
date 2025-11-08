@@ -75,11 +75,16 @@ class PipelineManager:
         self.pipelines: Dict[str, PipelineConfig] = {}
         self.hotkey_to_pipeline: Dict[str, str] = {}  # hotkey -> pipeline_name
 
-    def load_pipelines(self, pipelines_config: List[Dict[str, Any]]):
+    def load_pipelines(
+        self,
+        pipelines_config: List[Dict[str, Any]],
+        stage_definitions: Optional[Dict[str, Dict[str, Any]]] = None,
+    ):
         """Load and validate pipeline configurations.
 
         Args:
             pipelines_config: List of pipeline configurations from settings
+            stage_definitions: Optional dict of named stage instances from settings
 
         Raises:
             ValueError: If hotkey conflicts or invalid configurations detected
@@ -87,19 +92,24 @@ class PipelineManager:
         """
         logger.info(f"Loading {len(pipelines_config)} pipeline(s)...")
 
+        stage_definitions = stage_definitions or {}
+
         for config in pipelines_config:
             name = config["name"]
             enabled = config.get("enabled", True)
             hotkey = config["hotkey"]
-            stages = config["stages"]
+            stages_input = config["stages"]
 
-            # Validate hotkey uniqueness
-            if hotkey in self.hotkey_to_pipeline:
+            # Validate hotkey uniqueness (only for enabled pipelines)
+            if enabled and hotkey in self.hotkey_to_pipeline:
                 conflicting = self.hotkey_to_pipeline[hotkey]
                 raise ValueError(
                     f"Hotkey conflict: '{hotkey}' is used by both "
                     f"'{conflicting}' and '{name}'"
                 )
+
+            # Resolve stages: convert stage names to full stage configs
+            stages = self._resolve_stages(stages_input, stage_definitions)
 
             # Extract stage names for validation
             stage_names = [stage["stage"] for stage in stages]
@@ -122,6 +132,59 @@ class PipelineManager:
             )
 
         logger.info("All pipelines loaded and validated successfully")
+
+    def _resolve_stages(
+        self,
+        stages_input: List[Any],
+        stage_definitions: Dict[str, Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Resolve stage references to full stage configurations.
+
+        Args:
+            stages_input: List of stage class names or instance names (strings)
+            stage_definitions: Named stage instance definitions
+
+        Returns:
+            List of resolved stage configurations
+
+        Raises:
+            ValueError: If stage instance not found in definitions
+        """
+        resolved = []
+
+        for stage_ref in stages_input:
+            if not isinstance(stage_ref, str):
+                raise ValueError(
+                    f"Stage references must be strings (stage class or instance names), "
+                    f"got {type(stage_ref).__name__}. "
+                    f"Please define stages in [stage_configs.{stage_ref if isinstance(stage_ref, str) else 'YourStageName'}] "
+                    f"section and reference them by name in the pipeline."
+                )
+
+            # Check if this is a named instance or a direct class reference
+            if stage_ref in stage_definitions:
+                stage_def = stage_definitions[stage_ref]
+
+                # Check if this is a named instance (has "stage_class" field) or direct class reference
+                if "stage_class" in stage_def:
+                    # Named instance - use the specific configuration with different class name
+                    stage_class = stage_def["stage_class"]
+                    stage_config = {"stage": stage_class}
+                    stage_config.update(
+                        {k: v for k, v in stage_def.items() if k != "stage_class"}
+                    )
+                else:
+                    # Direct class reference with default config
+                    stage_config = {"stage": stage_ref}
+                    stage_config.update(stage_def)
+            else:
+                # No config found - use just the class name
+                # The stage itself will use its own defaults
+                stage_config = {"stage": stage_ref}
+
+            resolved.append(stage_config)
+
+        return resolved
 
     def get_pipeline_by_name(self, name: str) -> Optional[PipelineConfig]:
         """Get pipeline configuration by name.

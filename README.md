@@ -76,23 +76,71 @@ VoiceType can be configured using a `settings.toml` file. The application looks 
 
 ### Available Settings
 
-Create a `settings.toml` file with any of the following options:
+VoiceType uses a pipeline-based configuration system. Create a `settings.toml` file with any of the following options:
 
 ```toml
-[voice]
-# Provider for voice transcription (default: "local")
-# Options: "litellm" (requires OpenAI API key) or "local" (uses faster-whisper locally)
-provider = "local"
+# Define named stage instances with their configurations
+[stage_configs.RecordAudio_default]
+stage_class = "RecordAudio"
+minimum_duration = 0.25  # Minimum audio duration in seconds
 
-# Minimum duration (in seconds) of audio to process (default: 0.25)
-# Filters out accidental hotkey presses
-minimum_duration = 0.25
+[stage_configs.Transcribe_local]
+stage_class = "Transcribe"
+provider = "local"  # Use local faster-whisper model
 
-[hotkey]
-# Global hotkey to trigger recording (default: "<pause>")
-# Use pynput format, e.g., "<f12>", "<ctrl>+<alt>+r", "<pause>"
+[stage_configs.CorrectTypos_default]
+stage_class = "CorrectTypos"
+case_sensitive = false
+whole_word_only = true
+corrections = [
+    ["machinelearning", "machine learning"],
+]
+
+[stage_configs.TypeText_default]
+stage_class = "TypeText"
+
+# Define pipelines that reference stage instances
+[[pipelines]]
+name = "default"
+enabled = true
 hotkey = "<pause>"
+stages = [
+    "RecordAudio_default",
+    "Transcribe_local",
+    "CorrectTypos_default",
+    "TypeText_default",
+]
 ```
+
+**Stage Configuration Formats:**
+
+You can define stage configurations in two ways:
+
+1. **Named instance with `stage_class` field** (recommended for reusability):
+   ```toml
+   [stage_configs.RecordAudio_custom]
+   stage_class = "RecordAudio"
+   minimum_duration = 1.0
+   ```
+
+2. **Direct class reference** (simpler for single use):
+   ```toml
+   [stage_configs.RecordAudio]
+   minimum_duration = 0.5
+   ```
+   When the configuration key matches a stage class name and no `stage_class` field is present, it's treated as a direct class reference.
+
+Both formats are fully supported and can be mixed in the same configuration file.
+
+**Benefits of this approach:**
+- Define stage configurations once, reuse across multiple pipelines
+- Easily override individual stages without duplicating entire pipeline
+- Use the same stage type multiple times with different configurations
+- Reference stages by class name directly for simpler configurations
+
+**Important:** `stage_class` is a reserved field name used to specify which stage class to instantiate. Stage implementations cannot use `stage_class` as a configuration parameter name.
+
+See [settings.example.toml](settings.example.toml) for more examples and detailed configuration options.
 
 **Note:** If you used `voicetype install` and configured litellm during installation, your API key is stored separately in `~/.config/voicetype/.env`.
 
