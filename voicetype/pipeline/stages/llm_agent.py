@@ -27,6 +27,7 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
     Config parameters:
     - provider: Model string in format "provider:model" (e.g., "openai:gpt-4", "ollama:llama3.2")
     - system_prompt: Instructions for the LLM on how to process the text
+    - trigger_keywords: Optional list of keywords that must be present to invoke LLM (case-insensitive)
     - temperature: Optional float controlling randomness (0.0-2.0, default: provider default)
     - max_tokens: Optional int limiting response length
     - timeout: Optional int for request timeout in seconds (default: 30)
@@ -54,6 +55,7 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
         self.system_prompt = config["system_prompt"]
 
         # Optional parameters
+        self.trigger_keywords = config.get("trigger_keywords", [])
         self.temperature = config.get("temperature")
         self.max_tokens = config.get("max_tokens")
         self.timeout = config.get("timeout", 30)
@@ -89,6 +91,23 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
         if input_data is None:
             logger.info("No text to process (input is None)")
             return None
+
+        # Check for trigger keywords if configured
+        if self.trigger_keywords:
+            input_lower = input_data.lower()
+            keyword_found = any(
+                keyword.lower() in input_lower for keyword in self.trigger_keywords
+            )
+            if not keyword_found:
+                logger.debug(
+                    f"No trigger keywords {self.trigger_keywords} found in input, "
+                    "skipping LLM processing"
+                )
+                return input_data
+
+            logger.debug(
+                f"Trigger keyword found in input, proceeding with LLM processing"
+            )
 
         # Update icon to processing state
         context.icon_controller.set_icon("processing")

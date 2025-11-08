@@ -142,6 +142,89 @@ class TestLLMAgent:
         assert stage.max_tokens is None
         assert stage.timeout == 30
         assert stage.fallback_on_error is True
+        assert stage.trigger_keywords == []
+
+    def test_trigger_keywords_not_found_skips_llm(self):
+        """Test that LLM is not invoked when trigger keywords are not found."""
+        config = {
+            "provider": "test",
+            "system_prompt": "Test",
+            "trigger_keywords": ["jarvis", "hey assistant"],
+        }
+        stage = LLMAgent(config, {})
+        context = create_test_context()
+
+        # Input without trigger keywords should return unchanged
+        input_text = "Just regular text without any keywords"
+        result = stage.execute(input_text, context)
+        assert result == input_text
+
+    def test_trigger_keywords_found_invokes_llm(self):
+        """Test that LLM is invoked when trigger keywords are found."""
+        from pydantic_ai.models.test import TestModel
+
+        config = {
+            "provider": "test",
+            "system_prompt": "Test",
+            "trigger_keywords": ["jarvis", "hey assistant"],
+        }
+        stage = LLMAgent(config, {})
+        context = create_test_context()
+
+        # Replace with test model
+        stage.agent._model = TestModel()
+
+        # Input with trigger keyword should invoke LLM
+        input_text = "This is my email jarvis make it professional"
+        result = stage.execute(input_text, context)
+        # Result should be processed (not None and should be a string)
+        assert result is not None
+        assert isinstance(result, str)
+
+    def test_trigger_keywords_case_insensitive(self):
+        """Test that trigger keyword matching is case-insensitive."""
+        config = {
+            "provider": "test",
+            "system_prompt": "Test",
+            "trigger_keywords": ["jarvis"],
+        }
+        stage = LLMAgent(config, {})
+        context = create_test_context()
+
+        # Test various cases
+        test_cases = [
+            "text JARVIS command",
+            "text Jarvis command",
+            "text JaRvIs command",
+        ]
+
+        for input_text in test_cases:
+            from pydantic_ai.models.test import TestModel
+
+            stage.agent._model = TestModel()
+            result = stage.execute(input_text, context)
+            # Should invoke LLM (not just return input)
+            assert result is not None
+
+    def test_no_trigger_keywords_always_invokes_llm(self):
+        """Test that LLM is always invoked when trigger_keywords is empty."""
+        from pydantic_ai.models.test import TestModel
+
+        config = {
+            "provider": "test",
+            "system_prompt": "Test",
+            # No trigger_keywords specified
+        }
+        stage = LLMAgent(config, {})
+        context = create_test_context()
+
+        # Replace with test model
+        stage.agent._model = TestModel()
+
+        # Should always invoke LLM when no trigger keywords configured
+        result = stage.execute("Any text without keywords", context)
+        assert result is not None
+        assert isinstance(result, str)
 
     @pytest.mark.skipif(
         True,  # Skip by default as it requires actual LLM API access

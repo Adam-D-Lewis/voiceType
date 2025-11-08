@@ -51,19 +51,16 @@ stage_class = "TypeText"
 [stage_configs.LLMAgent_jarvis]
 stage_class = "LLMAgent"
 provider = "openai:gpt-4o-mini"  # or "ollama:llama3.2", "anthropic:claude-sonnet-4-5", etc.
+trigger_keywords = ["jarvis", "hey assistant"]  # Only invoke LLM if these words are present
 system_prompt = """You are a text transformation assistant.
 When you see a trigger word like 'jarvis' or 'hey assistant' in the input:
 - Text BEFORE the trigger word is the content to transform
 - Text AFTER the trigger word is the instruction for how to transform it
 - Apply the instruction and return ONLY the transformed text
 
-If there's no trigger word in the input, return the original text unchanged.
-
 Examples:
 - Input: "This is my email jarvis make it professional"
   Output: "Dear [Recipient],\n\nThis is my email.\n\nBest regards"
-- Input: "Just regular typing"
-  Output: "Just regular typing"
 """
 temperature = 0.3
 # max_tokens = 500  # Optional: limit response length
