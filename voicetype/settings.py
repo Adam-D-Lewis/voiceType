@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import toml
+from loguru import logger
 from pydantic_settings import BaseSettings
 
 
@@ -43,6 +44,36 @@ class Settings(BaseSettings):
     log_file: Optional[Path] = None
 
 
+def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    """Deep merge two dictionaries, with override taking precedence."""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def _validate_stage_configs(settings: Settings) -> None:
+    """Warn if stage_configs are defined but not used in any pipeline."""
+    if not settings.stage_configs or not settings.pipelines:
+        return
+
+    # Collect all stage names used in pipelines
+    used_stages = set()
+    for pipeline in settings.pipelines:
+        if "stages" in pipeline:
+            used_stages.update(pipeline["stages"])
+
+    # Check for unused stage configs
+    unused_configs = set(settings.stage_configs.keys()) - used_stages
+    if unused_configs:
+        logger.warning(
+            f"Stage configs defined but not used in any pipeline: {', '.join(sorted(unused_configs))}"
+        )
+
+
 def load_settings(settings_file: Path | None = None) -> Settings:
     """Loads settings from a TOML file, falling back to environment variables.
 
@@ -64,7 +95,23 @@ def load_settings(settings_file: Path | None = None) -> Settings:
                 settings_file = location
                 break
 
+    # Start with defaults
+    defaults = Settings()
+
     if settings_file and settings_file.is_file():
         data = toml.load(settings_file)
-        return Settings(**data)
-    return Settings()
+
+        # Deep merge stage_configs if present
+        if "stage_configs" in data and defaults.stage_configs:
+            data["stage_configs"] = _deep_merge(
+                defaults.stage_configs, data["stage_configs"]
+            )
+
+        settings = Settings(**data)
+    else:
+        settings = defaults
+
+    # Validate that all stage_configs are used in pipelines
+    _validate_stage_configs(settings)
+
+    return settings
