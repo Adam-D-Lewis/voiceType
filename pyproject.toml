@@ -195,3 +195,6 @@ local = ["local"]
 build = ["build"]
 litellm = ["litellm"]
 dev = ["dev"]
+
+[tool.typos]
+default.extend-ignore-re = ["(?Rm)^.*(#|//)\\s*typos: ignore$"]
