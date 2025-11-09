@@ -29,12 +29,11 @@ class TypeText(PipelineStage[Optional[str], None]):
 
     required_resources = {Resource.KEYBOARD}
 
-    def __init__(self, config: dict, metadata: dict):
+    def __init__(self, config: dict):
         """Initialize the type text stage.
 
         Args:
             config: Stage-specific configuration
-            metadata: Shared pipeline metadata (unused for this stage)
         """
         self.config = config
 

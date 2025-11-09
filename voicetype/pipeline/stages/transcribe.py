@@ -50,12 +50,11 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
 
     required_resources = set()  # No exclusive resources needed
 
-    def __init__(self, config: dict, metadata: dict):
+    def __init__(self, config: dict):
         """Initialize the transcribe stage.
 
         Args:
             config: Stage-specific configuration
-            metadata: Shared pipeline metadata (not used in this refactored version)
         """
         self.config = config
         self.audio_format = config.get("audio_format", "wav")

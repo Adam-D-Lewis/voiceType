@@ -55,12 +55,11 @@ class RecordAudio(PipelineStage[None, Optional[str]]):
     min_rms = 1e5
     pct = 0.0
 
-    def __init__(self, config: dict, metadata: dict):
+    def __init__(self, config: dict):
         """Initialize the record audio stage.
 
         Args:
             config: Stage-specific configuration
-            metadata: Shared pipeline metadata (not used in this refactored version)
         """
         self.config = config
         self.audio_format = config.get("audio_format", "wav")
