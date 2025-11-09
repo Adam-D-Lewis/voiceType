@@ -36,7 +36,7 @@ class Settings(BaseSettings):
                 "RecordAudio",
                 "Transcribe",
                 "CorrectTypos",
-                "LLMAgent",
+                # "LLMAgent",  # TODO: Get this working with a local model by default so it's faster
                 "TypeText",
             ],
         }
