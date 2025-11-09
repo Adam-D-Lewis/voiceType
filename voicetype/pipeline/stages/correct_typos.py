@@ -46,15 +46,13 @@ class CorrectTypos(PipelineStage[Optional[str], Optional[str]]):
 
     required_resources = set()  # No exclusive resources needed
 
-    def __init__(self, config: dict, metadata: dict):
+    def __init__(self, config: dict):
         """Initialize the correct typos stage.
 
         Args:
             config: Stage-specific configuration
-            metadata: Shared pipeline metadata (may contain global_corrections)
         """
         self.config = config
-        self.metadata = metadata
 
         # Default settings
         self.case_sensitive = config.get("case_sensitive", False)
@@ -135,22 +133,13 @@ class CorrectTypos(PipelineStage[Optional[str], Optional[str]]):
     def _parse_and_compile_corrections(self) -> list:
         """Parse corrections from config and compile regex patterns.
 
-        Merges global corrections from metadata with pipeline-specific corrections.
-        Pipeline-specific corrections are applied after global ones.
-
         Returns:
             List of tuples: (compiled_pattern, replacement_text, original_typo)
         """
         patterns = []
 
-        # Start with global corrections from metadata
-        global_corrections = self.metadata.get("global_corrections", [])
-
-        # Then add pipeline-specific corrections
-        pipeline_corrections = self.config.get("corrections", [])
-
-        # Combine them (pipeline-specific corrections override global ones if same typo)
-        corrections_list = list(global_corrections) + list(pipeline_corrections)
+        # Get corrections from config
+        corrections_list = self.config.get("corrections", [])
 
         for entry in corrections_list:
             if not isinstance(entry, list) or len(entry) < 2:

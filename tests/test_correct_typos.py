@@ -38,7 +38,7 @@ class TestCorrectTypos:
                 ["machinelearning", "machine learning"],
             ],
         }
-        stage = CorrectTypos(config, {})
+        stage = CorrectTypos(config)
         context = create_test_context()
 
         result = stage.execute("I love machinelearning", context)
@@ -54,7 +54,7 @@ class TestCorrectTypos:
                 ["air quotes", "error codes"],
             ],
         }
-        stage = CorrectTypos(config, {})
+        stage = CorrectTypos(config)
         context = create_test_context()
 
         result = stage.execute("I love machinelearning and air quotes", context)
@@ -69,7 +69,7 @@ class TestCorrectTypos:
                 ["python", "Python"],
             ],
         }
-        stage = CorrectTypos(config, {})
+        stage = CorrectTypos(config)
         context = create_test_context()
 
         result = stage.execute("I love python and PYTHON", context)
@@ -84,7 +84,7 @@ class TestCorrectTypos:
                 ["python", "Python", "case_sensitive=true"],
             ],
         }
-        stage = CorrectTypos(config, {})
+        stage = CorrectTypos(config)
         context = create_test_context()
 
         result = stage.execute("I love python and PYTHON", context)
@@ -100,7 +100,7 @@ class TestCorrectTypos:
                 ["test", "exam"],
             ],
         }
-        stage = CorrectTypos(config, {})
+        stage = CorrectTypos(config)
         context = create_test_context()
 
         result = stage.execute("This is a test and testing", context)
@@ -116,7 +116,7 @@ class TestCorrectTypos:
                 ["test", "exam", "whole_word_only=false"],
             ],
         }
-        stage = CorrectTypos(config, {})
+        stage = CorrectTypos(config)
         context = create_test_context()
 
         result = stage.execute("This is a test and testing", context)
@@ -132,7 +132,7 @@ class TestCorrectTypos:
                 ["Test", "exam", "case_sensitive=true,whole_word_only=false"],
             ],
         }
-        stage = CorrectTypos(config, {})
+        stage = CorrectTypos(config)
         context = create_test_context()
 
         # Case-sensitive and substring matching
@@ -148,7 +148,7 @@ class TestCorrectTypos:
                 ["test", "exam"],
             ],
         }
-        stage = CorrectTypos(config, {})
+        stage = CorrectTypos(config)
         context = create_test_context()
 
         result = stage.execute(None, context)
@@ -157,7 +157,7 @@ class TestCorrectTypos:
     def test_no_corrections_configured(self):
         """Test that text passes through unchanged when no corrections."""
         config = {"corrections": []}
-        stage = CorrectTypos(config, {})
+        stage = CorrectTypos(config)
         context = create_test_context()
 
         input_text = "This is some text"
@@ -171,7 +171,7 @@ class TestCorrectTypos:
                 ["xyz", "abc"],
             ],
         }
-        stage = CorrectTypos(config, {})
+        stage = CorrectTypos(config)
         context = create_test_context()
 
         input_text = "This is some text"
@@ -185,7 +185,7 @@ class TestCorrectTypos:
                 ["air quotes", "error codes"],
             ],
         }
-        stage = CorrectTypos(config, {})
+        stage = CorrectTypos(config)
         context = create_test_context()
 
         result = stage.execute("I hate air quotes in code", context)
@@ -198,7 +198,7 @@ class TestCorrectTypos:
                 ["test.", "exam", "whole_word_only=false"],
             ],
         }
-        stage = CorrectTypos(config, {})
+        stage = CorrectTypos(config)
         context = create_test_context()
 
         # Should only match literal "test.", not "testa" (where . is wildcard)
@@ -215,60 +215,8 @@ class TestCorrectTypos:
                 ["another", "valid"],
             ],
         }
-        stage = CorrectTypos(config, {})
+        stage = CorrectTypos(config)
         context = create_test_context()
 
         result = stage.execute("valid invalid another", context)
         assert result == "correction invalid valid"
-
-    def test_global_corrections_from_metadata(self):
-        """Test that global corrections from metadata are applied."""
-        config = {"corrections": []}
-        metadata = {
-            "global_corrections": [
-                ["global", "GLOBAL"],
-                ["typo", "correction"],
-            ]
-        }
-        stage = CorrectTypos(config, metadata)
-        context = create_test_context()
-
-        result = stage.execute("global typo test", context)
-        assert result == "GLOBAL correction test"
-
-    def test_pipeline_corrections_override_global(self):
-        """Test that pipeline-specific corrections are applied after global ones."""
-        config = {
-            "corrections": [
-                ["specific", "SPECIFIC"],
-            ]
-        }
-        metadata = {
-            "global_corrections": [
-                ["global", "GLOBAL"],
-            ]
-        }
-        stage = CorrectTypos(config, metadata)
-        context = create_test_context()
-
-        result = stage.execute("global specific test", context)
-        assert result == "GLOBAL SPECIFIC test"
-
-    def test_merged_corrections(self):
-        """Test that global and pipeline corrections are merged."""
-        config = {
-            "corrections": [
-                ["pipeline", "PIPELINE"],
-            ]
-        }
-        metadata = {
-            "global_corrections": [
-                ["global1", "GLOBAL1"],
-                ["global2", "GLOBAL2"],
-            ]
-        }
-        stage = CorrectTypos(config, metadata)
-        context = create_test_context()
-
-        result = stage.execute("global1 global2 pipeline test", context)
-        assert result == "GLOBAL1 GLOBAL2 PIPELINE test"

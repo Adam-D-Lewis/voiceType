@@ -23,6 +23,7 @@ class Settings(BaseSettings):
             "whole_word_only": True,
             "corrections": [],
         },
+        "LLMAgent": {"provider": "openai:gpt-5-mini", "trigger_keywords": ["Jarvis"]},
         "TypeText": {},
     }
 
@@ -35,6 +36,7 @@ class Settings(BaseSettings):
                 "RecordAudio",
                 "Transcribe",
                 "CorrectTypos",
+                "LLMAgent",
                 "TypeText",
             ],
         }

@@ -26,8 +26,9 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
 
     Config parameters:
     - provider: Model string in format "provider:model" (e.g., "openai:gpt-4", "ollama:llama3.2")
-    - system_prompt: Instructions for the LLM on how to process the text
-    - trigger_keywords: Optional list of keywords that must be present to invoke LLM (case-insensitive)
+    - system_prompt: Optional instructions for the LLM (default: "You are a helpful assistant.")
+    - trigger_keywords: List of keywords that must be present to invoke LLM (case-insensitive).
+                       If not configured or empty, LLM will NOT be invoked and original text is returned.
     - temperature: Optional float controlling randomness (0.0-2.0, default: provider default)
     - max_tokens: Optional int limiting response length
     - timeout: Optional int for request timeout in seconds (default: 30)
@@ -36,23 +37,27 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
 
     required_resources = set()  # No exclusive resources needed
 
-    def __init__(self, config: dict, metadata: dict):
+    def __init__(self, config: dict):
         """Initialize the LLM agent stage.
 
         Args:
             config: Stage-specific configuration
-            metadata: Shared pipeline metadata (unused for this stage)
         """
         self.config = config
 
         # Required parameters
         if "provider" not in config:
             raise ValueError("LLMAgent stage requires 'provider' in config")
-        if "system_prompt" not in config:
-            raise ValueError("LLMAgent stage requires 'system_prompt' in config")
 
         self.provider = config["provider"]
-        self.system_prompt = config["system_prompt"]
+        self.system_prompt = config.get(
+            "system_prompt",
+            """You are Jarvis.  You are a part of a speech to text pipeline where a user speaks, the audio is transcribed, and eventually typed out on the keyboard. The user has left a message for you to modify the text that he said in some way before it is typed.  Modify the text as requested and output the modified text.  Output nothing else b/c exactly what you output is what will be typed.  Make sure to remove references to yourself from the output.  The instructions for you should not be part of the output.
+
+        e.g.
+        User: Hello, Administrator. Okay, uh, actually, Jarvis, make this sound like, um, a cockney accent and spell it as if I had a heavy cockney accent.
+        Output: 'Ello Admin.'""",
+        )
 
         # Optional parameters
         self.trigger_keywords = config.get("trigger_keywords", [])
@@ -60,6 +65,14 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
         self.max_tokens = config.get("max_tokens")
         self.timeout = config.get("timeout", 30)
         self.fallback_on_error = config.get("fallback_on_error", True)
+
+        # Warn if trigger keywords are not configured
+        if not self.trigger_keywords:
+            logger.warning(
+                "LLMAgent configured without trigger_keywords. "
+                "The LLM will not be invoked. Please configure trigger_keywords "
+                "to enable LLM processing (e.g., trigger_keywords = ['jarvis', 'hey assistant'])"
+            )
 
         # Create the agent
         try:
@@ -92,22 +105,23 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
             logger.info("No text to process (input is None)")
             return None
 
-        # Check for trigger keywords if configured
-        if self.trigger_keywords:
-            input_lower = input_data.lower()
-            keyword_found = any(
-                keyword.lower() in input_lower for keyword in self.trigger_keywords
-            )
-            if not keyword_found:
-                logger.debug(
-                    f"No trigger keywords {self.trigger_keywords} found in input, "
-                    "skipping LLM processing"
-                )
-                return input_data
+        # Check for trigger keywords - return unchanged if not configured or not found
+        if not self.trigger_keywords:
+            logger.debug("No trigger_keywords configured, skipping LLM processing")
+            return input_data
 
+        input_lower = input_data.lower()
+        keyword_found = any(
+            keyword.lower() in input_lower for keyword in self.trigger_keywords
+        )
+        if not keyword_found:
             logger.debug(
-                f"Trigger keyword found in input, proceeding with LLM processing"
+                f"No trigger keywords {self.trigger_keywords} found in input, "
+                "skipping LLM processing"
             )
+            return input_data
+
+        logger.debug(f"Trigger keyword found in input, proceeding with LLM processing")
 
         # Update icon to processing state
         context.icon_controller.set_icon("processing")
@@ -127,7 +141,7 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
             result = self.agent.run_sync(input_data, **run_kwargs)
 
             # Extract the text from the result
-            output_text = result.data
+            output_text = result.output
 
             if output_text:
                 logger.info(f"LLM processing complete: {output_text[:100]}...")

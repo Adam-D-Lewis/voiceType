@@ -163,11 +163,8 @@ class PipelineExecutor:
                     k: v for k, v in stage_config.items() if k != "func"
                 }
 
-                # Instantiate stage with config and dependencies from metadata
-                # Each stage is responsible for extracting what it needs from metadata
-                stage_instance = stage_class(
-                    config=stage_specific_config, metadata=metadata
-                )
+                # Instantiate stage with config
+                stage_instance = stage_class(config=stage_specific_config)
                 stage_instances.append(stage_instance)
 
                 # Update context with stage-specific config
