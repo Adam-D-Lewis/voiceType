@@ -126,18 +126,6 @@ faster-whisper = "*"
 # Conda packages common across all platforms
 [tool.pixi.feature.local.dependencies]
 
-# Define the 'litellm' feature (for OpenAI/cloud transcription)
-[tool.pixi.feature.litellm]
-channels = ["conda-forge"]
-
-# PyPI packages for this feature
-[tool.pixi.feature.litellm.pypi-dependencies]
-voiceType2 = { path = "." }
-# aider-chat = "*"  # Includes litellm
-
-# Conda packages for this feature
-[tool.pixi.feature.litellm.dependencies]
-
 # Platform-scoped dependencies
 [tool.pixi.target.osx-64.pypi-dependencies]
 # the following dependencies come from vendoring in pynput
@@ -195,5 +183,4 @@ cudnn = "*"
 default = ["local"]
 local = ["local"]
 build = ["build"]
-litellm = ["litellm"]
 dev = ["dev"]
