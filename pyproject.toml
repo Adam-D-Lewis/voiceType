@@ -120,7 +120,7 @@ channels = ["conda-forge"]
 
 # PyPI packages for this feature
 [tool.pixi.feature.local.pypi-dependencies]
-voiceType2 = { path = "." }
+voiceType2 = { path = ".", editable = true }
 faster-whisper = "*"
 
 # Conda packages common across all platforms
@@ -159,22 +159,6 @@ python = ">=3.11"
 hatch = "*"
 hatch-vcs = "*"
 
-# Define the 'test' feature
-[tool.pixi.feature.test]
-channels = ["conda-forge"]
-
-[tool.pixi.feature.test.dependencies]
-pytest = "*"
-
-[tool.pixi.feature.test.pypi-dependencies]
-voiceType2 = { path = ".", editable = false }
-faster-whisper = "*"
-
-# Linux-specific dev dependencies
-[tool.pixi.feature.test.target.linux-64.dependencies]
-libcublas = "=12"  # faster_whisper doesn't seem to support cuda 13 yet
-cudnn = "*"
-
 # Define the 'dev' feature
 [tool.pixi.feature.dev]
 channels = ["conda-forge"]
@@ -187,6 +171,7 @@ faster-whisper = "*"
 # Conda packages for the dev feature
 [tool.pixi.feature.dev.dependencies]
 pre-commit = "*"
+pytest = "*"
 
 # Linux-specific dev dependencies
 [tool.pixi.feature.dev.target.linux-64.dependencies]
@@ -199,4 +184,3 @@ default = ["local"]
 local = ["local"]
 build = ["build"]
 dev = ["dev"]
-test = ["test"]
