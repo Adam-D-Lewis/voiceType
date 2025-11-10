@@ -82,6 +82,9 @@ ignore = [
     "PLR0915", # Ignore too many statements in function
 ]
 
+[tool.typos]
+default.extend-ignore-re = ["(?Rm)^.*(#|//)\\s*typos: ignore$"]
+
 [tool.pixi.project]
 channels = ["conda-forge", "nvidia"]
 platforms = ["linux-64", "win-64", "osx-64"]
@@ -195,6 +198,3 @@ local = ["local"]
 build = ["build"]
 litellm = ["litellm"]
 dev = ["dev"]
-
-[tool.typos]
-default.extend-ignore-re = ["(?Rm)^.*(#|//)\\s*typos: ignore$"]
