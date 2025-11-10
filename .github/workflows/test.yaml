@@ -22,7 +22,7 @@ jobs:
         with:
           pixi-version: v0.40.0
           cache: true
-          environments: dev
+          environments: test
 
       - name: Run tests
-        run: pixi run -e dev pytest tests/ -v
+        run: pixi run -e test pytest tests/ -v
