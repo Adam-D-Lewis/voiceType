@@ -4,7 +4,7 @@
 
 Type with your voice.
 
-[![Test](https://github.com/Adam-D-Lewis/voicetype/actions/workflows/test.yaml/badge.svg)](https://github.com/Adam-D-Lewis/voicetype/actions/workflows/test.yaml)
+[![Tests](https://github.com/Adam-D-Lewis/voicetype/actions/workflows/test.yaml/badge.svg)](https://github.com/Adam-D-Lewis/voicetype/actions/workflows/test.yaml)
 
 ## Features
 
