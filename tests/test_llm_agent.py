@@ -29,18 +29,18 @@ def create_test_context():
 class TestLLMAgent:
     """Tests for LLMAgent stage."""
 
-    def test_initialization_requires_provider(self):
-        """Test that initialization fails without provider."""
+    def test_initialization_requires_model(self):
+        """Test that initialization fails without model."""
         config = {
             "system_prompt": "Test prompt",
         }
-        with pytest.raises(ValueError, match="requires 'provider'"):
+        with pytest.raises(ValueError, match="requires 'model'"):
             LLMAgent(config)
 
     def test_initialization_with_default_system_prompt(self):
         """Test that initialization uses default system_prompt when not provided."""
         config = {
-            "provider": "test",
+            "model": "gpt-4o-mini",
             "trigger_keywords": ["test"],  # Add trigger keywords
         }
         stage = LLMAgent(config)
@@ -51,18 +51,18 @@ class TestLLMAgent:
     def test_initialization_with_test_model(self):
         """Test that LLMAgent can be initialized with test model."""
         config = {
-            "provider": "test",
+            "model": "gpt-4o-mini",
             "system_prompt": "You are a helpful assistant",
             "trigger_keywords": ["test"],
         }
         stage = LLMAgent(config)
-        assert stage.provider == "test"
+        assert stage.model == "gpt-4o-mini"
         assert stage.system_prompt == "You are a helpful assistant"
 
     def test_none_input_returns_none(self):
         """Test that None input returns None."""
         config = {
-            "provider": "test",
+            "model": "gpt-4o-mini",
             "system_prompt": "Test",
             "trigger_keywords": ["test"],
         }
@@ -72,30 +72,37 @@ class TestLLMAgent:
         result = stage.execute(None, context)
         assert result is None
 
-    def test_basic_agent_execution_with_test_model(self):
-        """Test basic agent execution using Pydantic AI's test model."""
-        from pydantic_ai.models.test import TestModel
+    def test_basic_agent_execution_with_mock(self):
+        """Test basic agent execution using a mocked LiteLLM response."""
+        import sys
+        from unittest.mock import MagicMock, patch
 
         config = {
-            "provider": "test",
+            "model": "gpt-4o-mini",
             "system_prompt": "You are a helpful assistant",
             "trigger_keywords": ["test"],
         }
         stage = LLMAgent(config)
         context = create_test_context()
 
-        # Replace the agent's model with a TestModel that returns predictable results
-        stage.agent._model = TestModel()
+        # Mock the litellm module
+        mock_litellm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Mocked response"
+        mock_litellm.completion.return_value = mock_response
 
-        # TestModel echoes back the input by default - must include trigger keyword
-        result = stage.execute("Hello world test", context)
-        assert result is not None
-        assert isinstance(result, str)
+        with patch.dict(sys.modules, {"litellm": mock_litellm}):
+            result = stage.execute("Hello world test", context)
+            assert result == "Mocked response"
 
     def test_fallback_on_error_enabled(self):
         """Test that original input is returned when fallback_on_error=True."""
+        import sys
+        from unittest.mock import MagicMock, patch
+
         config = {
-            "provider": "test",
+            "model": "gpt-4o-mini",
             "system_prompt": "Test",
             "fallback_on_error": True,
             "trigger_keywords": ["test"],
@@ -103,27 +110,21 @@ class TestLLMAgent:
         stage = LLMAgent(config)
         context = create_test_context()
 
-        # Force an error by using an invalid model
-        from pydantic_ai.models.test import TestModel
+        # Mock the litellm module to raise an error
+        mock_litellm = MagicMock()
+        mock_litellm.completion.side_effect = RuntimeError("Simulated error")
 
-        # Create a TestModel that raises an error
-        def error_call(*args, **kwargs):
-            raise RuntimeError("Simulated error")
-
-        stage.agent._model = TestModel()
-        stage.agent._model.agent_model = error_call
-
-        # Should return original input on error - must include trigger keyword
-        input_text = "Original text test"
-        result = stage.execute(input_text, context)
-        # Note: The actual behavior depends on how Pydantic AI handles errors
-        # This test validates the fallback logic exists
-        assert result is not None
+        with patch.dict(sys.modules, {"litellm": mock_litellm}):
+            # Should return original input on error - must include trigger keyword
+            input_text = "Original text test"
+            result = stage.execute(input_text, context)
+            # Should return original input due to fallback
+            assert result == input_text
 
     def test_optional_parameters_stored(self):
         """Test that optional parameters are stored correctly."""
         config = {
-            "provider": "test",
+            "model": "gpt-4o-mini",
             "system_prompt": "Test",
             "temperature": 0.7,
             "max_tokens": 100,
@@ -141,7 +142,7 @@ class TestLLMAgent:
     def test_default_optional_parameters(self):
         """Test default values for optional parameters."""
         config = {
-            "provider": "test",
+            "model": "gpt-4o-mini",
             "system_prompt": "Test",
             "trigger_keywords": ["test"],
         }
@@ -156,7 +157,7 @@ class TestLLMAgent:
     def test_trigger_keywords_not_found_skips_llm(self):
         """Test that LLM is not invoked when trigger keywords are not found."""
         config = {
-            "provider": "test",
+            "model": "gpt-4o-mini",
             "system_prompt": "Test",
             "trigger_keywords": ["jarvis", "hey assistant"],
         }
@@ -170,30 +171,38 @@ class TestLLMAgent:
 
     def test_trigger_keywords_found_invokes_llm(self):
         """Test that LLM is invoked when trigger keywords are found."""
-        from pydantic_ai.models.test import TestModel
+        import sys
+        from unittest.mock import MagicMock, patch
 
         config = {
-            "provider": "test",
+            "model": "gpt-4o-mini",
             "system_prompt": "Test",
             "trigger_keywords": ["jarvis", "hey assistant"],
         }
         stage = LLMAgent(config)
         context = create_test_context()
 
-        # Replace with test model
-        stage.agent._model = TestModel()
+        # Mock the litellm module
+        mock_litellm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Professional email"
+        mock_litellm.completion.return_value = mock_response
 
-        # Input with trigger keyword should invoke LLM
-        input_text = "This is my email jarvis make it professional"
-        result = stage.execute(input_text, context)
-        # Result should be processed (not None and should be a string)
-        assert result is not None
-        assert isinstance(result, str)
+        with patch.dict(sys.modules, {"litellm": mock_litellm}):
+            # Input with trigger keyword should invoke LLM
+            input_text = "This is my email jarvis make it professional"
+            result = stage.execute(input_text, context)
+            # Result should be the mocked response
+            assert result == "Professional email"
 
     def test_trigger_keywords_case_insensitive(self):
         """Test that trigger keyword matching is case-insensitive."""
+        import sys
+        from unittest.mock import MagicMock, patch
+
         config = {
-            "provider": "test",
+            "model": "gpt-4o-mini",
             "system_prompt": "Test",
             "trigger_keywords": ["jarvis"],
         }
@@ -208,17 +217,22 @@ class TestLLMAgent:
         ]
 
         for input_text in test_cases:
-            from pydantic_ai.models.test import TestModel
+            # Mock the litellm module
+            mock_litellm = MagicMock()
+            mock_response = MagicMock()
+            mock_response.choices = [MagicMock()]
+            mock_response.choices[0].message.content = "Processed text"
+            mock_litellm.completion.return_value = mock_response
 
-            stage.agent._model = TestModel()
-            result = stage.execute(input_text, context)
-            # Should invoke LLM (not just return input)
-            assert result is not None
+            with patch.dict(sys.modules, {"litellm": mock_litellm}):
+                result = stage.execute(input_text, context)
+                # Should invoke LLM and return mocked response
+                assert result == "Processed text"
 
     def test_no_trigger_keywords_skips_llm(self):
         """Test that LLM is NOT invoked when trigger_keywords is empty."""
         config = {
-            "provider": "test",
+            "model": "gpt-4o-mini",
             "system_prompt": "Test",
             # No trigger_keywords specified
         }
@@ -234,7 +248,7 @@ class TestLLMAgent:
     def test_empty_trigger_keywords_skips_llm(self):
         """Test that LLM is NOT invoked when trigger_keywords is explicitly empty list."""
         config = {
-            "provider": "test",
+            "model": "gpt-4o-mini",
             "system_prompt": "Test",
             "trigger_keywords": [],  # Explicitly empty
         }
@@ -258,7 +272,7 @@ class TestLLMAgent:
         # This test is skipped by default
         # To run it, set the appropriate environment variable and change skipif to False
         config = {
-            "provider": "openai:gpt-4o-mini",
+            "model": "gpt-4o-mini",
             "system_prompt": "You are a text transformation assistant. "
             "If the input contains 'jarvis', extract the instruction after it "
             "and apply it to the text before it. Otherwise return the text unchanged.",

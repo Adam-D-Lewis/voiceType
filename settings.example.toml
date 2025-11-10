@@ -50,10 +50,10 @@ stage_class = "TypeText"
 
 [stage_configs.LLMAgent_jarvis]
 stage_class = "LLMAgent"
-provider = "openai:gpt-4o-mini"  # or "ollama:llama3.2", "anthropic:claude-sonnet-4-5", etc.
+model = "gpt-4o-mini"  # or "ollama/llama3.2", "claude-3-5-sonnet-20241022", etc.
 trigger_keywords = ["jarvis", "hey assistant"]  # REQUIRED: Only invoke LLM if these words are present
                                                 # If empty or not configured, LLM will NOT be invoked
-# system_prompt is optional - defaults to "You are a helpful assistant." if not specified
+# system_prompt is optional - defaults to a Jarvis assistant prompt if not specified
 system_prompt = """You are a text transformation assistant.
 When you see a trigger word like 'jarvis' or 'hey assistant' in the input:
 - Text BEFORE the trigger word is the content to transform
@@ -155,10 +155,10 @@ stages = [
 #   - "local": Uses faster-whisper for local transcription (faster, offline)
 #   - "litellm": Uses cloud-based transcription (requires API key)
 #
-# LLM Provider Options (for LLMAgent stage):
-#   - Local: "ollama:llama3.2", "ollama:mistral", "ollama:phi3" (requires Ollama installed)
-#   - Remote: "openai:gpt-4o", "anthropic:claude-sonnet-4-5", "gemini:gemini-2.0-flash", etc.
-#   - See Pydantic AI docs for full list: https://ai.pydantic.dev/models/
+# LLM Model Options (for LLMAgent stage):
+#   - Local: "ollama/llama3.2", "ollama/mistral", "ollama/phi3" (requires Ollama installed)
+#   - Remote: "gpt-4o", "claude-3-5-sonnet-20241022", "gemini/gemini-2.0-flash", etc.
+#   - See LiteLLM docs for full list: https://docs.litellm.ai/docs/providers
 #
 # File Locations (searched in order):
 #   1. ./settings.toml (current directory)

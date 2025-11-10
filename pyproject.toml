@@ -96,6 +96,7 @@ gtk3 = "*"
 gobject-introspection = "*"
 pygobject = "*"
 loguru = ">=0.7.3,<0.8"
+litellm = ">=1.75"
 
 [tool.pixi.pypi-dependencies]
 # "pyaudio",  # was causing me problems with audio
@@ -109,7 +110,6 @@ soundfile = "*"  # for sound recording
 sounddevice = "*"  # for detecting input devices and recording sound
 pydantic-settings = "*"
 toml = "*"
-pydantic-ai = ">=1"
 
 # the following dependencies come from vendoring in pynput
 six = "*"
@@ -134,7 +134,6 @@ channels = ["conda-forge"]
 [tool.pixi.feature.litellm.pypi-dependencies]
 voiceType2 = { path = "." }
 # aider-chat = "*"  # Includes litellm
-litellm = ">=1.75"
 
 # Conda packages for this feature
 [tool.pixi.feature.litellm.dependencies]
