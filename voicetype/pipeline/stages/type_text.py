@@ -38,7 +38,7 @@ class TypeText(PipelineStage[Optional[str], None]):
             config: Stage-specific configuration
         """
         self.config = config
-        self.char_delay = config.get("char_delay", 0.005)
+        self.char_delay = config.get("char_delay", 0.001)
 
     def execute(self, input_data: Optional[str], context: PipelineContext) -> None:
         """Execute text typing.
