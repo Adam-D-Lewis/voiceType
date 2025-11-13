@@ -3,6 +3,7 @@
 This stage types text character-by-character using the virtual keyboard.
 """
 
+import time
 from typing import Optional
 
 from loguru import logger
@@ -24,7 +25,8 @@ class TypeText(PipelineStage[Optional[str], None]):
     - Output: None (final stage)
 
     Config parameters:
-    - typing_speed: Optional typing speed in characters per second
+    - char_delay: Delay in seconds between each character (default: 0.005)
+                  Increase this value if you experience scrambled letters
     """
 
     required_resources = {Resource.KEYBOARD}
@@ -36,6 +38,7 @@ class TypeText(PipelineStage[Optional[str], None]):
             config: Stage-specific configuration
         """
         self.config = config
+        self.char_delay = config.get("char_delay", 0.005)
 
     def execute(self, input_data: Optional[str], context: PipelineContext) -> None:
         """Execute text typing.
@@ -59,10 +62,12 @@ class TypeText(PipelineStage[Optional[str], None]):
 
         keyboard = pynput.keyboard.Controller()
 
-        # Type each character
-        # TODO: Add typing_speed support from config
-        for char in input_data:
+        # Type each character with a delay to prevent scrambled letters
+        for i, char in enumerate(input_data):
             keyboard.type(char)
+            # Don't sleep after the last character
+            if self.char_delay > 0 and i < len(input_data) - 1:
+                time.sleep(self.char_delay)
 
         context.icon_controller.set_icon("idle")
         logger.debug("Typing complete")
