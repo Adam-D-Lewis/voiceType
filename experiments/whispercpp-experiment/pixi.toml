@@ -1,0 +1,50 @@
+# Pixi environment for whisper.cpp benchmark experiments
+# This is a self-contained environment for running the benchmark
+
+[project]
+name = "whispercpp-experiment"
+version = "0.1.0"
+description = "Benchmark experiments comparing Whisper backends (faster-whisper vs pywhispercpp)"
+channels = ["conda-forge", "nvidia"]
+platforms = ["linux-64", "win-64", "osx-64"]
+
+[dependencies]
+python = ">=3.11, <3.14"
+loguru = ">=0.7.3,<0.8"
+
+[pypi-dependencies]
+speechrecognition = "*"
+faster-whisper = "*"
+pywhispercpp = "*"
+pydub = "*"
+soundfile = "*"
+
+# Platform-specific dependencies for faster-whisper GPU support
+[target.linux-64.dependencies]
+libcublas = "=12"
+cudnn = "*"
+
+[target.win-64.dependencies]
+libcublas = "=12"
+cudnn = "*"
+
+# Define tasks for easy running
+[tasks]
+benchmark = "python test_whisper_backends.py"
+benchmark-cpu = { cmd = "python test_whisper_backends.py", description = "Run CPU-only benchmarks" }
+
+# Optional: CPU-only feature without CUDA dependencies
+[feature.cpu-only]
+channels = ["conda-forge"]
+
+[feature.cpu-only.pypi-dependencies]
+speechrecognition = "*"
+faster-whisper = "*"
+pywhispercpp = "*"
+pydub = "*"
+soundfile = "*"
+
+# Environments
+[environments]
+default = { solve-group = "default" }
+cpu = { features = ["cpu-only"], solve-group = "cpu" }

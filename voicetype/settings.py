@@ -17,6 +17,11 @@ class Settings(BaseSettings):
         },
         "Transcribe": {
             "provider": "local",
+            "backend": "faster-whisper",  # Options: "faster-whisper", "pywhispercpp"
+            "device": "cuda",  # Options: "cuda", "cpu"
+            "model": "large-v3-turbo",  # Model size (e.g., "base", "tiny", "small")
+            # "compute_type": "float16",  # Optional: "float16", "int8" (auto-selected if not set)
+            # "n_threads": 4,  # Optional: for pywhispercpp backend only
         },
         "CorrectTypos": {
             "case_sensitive": False,

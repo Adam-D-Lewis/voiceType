@@ -167,6 +167,7 @@ channels = ["conda-forge"]
 [tool.pixi.feature.dev.pypi-dependencies]
 voiceType2 = { path = ".", editable = true }
 faster-whisper = "*"
+pywhispercpp = "*"  # For testing whisper.cpp backend
 
 # Conda packages for the dev feature
 [tool.pixi.feature.dev.dependencies]
@@ -178,9 +179,20 @@ pytest = "*"
 libcublas = "=12"  # faster_whisper doesn't seem to support cuda 13 yet
 cudnn = "*"
 
+# Define the 'cpu' feature for CPU-only deployments (no CUDA)
+[tool.pixi.feature.cpu]
+channels = ["conda-forge"]
+
+# PyPI packages for CPU-only
+[tool.pixi.feature.cpu.pypi-dependencies]
+voiceType2 = { path = ".", editable = true }
+faster-whisper = "*"
+pywhispercpp = "*"  # Optimized for CPU inference
+
 # Map environments to feature sets
 [tool.pixi.environments]
 default = ["local"]
 local = ["local"]
 build = ["build"]
 dev = ["dev"]
+cpu = ["cpu"]  # CPU-only environment without CUDA dependencies
