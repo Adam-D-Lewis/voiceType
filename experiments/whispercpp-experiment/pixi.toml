@@ -31,7 +31,7 @@ cudnn = "*"
 # Define tasks for easy running
 [tasks]
 benchmark = "python test_whisper_backends.py"
-benchmark-cpu = { cmd = "python test_whisper_backends.py", description = "Run CPU-only benchmarks" }
+benchmark-cpu = { cmd = "python test_whisper_backends.py --cpu-only", description = "Run CPU-only benchmarks (skip GPU tests)" }
 
 # Optional: CPU-only feature without CUDA dependencies
 [feature.cpu-only]

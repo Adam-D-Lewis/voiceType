@@ -8,8 +8,13 @@ This script tests:
 4. Different model sizes (tiny, base, small, medium, large-v3-turbo)
 
 Run this to explore CPU-only options for better portability.
+
+Usage:
+    python test_whisper_backends.py           # Run all tests (GPU + CPU)
+    python test_whisper_backends.py --cpu-only  # Run CPU tests only
 """
 
+import argparse
 import os
 import time
 from pathlib import Path
@@ -161,12 +166,19 @@ def test_pywhispercpp(audio_file: str, model_size: str = "base.en") -> Benchmark
                 pass
 
 
-def run_benchmarks(audio_file: str) -> List[BenchmarkResult]:
-    """Run all benchmark tests."""
+def run_benchmarks(audio_file: str, cpu_only: bool = False) -> List[BenchmarkResult]:
+    """Run all benchmark tests.
+
+    Args:
+        audio_file: Path to audio file to test
+        cpu_only: If True, skip CUDA/GPU tests
+    """
     results = []
 
     print("=" * 80)
     print("WHISPER BACKEND BENCHMARKS")
+    if cpu_only:
+        print("(CPU-only mode)")
     print("=" * 80)
     print(f"Test audio: {audio_file}")
     print()
@@ -177,65 +189,75 @@ def run_benchmarks(audio_file: str) -> List[BenchmarkResult]:
         return results
 
     # Test configurations
-    configs = [
-        # faster-whisper with CUDA (current setup)
-        {
-            "name": "faster-whisper (CUDA)",
-            "func": lambda: test_faster_whisper(
-                audio_file, device="cuda", model_size="large-v3-turbo"
-            ),
-        },
-        {
-            "name": "faster-whisper (CUDA, tiny)",
-            "func": lambda: test_faster_whisper(
-                audio_file, device="cuda", model_size="tiny"
-            ),
-        },
-        {
-            "name": "faster-whisper (CUDA, base)",
-            "func": lambda: test_faster_whisper(
-                audio_file, device="cuda", model_size="base"
-            ),
-        },
-        # faster-whisper with CPU
-        {
-            "name": "faster-whisper (CPU, tiny)",
-            "func": lambda: test_faster_whisper(
-                audio_file, device="cpu", model_size="tiny"
-            ),
-        },
-        {
-            "name": "faster-whisper (CPU, base)",
-            "func": lambda: test_faster_whisper(
-                audio_file, device="cpu", model_size="base"
-            ),
-        },
-        {
-            "name": "faster-whisper (CPU, small)",
-            "func": lambda: test_faster_whisper(
-                audio_file, device="cpu", model_size="small"
-            ),
-        },
-        {
-            "name": "faster-whisper (CPU, large-v3-turbo)",
-            "func": lambda: test_faster_whisper(
-                audio_file, device="cpu", model_size="large-v3-turbo"
-            ),
-        },
-        # pywhispercpp (CPU-optimized)
-        {
-            "name": "pywhispercpp (CPU, tiny.en)",
-            "func": lambda: test_pywhispercpp(audio_file, model_size="tiny.en"),
-        },
-        {
-            "name": "pywhispercpp (CPU, base.en)",
-            "func": lambda: test_pywhispercpp(audio_file, model_size="base.en"),
-        },
-        {
-            "name": "pywhispercpp (CPU, small.en)",
-            "func": lambda: test_pywhispercpp(audio_file, model_size="small.en"),
-        },
-    ]
+    configs = []
+
+    # GPU tests (skip if cpu_only)
+    if not cpu_only:
+        configs.extend(
+            [
+                {
+                    "name": "faster-whisper (CUDA, large-v3-turbo)",
+                    "func": lambda: test_faster_whisper(
+                        audio_file, device="cuda", model_size="large-v3-turbo"
+                    ),
+                },
+                {
+                    "name": "faster-whisper (CUDA, tiny)",
+                    "func": lambda: test_faster_whisper(
+                        audio_file, device="cuda", model_size="tiny"
+                    ),
+                },
+                {
+                    "name": "faster-whisper (CUDA, base)",
+                    "func": lambda: test_faster_whisper(
+                        audio_file, device="cuda", model_size="base"
+                    ),
+                },
+            ]
+        )
+
+    # CPU tests (always included)
+    configs.extend(
+        [
+            {
+                "name": "faster-whisper (CPU, tiny)",
+                "func": lambda: test_faster_whisper(
+                    audio_file, device="cpu", model_size="tiny"
+                ),
+            },
+            {
+                "name": "faster-whisper (CPU, base)",
+                "func": lambda: test_faster_whisper(
+                    audio_file, device="cpu", model_size="base"
+                ),
+            },
+            {
+                "name": "faster-whisper (CPU, small)",
+                "func": lambda: test_faster_whisper(
+                    audio_file, device="cpu", model_size="small"
+                ),
+            },
+            {
+                "name": "faster-whisper (CPU, large-v3-turbo)",
+                "func": lambda: test_faster_whisper(
+                    audio_file, device="cpu", model_size="large-v3-turbo"
+                ),
+            },
+            # pywhispercpp (CPU-optimized)
+            {
+                "name": "pywhispercpp (CPU, tiny.en)",
+                "func": lambda: test_pywhispercpp(audio_file, model_size="tiny.en"),
+            },
+            {
+                "name": "pywhispercpp (CPU, base.en)",
+                "func": lambda: test_pywhispercpp(audio_file, model_size="base.en"),
+            },
+            {
+                "name": "pywhispercpp (CPU, small.en)",
+                "func": lambda: test_pywhispercpp(audio_file, model_size="small.en"),
+            },
+        ]
+    )
 
     for config in configs:
         print(f"Testing: {config['name']}...")
@@ -287,5 +309,15 @@ def print_summary(results: List[BenchmarkResult]):
 
 
 if __name__ == "__main__":
-    results = run_benchmarks(TEST_AUDIO)
+    parser = argparse.ArgumentParser(
+        description="Benchmark different Whisper backends and configurations"
+    )
+    parser.add_argument(
+        "--cpu-only",
+        action="store_true",
+        help="Run CPU tests only (skip CUDA/GPU tests)",
+    )
+    args = parser.parse_args()
+
+    results = run_benchmarks(TEST_AUDIO, cpu_only=args.cpu_only)
     print_summary(results)
