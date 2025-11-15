@@ -150,7 +150,14 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             else:
                 filename_to_use = filename
 
-            whisper_model = Model(model, n_threads=n_threads)
+            # Suppress verbose whisper.cpp logs
+            whisper_model = Model(
+                model,
+                n_threads=n_threads,
+                print_realtime=False,
+                print_progress=False,
+                redirect_whispercpp_logs_to=None,  # Redirect to devnull
+            )
             segments = whisper_model.transcribe(filename_to_use, language=language)
 
             # Combine all segments into a single string
@@ -187,9 +194,9 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         Returns:
             str: Transcribed text with leading/trailing whitespace removed
         """
-        backend = self.config.get("backend", "faster-whisper")
+        backend = self.config.get("backend", "pywhispercpp")
         device = self.config.get("device", "cuda")
-        model = self.config.get("model", "large-v3-turbo")
+        model = self.config.get("model", "tiny.en")
         language = language or self.config.get("language", "en")
 
         if backend == "faster-whisper":

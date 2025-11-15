@@ -15,8 +15,11 @@ Usage:
 """
 
 import argparse
+import contextlib
 import os
+import sys
 import time
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -47,6 +50,7 @@ class BenchmarkResult:
         transcription: str,
         duration: float,
         error: Optional[str] = None,
+        similarity_score: Optional[float] = None,
     ):
         self.backend = backend
         self.device = device
@@ -54,12 +58,18 @@ class BenchmarkResult:
         self.transcription = transcription
         self.duration = duration
         self.error = error
+        self.similarity_score = similarity_score
 
     def __repr__(self):
         status = "ERROR" if self.error else "OK"
+        score_str = (
+            f" (similarity: {self.similarity_score:.1%})"
+            if self.similarity_score is not None
+            else ""
+        )
         return (
             f"[{status}] {self.backend} ({self.device}, {self.model_size}): "
-            f"{self.duration:.3f}s - '{self.transcription}'"
+            f"{self.duration:.3f}s{score_str} - '{self.transcription}'"
         )
 
 
@@ -133,7 +143,14 @@ def test_pywhispercpp(audio_file: str, model_size: str = "base.en") -> Benchmark
 
         start = time.time()
 
-        model = Model(model_size, n_threads=4)  # Use 4 threads for CPU
+        # Suppress verbose whisper.cpp logs
+        model = Model(
+            model_size,
+            n_threads=4,
+            print_realtime=False,
+            print_progress=False,
+            redirect_whispercpp_logs_to=None,  # Redirect to devnull
+        )
         segments = model.transcribe(audio_file_to_use)
 
         # Combine all segments
@@ -164,6 +181,14 @@ def test_pywhispercpp(audio_file: str, model_size: str = "base.en") -> Benchmark
                 os.unlink(temp_file.name)
             except Exception:
                 pass
+
+
+def calculate_similarity(text1: str, text2: str) -> float:
+    """Calculate similarity between two transcriptions using SequenceMatcher.
+
+    Returns a value between 0 and 1, where 1 is identical.
+    """
+    return SequenceMatcher(None, text1.lower(), text2.lower()).ratio()
 
 
 def run_benchmarks(audio_file: str, cpu_only: bool = False) -> List[BenchmarkResult]:
@@ -219,6 +244,7 @@ def run_benchmarks(audio_file: str, cpu_only: bool = False) -> List[BenchmarkRes
     # CPU tests (always included)
     configs.extend(
         [
+            # faster-whisper multilingual models
             {
                 "name": "faster-whisper (CPU, tiny)",
                 "func": lambda: test_faster_whisper(
@@ -241,6 +267,31 @@ def run_benchmarks(audio_file: str, cpu_only: bool = False) -> List[BenchmarkRes
                 "name": "faster-whisper (CPU, large-v3-turbo)",
                 "func": lambda: test_faster_whisper(
                     audio_file, device="cpu", model_size="large-v3-turbo"
+                ),
+            },
+            # faster-whisper English-only models (faster)
+            {
+                "name": "faster-whisper (CPU, tiny.en)",
+                "func": lambda: test_faster_whisper(
+                    audio_file, device="cpu", model_size="tiny.en"
+                ),
+            },
+            {
+                "name": "faster-whisper (CPU, base.en)",
+                "func": lambda: test_faster_whisper(
+                    audio_file, device="cpu", model_size="base.en"
+                ),
+            },
+            {
+                "name": "faster-whisper (CPU, small.en)",
+                "func": lambda: test_faster_whisper(
+                    audio_file, device="cpu", model_size="small.en"
+                ),
+            },
+            {
+                "name": "faster-whisper (CPU, medium.en)",
+                "func": lambda: test_faster_whisper(
+                    audio_file, device="cpu", model_size="medium.en"
                 ),
             },
             # pywhispercpp (CPU-optimized)
@@ -268,6 +319,57 @@ def run_benchmarks(audio_file: str, cpu_only: bool = False) -> List[BenchmarkRes
             print(f"  Error details: {result.error}")
         print()
 
+    # Calculate similarity scores against the reference (large-v3-turbo on GPU if available, otherwise CPU)
+    reference_result = None
+
+    # Try to find large-v3-turbo GPU result as reference
+    if not cpu_only:
+        reference_result = next(
+            (
+                r
+                for r in results
+                if r.model_size == "large-v3-turbo"
+                and r.device == "cuda"
+                and not r.error
+            ),
+            None,
+        )
+
+    # Fallback to large-v3-turbo CPU if GPU not available
+    if reference_result is None:
+        reference_result = next(
+            (
+                r
+                for r in results
+                if r.model_size == "large-v3-turbo"
+                and r.device == "cpu"
+                and not r.error
+            ),
+            None,
+        )
+
+    if reference_result:
+        print("\n" + "=" * 80)
+        print(
+            f"REFERENCE TRANSCRIPTION (from {reference_result.backend} {reference_result.device} {reference_result.model_size}):"
+        )
+        print(f"'{reference_result.transcription}'")
+        print("=" * 80)
+        print("\nCalculating similarity scores against reference...")
+
+        for result in results:
+            if not result.error and result != reference_result:
+                result.similarity_score = calculate_similarity(
+                    reference_result.transcription, result.transcription
+                )
+                print(
+                    f"  {result.backend} ({result.device}, {result.model_size}): {result.similarity_score:.1%}"
+                )
+
+        # Reference gets 100% similarity
+        reference_result.similarity_score = 1.0
+        print()
+
     return results
 
 
@@ -288,19 +390,64 @@ def print_summary(results: List[BenchmarkResult]):
 
     print("\nFastest to Slowest:")
     for i, result in enumerate(successful_results, 1):
+        similarity_str = (
+            f" | Similarity: {result.similarity_score:.1%}"
+            if result.similarity_score is not None
+            else ""
+        )
         print(
             f"{i}. {result.backend} ({result.device}, {result.model_size}): "
-            f"{result.duration:.3f}s"
+            f"{result.duration:.3f}s{similarity_str}"
         )
+
+    # Show best accuracy (highest similarity)
+    results_with_scores = [
+        r for r in successful_results if r.similarity_score is not None
+    ]
+    if results_with_scores:
+        print("\nBest Accuracy (highest similarity to reference):")
+        results_with_scores.sort(key=lambda x: x.similarity_score, reverse=True)
+        for i, result in enumerate(results_with_scores[:5], 1):
+            print(
+                f"{i}. {result.backend} ({result.device}, {result.model_size}): "
+                f"{result.similarity_score:.1%} | {result.duration:.3f}s"
+            )
 
     print("\nRecommendations:")
     fastest_cpu = next((r for r in successful_results if r.device == "cpu"), None)
     if fastest_cpu:
+        similarity_str = (
+            f" | Similarity: {fastest_cpu.similarity_score:.1%}"
+            if fastest_cpu.similarity_score
+            else ""
+        )
         print(
             f"  Fastest CPU option: {fastest_cpu.backend} with {fastest_cpu.model_size}"
         )
-        print(f"    - Speed: {fastest_cpu.duration:.3f}s")
+        print(f"    - Speed: {fastest_cpu.duration:.3f}s{similarity_str}")
         print(f"    - Transcription: '{fastest_cpu.transcription}'")
+
+    # Best CPU option (balance of speed and accuracy)
+    cpu_results = [
+        r
+        for r in successful_results
+        if r.device == "cpu" and r.similarity_score is not None
+    ]
+    if cpu_results:
+        # Score = similarity / normalized_duration (higher is better)
+        max_duration = max(r.duration for r in cpu_results)
+        for r in cpu_results:
+            r.combined_score = r.similarity_score * (
+                1 - (r.duration / max_duration) * 0.5
+            )
+
+        best_balanced = max(cpu_results, key=lambda x: x.combined_score)
+        print(
+            f"\n  Best balanced CPU option (speed + accuracy): {best_balanced.backend} with {best_balanced.model_size}"
+        )
+        print(f"    - Speed: {best_balanced.duration:.3f}s")
+        print(f"    - Similarity: {best_balanced.similarity_score:.1%}")
+        print(f"    - Transcription: '{best_balanced.transcription}'")
 
     fastest_gpu = next((r for r in successful_results if r.device == "cuda"), None)
     if fastest_gpu and fastest_cpu:
