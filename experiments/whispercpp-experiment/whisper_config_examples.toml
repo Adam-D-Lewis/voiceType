@@ -1,0 +1,84 @@
+# Example configurations for different Whisper backends
+# Copy the relevant section to your settings.toml to test different options
+
+# ============================================================================
+# CURRENT SETUP: faster-whisper with CUDA (GPU)
+# Best for: High accuracy, NVIDIA GPU available
+# ============================================================================
+[stage_configs.Transcribe]
+provider = "local"
+backend = "faster-whisper"  # Options: "faster-whisper", "pywhispercpp"
+device = "cuda"              # Options: "cuda", "cpu"
+model = "large-v3-turbo"     # Large model for best accuracy
+compute_type = "float16"     # Use float16 on GPU
+
+
+# ============================================================================
+# OPTION 1: faster-whisper with CPU
+# Best for: No GPU available, still want decent accuracy
+# Note: Slower than GPU, but uses the same proven backend
+# ============================================================================
+[stage_configs.Transcribe]
+provider = "local"
+backend = "faster-whisper"
+device = "cpu"
+model = "base"           # Smaller model for CPU
+compute_type = "int8"    # Quantized for better CPU performance
+
+
+# ============================================================================
+# OPTION 2: pywhispercpp with CPU (whisper.cpp)
+# Best for: CPU-only, maximum performance optimization
+# Note: whisper.cpp is highly optimized for CPU inference
+# ============================================================================
+[stage_configs.Transcribe]
+provider = "local"
+backend = "pywhispercpp"
+device = "cpu"
+model = "base.en"        # .en models are English-only and faster
+n_threads = 4            # Number of CPU threads to use
+
+
+# ============================================================================
+# LIGHTWEIGHT: Fastest CPU option with tiny model
+# Best for: Low-resource systems, speed over accuracy
+# ============================================================================
+[stage_configs.Transcribe]
+provider = "local"
+backend = "pywhispercpp"
+device = "cpu"
+model = "tiny.en"        # Smallest, fastest model
+n_threads = 4
+
+
+# ============================================================================
+# BALANCED: Medium accuracy/performance on CPU
+# Best for: Balance between speed and accuracy
+# ============================================================================
+[stage_configs.Transcribe]
+provider = "local"
+backend = "faster-whisper"
+device = "cpu"
+model = "small"
+compute_type = "int8"
+
+
+# ============================================================================
+# Available Model Sizes (ordered by size/accuracy):
+# ============================================================================
+# faster-whisper models:
+#   - tiny: 39M parameters (fastest, least accurate)
+#   - base: 74M parameters
+#   - small: 244M parameters
+#   - medium: 769M parameters
+#   - large-v3: 1550M parameters
+#   - large-v3-turbo: optimized version of large-v3
+#
+# pywhispercpp models:
+#   - tiny / tiny.en
+#   - base / base.en
+#   - small / small.en
+#   - medium / medium.en
+#   - large-v3
+#
+# Note: .en models are English-only and typically faster

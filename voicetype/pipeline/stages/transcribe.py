@@ -42,7 +42,11 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
 
     Config parameters:
     - provider: STT provider ("local" or "litellm", default: "local")
-    - model: Model name (optional, provider-specific)
+    - backend: Backend for local provider ("faster-whisper" or "pywhispercpp", default: "faster-whisper")
+    - device: Device for inference ("cuda" or "cpu", default: "cuda")
+    - model: Model name (e.g., "large-v3-turbo", "base", "tiny.en")
+    - compute_type: Compute type for faster-whisper ("float16", "int8", default: auto)
+    - n_threads: Number of threads for pywhispercpp (default: 4)
     - language: Language code (default: "en")
     - history: Optional context for better accuracy
     - audio_format: Audio format (default: "wav")
@@ -59,18 +63,22 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         self.config = config
         self.audio_format = config.get("audio_format", "wav")
 
-    def _transcribe_with_local(
+    def _transcribe_with_faster_whisper(
         self,
         filename: str,
-        history: Optional[str] = None,
-        language: Optional[str] = None,
+        model: str = "large-v3-turbo",
+        device: str = "cuda",
+        compute_type: Optional[str] = None,
+        language: str = "en",
     ) -> str:
-        """Transcribe audio using local Whisper model via speech_recognition.
+        """Transcribe audio using faster-whisper backend.
 
         Args:
             filename: Path to audio file
-            history: Unused in local transcription
-            language: Unused in local transcription (defaults to English)
+            model: Model size (e.g., "large-v3-turbo", "base", "tiny")
+            device: Device to use ("cuda" or "cpu")
+            compute_type: Compute type ("float16", "int8", None for auto)
+            language: Language code
 
         Returns:
             str: Transcribed text with leading/trailing whitespace removed
@@ -80,18 +88,139 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
 
         audio = sr.AudioData.from_file(filename)
 
+        # Auto-select compute type if not specified
+        if compute_type is None:
+            compute_type = "float16" if device == "cuda" else "int8"
+
         transcribed_text = faster_whisper.recognize(
             None,
             audio_data=audio,
-            model="large-v3-turbo",
-            language="en",
+            model=model,
+            language=language,
             init_options=faster_whisper.InitOptionalParameters(
-                device="cuda",
+                device=device,
+                compute_type=compute_type,
             ),
         )
 
         # transcribed_text seems to come back with a leading space, so we strip it
         return transcribed_text.strip()
+
+    def _transcribe_with_pywhispercpp(
+        self,
+        filename: str,
+        model: str = "base.en",
+        n_threads: int = 4,
+        language: str = "en",
+    ) -> str:
+        """Transcribe audio using pywhispercpp backend (whisper.cpp).
+
+        Note: pywhispercpp requires 16kHz mono WAV. This method will automatically
+        convert the audio if needed.
+
+        Args:
+            filename: Path to audio file
+            model: Model size (e.g., "base.en", "tiny.en", "small.en")
+            n_threads: Number of CPU threads to use
+            language: Language code (note: .en models are English-only)
+
+        Returns:
+            str: Transcribed text with leading/trailing whitespace removed
+        """
+        import tempfile
+
+        from pywhispercpp.model import Model
+
+        temp_file = None
+        try:
+            # pywhispercpp requires 16kHz mono WAV, so convert if needed
+            audio = AudioSegment.from_file(filename)
+
+            # Convert to 16kHz mono if needed
+            if audio.frame_rate != 16000 or audio.channels != 1:
+                audio = audio.set_frame_rate(16000).set_channels(1)
+
+                # Save to temporary file
+                temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                audio.export(temp_file.name, format="wav")
+                filename_to_use = temp_file.name
+                logger.debug(
+                    f"Converted audio to 16kHz mono for pywhispercpp: {temp_file.name}"
+                )
+            else:
+                filename_to_use = filename
+
+            # Suppress verbose whisper.cpp logs
+            whisper_model = Model(
+                model,
+                n_threads=n_threads,
+                print_realtime=False,
+                print_progress=False,
+                redirect_whispercpp_logs_to=None,  # Redirect to devnull
+            )
+            segments = whisper_model.transcribe(filename_to_use, language=language)
+
+            # Combine all segments into a single string
+            transcription = " ".join([segment.text for segment in segments])
+
+            return transcription.strip()
+
+        finally:
+            # Clean up temporary file if created
+            if temp_file and Path(temp_file.name).exists():
+                try:
+                    Path(temp_file.name).unlink()
+                    logger.debug(f"Cleaned up temporary file: {temp_file.name}")
+                except OSError as e:
+                    logger.debug(
+                        f"Warning: Could not remove temporary file {temp_file.name}: {e}"
+                    )
+
+    def _transcribe_with_local(
+        self,
+        filename: str,
+        history: Optional[str] = None,
+        language: Optional[str] = None,
+    ) -> str:
+        """Transcribe audio using local Whisper model.
+
+        Routes to the appropriate backend based on configuration.
+
+        Args:
+            filename: Path to audio file
+            history: Unused in local transcription
+            language: Language code (defaults to "en")
+
+        Returns:
+            str: Transcribed text with leading/trailing whitespace removed
+        """
+        backend = self.config.get("backend", "pywhispercpp")
+        device = self.config.get("device", "cuda")
+        model = self.config.get("model", "tiny.en")
+        language = language or self.config.get("language", "en")
+
+        if backend == "faster-whisper":
+            compute_type = self.config.get("compute_type")
+            return self._transcribe_with_faster_whisper(
+                filename=filename,
+                model=model,
+                device=device,
+                compute_type=compute_type,
+                language=language,
+            )
+        elif backend == "pywhispercpp":
+            n_threads = self.config.get("n_threads", 4)
+            return self._transcribe_with_pywhispercpp(
+                filename=filename,
+                model=model,
+                n_threads=n_threads,
+                language=language,
+            )
+        else:
+            raise NotImplementedError(
+                f"Backend '{backend}' is not supported. "
+                f"Use 'faster-whisper' or 'pywhispercpp'."
+            )
 
     def _transcribe_with_litellm(
         self,
