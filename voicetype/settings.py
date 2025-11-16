@@ -3,7 +3,18 @@ from typing import Any, Dict, List, Optional
 
 import toml
 from loguru import logger
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings
+
+
+class TelemetryConfig(BaseModel):
+    """Telemetry configuration for OpenTelemetry tracing."""
+
+    enabled: bool = True
+    service_name: str = "voicetype"
+    export_to_file: bool = True
+    trace_file: Optional[str] = None
+    otlp_endpoint: Optional[str] = None
 
 
 class Settings(BaseSettings):
@@ -41,6 +52,9 @@ class Settings(BaseSettings):
             ],
         }
     ]
+
+    # Telemetry configuration (enabled by default with file export)
+    telemetry: TelemetryConfig = TelemetryConfig()
 
     # Path to log file (uses platform defaults if not specified)
     log_file: Optional[Path] = None
