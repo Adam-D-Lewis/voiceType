@@ -16,34 +16,33 @@
 # =============================================================================
 # TELEMETRY CONFIGURATION (OpenTelemetry)
 # =============================================================================
-# Optional: Configure OpenTelemetry tracing to monitor pipeline performance.
+# By default, telemetry exports traces to a local file for offline analysis.
+# Traces are saved to ~/.config/voicetype/traces.jsonl (or platform equivalent).
 #
 # Export Modes:
-# 1. Real-time to Jaeger (requires Jaeger running):
+# 1. File export (DEFAULT - no Jaeger needed):
+#    - Traces saved to ~/.config/voicetype/traces.jsonl
+#    - View with: cat ~/.config/voicetype/traces.jsonl | jq
+#
+# 2. Real-time to Jaeger (requires Jaeger running):
 #    - Start Jaeger: docker-compose up -d
-#    - Set otlp_endpoint below
+#    - Uncomment otlp_endpoint below
 #    - View at http://localhost:16686
 #
-# 2. Export to file (no Jaeger needed):
-#    - Set export_to_file = true
-#    - Traces saved to ~/.config/voicetype/traces.jsonl
-#    - View file directly or import to Jaeger later
-#
 # 3. Both simultaneously (recommended for development):
-#    - Set both otlp_endpoint and export_to_file = true
+#    - Uncomment otlp_endpoint below (export_to_file is already enabled)
 
 [telemetry]
-enabled = true  # Set to false to disable telemetry completely
+enabled = true  # Default: enabled with file export
 service_name = "voicetype"  # Service name shown in traces
+export_to_file = true  # Default: export traces to file
 
-# Real-time export to OTLP collector (Jaeger/OTEL)
-# Comment out if you only want file export
-otlp_endpoint = "http://localhost:4317"  # OTLP gRPC endpoint
+# Optional: Real-time export to OTLP collector (Jaeger/OTEL)
+# Uncomment to enable real-time viewing in Jaeger
+# otlp_endpoint = "http://localhost:4317"  # OTLP gRPC endpoint
 
-# File export for offline viewing
-# Uncomment to enable trace file export (works without Jaeger running)
-# export_to_file = true  # Export traces to file
-# trace_file = "~/.config/voicetype/traces.jsonl"  # Optional custom path
+# Optional: Custom trace file path
+# trace_file = "~/my-traces.jsonl"  # Default: ~/.config/voicetype/traces.jsonl
 
 # =============================================================================
 # STAGE DEFINITIONS

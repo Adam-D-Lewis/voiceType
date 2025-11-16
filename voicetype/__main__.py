@@ -164,13 +164,13 @@ def main():
     # Configure logging to file + stderr (using custom path from settings if provided)
     log_file_path = configure_logging(settings.log_file)
 
-    # Initialize telemetry if enabled
+    # Initialize telemetry if enabled (defaults: enabled=True, export_to_file=True)
     telemetry_config = getattr(settings, "telemetry", None)
     if telemetry_config:
         initialize_telemetry(
             service_name=getattr(telemetry_config, "service_name", "voicetype"),
             otlp_endpoint=getattr(telemetry_config, "otlp_endpoint", None),
-            export_to_file=getattr(telemetry_config, "export_to_file", False),
+            export_to_file=getattr(telemetry_config, "export_to_file", True),
             trace_file=getattr(telemetry_config, "trace_file", None),
             enabled=getattr(telemetry_config, "enabled", True),
         )

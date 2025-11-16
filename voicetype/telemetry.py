@@ -58,7 +58,7 @@ def _get_trace_file_path(trace_file: Optional[str] = None) -> Path:
 def initialize_telemetry(
     service_name: str = "voicetype",
     otlp_endpoint: Optional[str] = None,
-    export_to_file: bool = False,
+    export_to_file: bool = True,
     trace_file: Optional[str] = None,
     enabled: bool = True,
 ) -> None:
@@ -68,15 +68,15 @@ def initialize_telemetry(
     Args:
         service_name: Name of the service for tracing (default: "voicetype")
         otlp_endpoint: OTLP collector endpoint (default: None, disables OTLP export)
-        export_to_file: Whether to export traces to a file (default: False)
+        export_to_file: Whether to export traces to a file (default: True)
         trace_file: Custom path for trace file (default: platform-specific)
         enabled: Whether to enable telemetry (default: True)
 
-    Export modes:
+    Export modes (default: file export only):
         - enabled=False: Telemetry completely disabled
-        - otlp_endpoint set, export_to_file=False: Only send to OTLP collector
-        - otlp_endpoint=None, export_to_file=True: Only export to file
-        - otlp_endpoint set, export_to_file=True: Export to both
+        - export_to_file=True (default): Export to file
+        - otlp_endpoint set: Also send to OTLP collector
+        - export_to_file=False, otlp_endpoint set: OTLP only (no file)
     """
     global _tracer, _tracer_provider
 
