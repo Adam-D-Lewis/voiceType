@@ -170,6 +170,8 @@ def main():
         initialize_telemetry(
             service_name=getattr(telemetry_config, "service_name", "voicetype"),
             otlp_endpoint=getattr(telemetry_config, "otlp_endpoint", None),
+            export_to_file=getattr(telemetry_config, "export_to_file", False),
+            trace_file=getattr(telemetry_config, "trace_file", None),
             enabled=getattr(telemetry_config, "enabled", True),
         )
 

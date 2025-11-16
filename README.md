@@ -150,7 +150,13 @@ See [settings.example.toml](settings.example.toml) for more examples and detaile
 
 VoiceType includes built-in OpenTelemetry instrumentation to track pipeline execution and stage performance. This allows you to visualize how long each stage takes and identify performance bottlenecks.
 
-### Quick Start with Jaeger
+### Export Modes
+
+You can export traces in three different ways:
+
+#### 1. Real-time to Jaeger (Live Monitoring)
+
+**Best for:** Active development, real-time debugging
 
 1. **Start Jaeger using Docker Compose:**
    ```bash
@@ -172,6 +178,43 @@ VoiceType includes built-in OpenTelemetry instrumentation to track pipeline exec
    - Select "voicetype" from the Service dropdown
    - Click "Find Traces" to see your pipeline executions
 
+#### 2. Export to File (Offline Analysis)
+
+**Best for:** General use, viewing traces later without running Jaeger
+
+1. **Configure file export in your `settings.toml`:**
+   ```toml
+   [telemetry]
+   enabled = true
+   service_name = "voicetype"
+   export_to_file = true
+   # trace_file = "~/my-traces.jsonl"  # Optional: custom path
+   ```
+
+2. **Run VoiceType normally** - traces will be saved to:
+   - Linux: `~/.config/voicetype/traces.jsonl`
+   - macOS: `~/Library/Application Support/voicetype/traces.jsonl`
+   - Windows: `%APPDATA%/voicetype/traces.jsonl`
+
+3. **View traces later:**
+   - **Option A:** Read the JSON file directly in any text editor
+   - **Option B:** Start Jaeger and import the traces (future feature)
+   - **Option C:** Use any OpenTelemetry-compatible viewer
+
+#### 3. Both Simultaneously
+
+**Best for:** Development with backup
+
+```toml
+[telemetry]
+enabled = true
+service_name = "voicetype"
+otlp_endpoint = "http://localhost:4317"  # Send to Jaeger
+export_to_file = true                     # Also save to file
+```
+
+This gives you both real-time viewing and a persistent record.
+
 ### What You Can See
 
 Each pipeline execution creates a trace with:
@@ -180,7 +223,7 @@ Each pipeline execution creates a trace with:
 - **Pipeline metadata** - Pipeline name, ID, stage count
 - **Error tracking** - Any exceptions or failures with stack traces
 
-### Example Trace View
+### Example Trace View (in Jaeger)
 
 ```
 pipeline.default (5.2s)
@@ -188,6 +231,43 @@ pipeline.default (5.2s)
   ├─ stage.Transcribe (2.8s)
   ├─ stage.CorrectTypos (0.05s)
   └─ stage.TypeText (0.25s)
+```
+
+### Example Trace (in File)
+
+When exported to file, each span is written as JSON:
+```json
+{
+  "name": "pipeline.default",
+  "context": {...},
+  "start_time": 1234567890,
+  "end_time": 1234567895,
+  "attributes": {
+    "pipeline.id": "abc-123",
+    "pipeline.name": "default",
+    "pipeline.duration_ms": 5200
+  }
+}
+```
+
+### Managing Trace Files
+
+**View traces:**
+```bash
+# Pretty-print the traces
+cat ~/.config/voicetype/traces.jsonl | jq
+```
+
+**Clear old traces:**
+```bash
+# Delete the trace file
+rm ~/.config/voicetype/traces.jsonl
+```
+
+**Analyze with grep:**
+```bash
+# Find slow stages
+grep "duration_ms" ~/.config/voicetype/traces.jsonl | grep -E "duration_ms\":[0-9]{4,}"
 ```
 
 ### Disable Telemetry
