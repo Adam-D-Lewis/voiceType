@@ -12,6 +12,17 @@ SERVICE_FILE_PATH = SYSTEMD_USER_DIR / SERVICE_NAME
 APP_CONFIG_DIR = Path.home() / ".config" / "voicetype"
 ENV_FILE_PATH = APP_CONFIG_DIR / ".env"
 
+# Windows startup constants
+WINDOWS_APP_NAME = "VoiceType"
+WINDOWS_APP_DESCRIPTION = (
+    "Type with your voice using hotkey-activated speech recognition"
+)
+
+# TODO: Consider using Task Scheduler or NSSM for more robust auto-start:
+# - Task Scheduler: schtasks /create /tn "VoiceType" /tr "..." /sc onlogon
+# - NSSM: More professional service management, requires bundling nssm.exe
+# Current implementation uses Startup folder for simplicity (no admin required)
+
 
 def get_project_root() -> Path:
     """
@@ -248,28 +259,182 @@ def service_status():
     run_systemctl_command(["status", SERVICE_NAME], ignore_errors=True)
 
 
+def install_windows_startup():
+    """Install VoiceType to start automatically on Windows login using Startup folder."""
+    if sys.platform != "win32":
+        print("This command is for Windows only.", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Installing {WINDOWS_APP_NAME} to start on login...")
+
+    # Get the path to the current executable
+    exe_path = Path(sys.executable).resolve()
+
+    # Get Windows Startup folder
+    startup_folder = (
+        Path(os.environ.get("APPDATA"))
+        / "Microsoft"
+        / "Windows"
+        / "Start Menu"
+        / "Programs"
+        / "Startup"
+    )
+    shortcut_path = startup_folder / f"{WINDOWS_APP_NAME}.lnk"
+
+    # Prompt for provider configuration
+    provider = ""
+    while provider not in ["litellm", "local"]:
+        provider = input("Choose a voice provider [litellm, local]: ").strip().lower()
+        if provider not in ["litellm", "local"]:
+            print("Invalid provider. Please choose 'litellm' or 'local'.")
+
+    env_vars = {"VOICE__PROVIDER": provider}
+
+    if provider == "litellm":
+        api_key = input("Please enter your OPENAI_API_KEY: ").strip()
+        if not api_key:
+            print(
+                "OPENAI_API_KEY cannot be empty for the 'litellm' provider. Installation aborted.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        env_vars["OPENAI_API_KEY"] = api_key
+
+    # Create app config directory and .env file (Windows path)
+    app_config_dir = Path(os.environ.get("APPDATA")) / "voicetype"
+    app_config_dir.mkdir(parents=True, exist_ok=True)
+    env_file = app_config_dir / ".env"
+
+    try:
+        with open(env_file, "w") as f:
+            for key, value in env_vars.items():
+                f.write(f"{key}={value}\n")
+        print(f"Configuration stored in {env_file}")
+    except IOError as e:
+        print(f"Error writing environment file to {env_file}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # Create startup shortcut using PowerShell
+    try:
+        # PowerShell script to create a shortcut
+        ps_script = f"""
+$WScriptShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WScriptShell.CreateShortcut("{shortcut_path}")
+$Shortcut.TargetPath = "{exe_path}"
+$Shortcut.WorkingDirectory = "{exe_path.parent}"
+$Shortcut.Description = "{WINDOWS_APP_DESCRIPTION}"
+$Shortcut.Save()
+"""
+        subprocess.run(
+            ["powershell", "-Command", ps_script],
+            check=True,
+            capture_output=True,
+        )
+
+        print(f"\n✅ {WINDOWS_APP_NAME} installed successfully!")
+        print(f"   Configuration: {env_file}")
+        print(f"   Startup shortcut: {shortcut_path}")
+        print(f"\n   VoiceType will start automatically when you log in.")
+        print(f"   To start now, run: voicetype.exe")
+        print(f"\n   To disable auto-start, delete the shortcut from:")
+        print(f"   {startup_folder}")
+
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Failed to create startup shortcut: {e}", file=sys.stderr)
+        print(f"   Error output: {e.stderr.decode() if e.stderr else 'N/A'}")
+        sys.exit(1)
+
+
+def uninstall_windows_startup():
+    """Remove VoiceType from Windows startup."""
+    if sys.platform != "win32":
+        print("This command is for Windows only.", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Uninstalling {WINDOWS_APP_NAME} from startup...")
+
+    # Get Windows Startup folder
+    startup_folder = (
+        Path(os.environ.get("APPDATA"))
+        / "Microsoft"
+        / "Windows"
+        / "Start Menu"
+        / "Programs"
+        / "Startup"
+    )
+    shortcut_path = startup_folder / f"{WINDOWS_APP_NAME}.lnk"
+
+    # Remove startup shortcut
+    if shortcut_path.exists():
+        try:
+            shortcut_path.unlink()
+            print(f"✅ Removed startup shortcut: {shortcut_path}")
+        except OSError as e:
+            print(f"❌ Failed to remove startup shortcut: {e}", file=sys.stderr)
+    else:
+        print(f"   Startup shortcut not found: {shortcut_path}")
+
+    # Remove config file
+    app_config_dir = Path(os.environ.get("APPDATA")) / "voicetype"
+    env_file = app_config_dir / ".env"
+
+    if env_file.exists():
+        try:
+            env_file.unlink()
+            print(f"✅ Removed configuration: {env_file}")
+        except OSError as e:
+            print(f"   Warning: Could not remove {env_file}: {e}")
+    else:
+        print(f"   Configuration file not found: {env_file}")
+
+    # Try to remove config directory if empty
+    try:
+        if app_config_dir.exists() and not any(app_config_dir.iterdir()):
+            app_config_dir.rmdir()
+            print(f"✅ Removed configuration directory: {app_config_dir}")
+    except OSError:
+        pass  # Not empty or other issue, that's fine
+
+    print(f"\n✅ {WINDOWS_APP_NAME} uninstalled successfully!")
+    print("   Note: VoiceType executable remains installed.")
+    print("   To fully remove, uninstall via Windows Settings > Apps")
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Manage VoiceType systemd user service for Linux."
+        description="Manage VoiceType service for Linux (systemd) or Windows."
     )
     subparsers = parser.add_subparsers(
         dest="command", help="Available commands", required=True
     )
 
+    # Linux systemd commands
     install_parser = subparsers.add_parser(
-        "install", help="Install and start the systemd service."
+        "install", help="Install and start the systemd service (Linux only)."
     )
     install_parser.set_defaults(func=install_service)
 
     uninstall_parser = subparsers.add_parser(
-        "uninstall", help="Stop, disable and uninstall the systemd service."
+        "uninstall",
+        help="Stop, disable and uninstall the systemd service (Linux only).",
     )
     uninstall_parser.set_defaults(func=uninstall_service)
 
     status_parser = subparsers.add_parser(
-        "status", help="Check the status of the systemd service."
+        "status", help="Check the status of the systemd service (Linux only)."
     )
     status_parser.set_defaults(func=service_status)
+
+    # Windows startup commands
+    install_startup_parser = subparsers.add_parser(
+        "install-startup", help="Install VoiceType to start on login (Windows only)."
+    )
+    install_startup_parser.set_defaults(func=install_windows_startup)
+
+    uninstall_startup_parser = subparsers.add_parser(
+        "uninstall-startup", help="Remove VoiceType from startup (Windows only)."
+    )
+    uninstall_startup_parser.set_defaults(func=uninstall_windows_startup)
 
     args = parser.parse_args()
     args.func()

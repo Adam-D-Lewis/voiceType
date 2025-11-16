@@ -149,7 +149,7 @@ libcublas = "=12"
 cudnn = "*"
 
 
-# Define the 'build' feature
+# Define the 'build' feature for Python package building
 [tool.pixi.feature.build]
 channels = ["conda-forge"]
 
@@ -158,6 +158,20 @@ channels = ["conda-forge"]
 python = ">=3.11"
 hatch = "*"
 hatch-vcs = "*"
+
+# Define the 'windows-build' feature for creating Windows installers
+[tool.pixi.feature.windows-build]
+channels = ["conda-forge"]
+
+# PyPI packages for Windows build
+[tool.pixi.feature.windows-build.pypi-dependencies]
+voiceType2 = { path = ".", editable = true }
+faster-whisper = "*"  # CPU-only for smaller bundle
+pyinstaller = "*"     # For creating standalone executables
+
+# Windows-specific build dependencies
+[tool.pixi.feature.windows-build.target.win-64.dependencies]
+# NSIS would be installed externally via Chocolatey or download
 
 # Define the 'dev' feature
 [tool.pixi.feature.dev]
@@ -184,3 +198,11 @@ default = ["local"]
 local = ["local"]
 build = ["build"]
 dev = ["dev"]
+windows-build = ["windows-build"]  # For building Windows installers
+
+# Pixi tasks for building
+[tool.pixi.feature.windows-build.tasks]
+# Build Windows installer (PyInstaller + NSIS)
+build-windows = { cmd = "python build_scripts/build_windows.py --clean", description = "Build Windows installer with PyInstaller + NSIS" }
+build-exe = { cmd = "pyinstaller --clean voicetype.spec", description = "Build standalone exe with PyInstaller only" }
+clean-build = { cmd = "python -c \"import shutil; from pathlib import Path; [shutil.rmtree(p) for p in [Path('dist'), Path('build')] if p.exists()]\"", description = "Clean build artifacts" }
