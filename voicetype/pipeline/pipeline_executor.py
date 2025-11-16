@@ -8,11 +8,16 @@ The PipelineExecutor manages the execution of individual pipeline stages, handli
 """
 
 import threading
+import time
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Set
 
 from loguru import logger
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
+
+from voicetype.telemetry import get_tracer
 
 from .context import IconController, PipelineContext
 from .resource_manager import Resource, ResourceManager
@@ -132,6 +137,22 @@ class PipelineExecutor:
             trigger_event: Optional trigger event
             metadata: Initial metadata dictionary
         """
+        # Get tracer for OpenTelemetry spans
+        tracer = get_tracer()
+
+        # Create top-level pipeline span
+        if tracer is not None:
+            pipeline_span = tracer.start_span(
+                f"pipeline.{pipeline_name}",
+                attributes={
+                    "pipeline.id": pipeline_id,
+                    "pipeline.name": pipeline_name,
+                    "pipeline.stage_count": len(stages),
+                },
+            )
+        else:
+            pipeline_span = None
+
         # Create pipeline context
         context = PipelineContext(
             config={},
@@ -143,45 +164,97 @@ class PipelineExecutor:
 
         result = None
         stage_instances = []  # Track stage instances for cleanup
+        pipeline_start_time = time.time()
 
         try:
-            for stage_config in stages:
+            for stage_index, stage_config in enumerate(stages):
                 # Check for cancellation
                 if context.cancel_requested.is_set():
                     logger.info(f"Pipeline '{pipeline_name}' cancelled")
+                    if pipeline_span is not None:
+                        pipeline_span.set_status(Status(StatusCode.ERROR, "Cancelled"))
+                        pipeline_span.end()
                     return
 
                 stage_name = stage_config["stage"]
                 logger.debug(f"[{pipeline_name}] Starting stage: {stage_name}")
 
-                # Get stage class from registry
-                stage_metadata = STAGE_REGISTRY.get(stage_name)
-                stage_class = stage_metadata.stage_class
+                # Create stage span
+                stage_span = None
+                if tracer is not None:
+                    stage_span = tracer.start_span(
+                        f"stage.{stage_name}",
+                        attributes={
+                            "pipeline.id": pipeline_id,
+                            "pipeline.name": pipeline_name,
+                            "stage.name": stage_name,
+                            "stage.index": stage_index,
+                        },
+                    )
 
-                # Extract stage-specific config (remove 'func' key)
-                stage_specific_config = {
-                    k: v for k, v in stage_config.items() if k != "func"
-                }
+                stage_start_time = time.time()
 
-                # Instantiate stage with config
-                stage_instance = stage_class(config=stage_specific_config)
-                stage_instances.append(stage_instance)
+                try:
+                    # Get stage class from registry
+                    stage_metadata = STAGE_REGISTRY.get(stage_name)
+                    stage_class = stage_metadata.stage_class
 
-                # Update context with stage-specific config
-                context.config = stage_specific_config
+                    # Extract stage-specific config (remove 'func' key)
+                    stage_specific_config = {
+                        k: v for k, v in stage_config.items() if k != "func"
+                    }
 
-                # Execute stage (may block for seconds)
-                result = stage_instance.execute(result, context)
+                    # Instantiate stage with config
+                    stage_instance = stage_class(config=stage_specific_config)
+                    stage_instances.append(stage_instance)
 
-                logger.debug(f"[{pipeline_name}] Stage {stage_name} completed")
+                    # Update context with stage-specific config
+                    context.config = stage_specific_config
 
-            logger.info(f"Pipeline '{pipeline_name}' completed successfully")
+                    # Execute stage (may block for seconds)
+                    result = stage_instance.execute(result, context)
+
+                    # Record stage completion
+                    stage_duration = time.time() - stage_start_time
+                    if stage_span is not None:
+                        stage_span.set_attribute("stage.duration_ms", stage_duration * 1000)
+                        stage_span.set_status(Status(StatusCode.OK))
+
+                    logger.debug(
+                        f"[{pipeline_name}] Stage {stage_name} completed in {stage_duration:.2f}s"
+                    )
+
+                except Exception as e:
+                    stage_duration = time.time() - stage_start_time
+                    if stage_span is not None:
+                        stage_span.set_attribute("stage.duration_ms", stage_duration * 1000)
+                        stage_span.set_status(Status(StatusCode.ERROR, str(e)))
+                        stage_span.record_exception(e)
+                    raise
+                finally:
+                    if stage_span is not None:
+                        stage_span.end()
+
+            # Pipeline completed successfully
+            pipeline_duration = time.time() - pipeline_start_time
+            if pipeline_span is not None:
+                pipeline_span.set_attribute("pipeline.duration_ms", pipeline_duration * 1000)
+                pipeline_span.set_status(Status(StatusCode.OK))
+
+            logger.info(
+                f"Pipeline '{pipeline_name}' completed successfully in {pipeline_duration:.2f}s"
+            )
 
         except Exception as e:
+            pipeline_duration = time.time() - pipeline_start_time
             logger.error(
                 f"Pipeline '{pipeline_name}' failed at stage {stage_name}: {e}",
                 exc_info=True,
             )
+            if pipeline_span is not None:
+                pipeline_span.set_attribute("pipeline.duration_ms", pipeline_duration * 1000)
+                pipeline_span.set_status(Status(StatusCode.ERROR, str(e)))
+                pipeline_span.record_exception(e)
             self.icon_controller.set_icon("error")
             raise
 
@@ -202,6 +275,10 @@ class PipelineExecutor:
 
             # Reset icon
             self.icon_controller.set_icon("idle")
+
+            # End pipeline span
+            if pipeline_span is not None:
+                pipeline_span.end()
 
     def _on_pipeline_complete(self, pipeline_id: str, future: Future):
         """Callback when pipeline completes (runs on worker thread).

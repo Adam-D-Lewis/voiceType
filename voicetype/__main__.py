@@ -17,6 +17,7 @@ from voicetype.pipeline import (
 )
 from voicetype.settings import load_settings
 from voicetype.state import AppState, State
+from voicetype.telemetry import initialize_telemetry, shutdown_telemetry
 from voicetype.trayicon import TrayIconController, create_tray
 from voicetype.utils import play_sound, type_text
 
@@ -162,6 +163,15 @@ def main():
 
     # Configure logging to file + stderr (using custom path from settings if provided)
     log_file_path = configure_logging(settings.log_file)
+
+    # Initialize telemetry if enabled
+    telemetry_config = getattr(settings, "telemetry", None)
+    if telemetry_config:
+        initialize_telemetry(
+            service_name=getattr(telemetry_config, "service_name", "voicetype"),
+            otlp_endpoint=getattr(telemetry_config, "otlp_endpoint", None),
+            enabled=getattr(telemetry_config, "enabled", True),
+        )
 
     logger.info("Starting VoiceType application...")
 
@@ -310,6 +320,12 @@ def main():
                 logger.error(
                     f"Error shutting down pipeline manager: {e}", exc_info=True
                 )
+
+        # Shutdown telemetry
+        try:
+            shutdown_telemetry()
+        except Exception as e:
+            logger.error(f"Error shutting down telemetry: {e}", exc_info=True)
 
         logger.info("VoiceType application finished.")
 

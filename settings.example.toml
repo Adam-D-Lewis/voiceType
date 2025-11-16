@@ -14,6 +14,18 @@
 # log_file = "~/custom/logs/voicetype.log"  # Tilde expansion supported
 
 # =============================================================================
+# TELEMETRY CONFIGURATION (OpenTelemetry)
+# =============================================================================
+# Optional: Configure OpenTelemetry tracing to monitor pipeline performance.
+# To view traces, start Jaeger using: docker-compose up -d
+# Then visit http://localhost:16686 in your browser
+
+[telemetry]
+enabled = true  # Set to false to disable telemetry
+service_name = "voicetype"  # Service name in traces
+otlp_endpoint = "http://localhost:4317"  # OTLP gRPC endpoint (Jaeger collector)
+
+# =============================================================================
 # STAGE DEFINITIONS
 # =============================================================================
 # Define named stage instances with their configurations.

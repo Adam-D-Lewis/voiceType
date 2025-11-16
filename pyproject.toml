@@ -111,6 +111,12 @@ sounddevice = "*"  # for detecting input devices and recording sound
 pydantic-settings = "*"
 toml = "*"
 
+# OpenTelemetry for tracing and observability
+opentelemetry-api = "*"
+opentelemetry-sdk = "*"
+opentelemetry-exporter-otlp = "*"
+opentelemetry-instrumentation = "*"
+
 # the following dependencies come from vendoring in pynput
 six = "*"
 

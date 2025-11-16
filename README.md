@@ -146,6 +146,64 @@ See [settings.example.toml](settings.example.toml) for more examples and detaile
 
 **Note:** If you used `voicetype install` and configured litellm during installation, your API key is stored separately in `~/.config/voicetype/.env`.
 
+## Monitoring Pipeline Performance with OpenTelemetry
+
+VoiceType includes built-in OpenTelemetry instrumentation to track pipeline execution and stage performance. This allows you to visualize how long each stage takes and identify performance bottlenecks.
+
+### Quick Start with Jaeger
+
+1. **Start Jaeger using Docker Compose:**
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Configure telemetry in your `settings.toml`:**
+   ```toml
+   [telemetry]
+   enabled = true
+   service_name = "voicetype"
+   otlp_endpoint = "http://localhost:4317"
+   ```
+
+3. **Run VoiceType and use the hotkey to trigger a pipeline.**
+
+4. **View traces in Jaeger UI:**
+   - Open http://localhost:16686 in your browser
+   - Select "voicetype" from the Service dropdown
+   - Click "Find Traces" to see your pipeline executions
+
+### What You Can See
+
+Each pipeline execution creates a trace with:
+- **Overall pipeline duration** - Total time from start to finish
+- **Individual stage timings** - How long each stage (RecordAudio, Transcribe, etc.) took
+- **Pipeline metadata** - Pipeline name, ID, stage count
+- **Error tracking** - Any exceptions or failures with stack traces
+
+### Example Trace View
+
+```
+pipeline.default (5.2s)
+  ├─ stage.RecordAudio (2.1s)
+  ├─ stage.Transcribe (2.8s)
+  ├─ stage.CorrectTypos (0.05s)
+  └─ stage.TypeText (0.25s)
+```
+
+### Disable Telemetry
+
+If you don't need monitoring, set `enabled = false` in the telemetry configuration:
+```toml
+[telemetry]
+enabled = false
+```
+
+### Stop Jaeger
+
+```bash
+docker-compose down
+```
+
 ## Usage
 
 -   **If using the Linux systemd service:** The service will start automatically on login. VoiceType will be listening for the hotkey in the background.
