@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings
 class TelemetryConfig(BaseModel):
     """Telemetry configuration for OpenTelemetry tracing."""
 
-    enabled: bool = True
+    enabled: bool = False
     service_name: str = "voicetype"
     export_to_file: bool = True
     trace_file: Optional[str] = None

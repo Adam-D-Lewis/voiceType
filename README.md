@@ -148,54 +148,23 @@ See [settings.example.toml](settings.example.toml) for more examples and detaile
 
 ## Monitoring Pipeline Performance with OpenTelemetry
 
-VoiceType includes built-in OpenTelemetry instrumentation to track pipeline execution and stage performance. **By default, traces are exported to a local file** for offline analysis - no additional setup required!
+VoiceType includes built-in OpenTelemetry instrumentation to track pipeline execution and stage performance. When enabled, traces are exported to a local file for offline analysis.
 
-### Default: File Export (No Setup Needed)
+### Enabling Telemetry
+
+Telemetry is disabled by default. To enable it, add to your `settings.toml`:
+
+```toml
+[telemetry]
+enabled = true
+```
+
+### Trace File Location
 
 Traces are automatically saved to:
 - Linux: `~/.config/voicetype/traces.jsonl`
 - macOS: `~/Library/Application Support/voicetype/traces.jsonl`
 - Windows: `%APPDATA%/voicetype/traces.jsonl`
-
-**View your traces:**
-```bash
-# Pretty-print the traces
-cat ~/.config/voicetype/traces.jsonl | jq
-
-# Or just view in any text editor
-cat ~/.config/voicetype/traces.jsonl
-```
-
-**To disable telemetry:**
-```toml
-[telemetry]
-enabled = false
-```
-
-### Optional: Real-time Viewing with Jaeger
-
-For live monitoring during development:
-
-1. **Start Jaeger using Docker Compose:**
-   ```bash
-   docker-compose up -d
-   ```
-
-2. **Uncomment the OTLP endpoint in `settings.toml`:**
-   ```toml
-   [telemetry]
-   enabled = true
-   service_name = "voicetype"
-   export_to_file = true
-   otlp_endpoint = "http://localhost:4317"  # Uncomment this line
-   ```
-
-3. **View traces in Jaeger UI:**
-   - Open http://localhost:16686 in your browser
-   - Select "voicetype" from the Service dropdown
-   - Click "Find Traces" to see your pipeline executions
-
-**Note:** With both enabled, you get real-time viewing AND a persistent file backup.
 
 ### What You Can See
 
@@ -205,19 +174,9 @@ Each pipeline execution creates a trace with:
 - **Pipeline metadata** - Pipeline name, ID, stage count
 - **Error tracking** - Any exceptions or failures with stack traces
 
-### Example Trace View (in Jaeger)
+### Example Trace
 
-```
-pipeline.default (5.2s)
-  ├─ stage.RecordAudio (2.1s)
-  ├─ stage.Transcribe (2.8s)
-  ├─ stage.CorrectTypos (0.05s)
-  └─ stage.TypeText (0.25s)
-```
-
-### Example Trace (in File)
-
-When exported to file, each span is written as JSON:
+Each span is written as a JSON line:
 ```json
 {
   "name": "pipeline.default",
@@ -238,6 +197,9 @@ When exported to file, each span is written as JSON:
 ```bash
 # Pretty-print the traces
 cat ~/.config/voicetype/traces.jsonl | jq
+
+# Or just view in any text editor
+cat ~/.config/voicetype/traces.jsonl
 ```
 
 **Clear old traces:**
@@ -252,41 +214,13 @@ rm ~/.config/voicetype/traces.jsonl
 grep "duration_ms" ~/.config/voicetype/traces.jsonl | grep -E "duration_ms\":[0-9]{4,}"
 ```
 
-### Advanced Configuration
-
-**Disable telemetry entirely:**
-```toml
-[telemetry]
-enabled = false
-```
-
-**File export only (no OTLP):**
-```toml
-[telemetry]
-enabled = true
-export_to_file = true
-# otlp_endpoint is commented out or omitted
-```
-
-**OTLP only (no file):**
-```toml
-[telemetry]
-enabled = true
-export_to_file = false
-otlp_endpoint = "http://localhost:4317"
-```
+### Configuration
 
 **Custom trace file location:**
 ```toml
 [telemetry]
 enabled = true
-export_to_file = true
 trace_file = "~/my-custom-traces.jsonl"
-```
-
-**Stop Jaeger (if running):**
-```bash
-docker-compose down
 ```
 
 ## Usage

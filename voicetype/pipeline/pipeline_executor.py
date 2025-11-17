@@ -184,16 +184,35 @@ class PipelineExecutor:
                     stage_name = stage_config["stage"]
                     logger.debug(f"[{pipeline_name}] Starting stage: {stage_name}")
 
-                    # Create stage span as child of pipeline span
+                    # Get stage class from registry
+                    stage_metadata = STAGE_REGISTRY.get(stage_name)
+                    stage_class = stage_metadata.stage_class
+
+                    # Extract stage-specific config (remove 'func' key)
+                    stage_specific_config = {
+                        k: v for k, v in stage_config.items() if k != "func"
+                    }
+
+                    # Create stage span with configuration as attributes
                     if tracer is not None:
+                        # Build attributes with stage config
+                        stage_attributes = {
+                            "pipeline.id": pipeline_id,
+                            "pipeline.name": pipeline_name,
+                            "stage.name": stage_name,
+                            "stage.index": stage_index,
+                        }
+
+                        # Add stage configuration as attributes with "stage.config." prefix
+                        for config_key, config_value in stage_specific_config.items():
+                            # Convert value to string for OpenTelemetry attribute
+                            stage_attributes[f"stage.config.{config_key}"] = str(
+                                config_value
+                            )
+
                         stage_span = tracer.start_as_current_span(
                             f"stage.{stage_name}",
-                            attributes={
-                                "pipeline.id": pipeline_id,
-                                "pipeline.name": pipeline_name,
-                                "stage.name": stage_name,
-                                "stage.index": stage_index,
-                            },
+                            attributes=stage_attributes,
                         )
                     else:
                         from contextlib import nullcontext
@@ -204,14 +223,6 @@ class PipelineExecutor:
                         stage_start_time = time.time()
 
                         try:
-                            # Get stage class from registry
-                            stage_metadata = STAGE_REGISTRY.get(stage_name)
-                            stage_class = stage_metadata.stage_class
-
-                            # Extract stage-specific config (remove 'func' key)
-                            stage_specific_config = {
-                                k: v for k, v in stage_config.items() if k != "func"
-                            }
 
                             # Instantiate stage with config
                             stage_instance = stage_class(config=stage_specific_config)

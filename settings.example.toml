@@ -16,29 +16,21 @@
 # =============================================================================
 # TELEMETRY CONFIGURATION (OpenTelemetry)
 # =============================================================================
-# By default, telemetry exports traces to a local file for offline analysis.
+# Telemetry is disabled by default. To enable, set enabled = true.
+# When enabled, traces are exported to a local file for offline analysis.
 # Traces are saved to ~/.config/voicetype/traces.jsonl (or platform equivalent).
 #
-# Export Modes:
-# 1. File export (DEFAULT - no Jaeger needed):
-#    - Traces saved to ~/.config/voicetype/traces.jsonl
-#    - View with: cat ~/.config/voicetype/traces.jsonl | jq
+# View traces with: cat ~/.config/voicetype/traces.jsonl | jq
 #
-# 2. Real-time to Jaeger (requires Jaeger running):
-#    - Start Jaeger: docker-compose up -d
-#    - Uncomment otlp_endpoint below
-#    - View at http://localhost:16686
-#
-# 3. Both simultaneously (recommended for development):
-#    - Uncomment otlp_endpoint below (export_to_file is already enabled)
+# Optional: You can also export to an OTLP endpoint (e.g., a custom OpenTelemetry
+# collector) by setting otlp_endpoint and export_to_file=true for both.
 
 [telemetry]
-enabled = true  # Default: enabled with file export
+enabled = false  # Default: disabled (set to true to enable)
 service_name = "voicetype"  # Service name shown in traces
-export_to_file = true  # Default: export traces to file
+export_to_file = true  # Export traces to file (default: true)
 
-# Optional: Real-time export to OTLP collector (Jaeger/OTEL)
-# Uncomment to enable real-time viewing in Jaeger
+# Optional: Export to OTLP endpoint (for custom visualization tools)
 # otlp_endpoint = "http://localhost:4317"  # OTLP gRPC endpoint
 
 # Optional: Custom trace file path

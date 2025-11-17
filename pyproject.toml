@@ -184,9 +184,19 @@ pytest = "*"
 libcublas = "=12"  # faster_whisper doesn't seem to support cuda 13 yet
 cudnn = "*"
 
+# Analytics/visualization feature for trace analysis
+[tool.pixi.feature.analytics]
+channels = ["conda-forge"]
+
+[tool.pixi.feature.analytics.dependencies]
+polars = ">=1.0"
+plotly = ">=5.0"
+python-kaleido = "*"  # For static image export
+
 # Map environments to feature sets
 [tool.pixi.environments]
 default = ["local"]
 local = ["local"]
 build = ["build"]
 dev = ["dev"]
+analytics = ["local", "analytics"]  # Include local deps + analytics tools
