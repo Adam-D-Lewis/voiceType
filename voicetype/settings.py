@@ -16,6 +16,10 @@ class TelemetryConfig(BaseModel):
     trace_file: Optional[str] = None
     otlp_endpoint: Optional[str] = None
 
+    # File rotation settings
+    rotation_enabled: bool = True
+    rotation_max_size_mb: int = 10  # Rotate when file reaches this size in MB
+
 
 class Settings(BaseSettings):
     """Main application settings."""

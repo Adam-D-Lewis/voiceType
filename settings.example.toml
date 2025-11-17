@@ -36,6 +36,10 @@ export_to_file = true  # Export traces to file (default: true)
 # Optional: Custom trace file path
 # trace_file = "~/my-traces.jsonl"  # Default: ~/.config/voicetype/traces.jsonl
 
+# File rotation settings
+rotation_enabled = true  # Enable automatic file rotation (default: true)
+rotation_max_size_mb = 10  # Rotate when file reaches this size in MB (default: 10)
+
 # =============================================================================
 # STAGE DEFINITIONS
 # =============================================================================

@@ -171,6 +171,8 @@ def main():
         export_to_file=settings.telemetry.export_to_file,
         trace_file=settings.telemetry.trace_file,
         enabled=settings.telemetry.enabled,
+        rotation_enabled=settings.telemetry.rotation_enabled,
+        rotation_max_size_mb=settings.telemetry.rotation_max_size_mb,
     )
 
     logger.info("Starting VoiceType application...")

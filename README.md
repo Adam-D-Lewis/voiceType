@@ -193,10 +193,16 @@ Each span is written as a JSON line:
 
 ### Managing Trace Files
 
+**Automatic rotation:**
+Trace files are automatically rotated when they reach 10 MB. Rotated files are timestamped (e.g., `traces.20250117_143022.jsonl`) and kept indefinitely.
+
 **View traces:**
 ```bash
-# Pretty-print the traces
+# Pretty-print the current trace file
 cat ~/.config/voicetype/traces.jsonl | jq
+
+# View all trace files (including rotated)
+cat ~/.config/voicetype/traces*.jsonl | jq
 
 # Or just view in any text editor
 cat ~/.config/voicetype/traces.jsonl
@@ -204,14 +210,17 @@ cat ~/.config/voicetype/traces.jsonl
 
 **Clear old traces:**
 ```bash
-# Delete the trace file
-rm ~/.config/voicetype/traces.jsonl
+# Delete all trace files
+rm ~/.config/voicetype/traces*.jsonl
 ```
 
 **Analyze with grep:**
 ```bash
-# Find slow stages
+# Find slow stages in current file
 grep "duration_ms" ~/.config/voicetype/traces.jsonl | grep -E "duration_ms\":[0-9]{4,}"
+
+# Search across all trace files
+grep "duration_ms" ~/.config/voicetype/traces*.jsonl | grep -E "duration_ms\":[0-9]{4,}"
 ```
 
 ### Configuration
@@ -221,6 +230,24 @@ grep "duration_ms" ~/.config/voicetype/traces.jsonl | grep -E "duration_ms\":[0-
 [telemetry]
 enabled = true
 trace_file = "~/my-custom-traces.jsonl"
+```
+
+**Adjust rotation size or disable rotation:**
+```toml
+[telemetry]
+enabled = true
+rotation_max_size_mb = 50  # Rotate at 50 MB instead of 10 MB
+
+# Or disable rotation entirely
+# rotation_enabled = false
+```
+
+**Export to OTLP endpoint only (disable file export):**
+```toml
+[telemetry]
+enabled = true
+export_to_file = false
+otlp_endpoint = "http://localhost:4317"
 ```
 
 ## Usage
