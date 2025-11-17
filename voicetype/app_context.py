@@ -17,3 +17,5 @@ class AppContext:
     state: AppState
     hotkey_listener: Optional["HotkeyListener"]
     log_file_path: Optional[Path] = None
+    telemetry_enabled: bool = False
+    trace_file_path: Optional[Path] = None

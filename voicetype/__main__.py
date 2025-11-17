@@ -17,7 +17,11 @@ from voicetype.pipeline import (
 )
 from voicetype.settings import load_settings
 from voicetype.state import AppState, State
-from voicetype.telemetry import initialize_telemetry, shutdown_telemetry
+from voicetype.telemetry import (
+    _get_trace_file_path,
+    initialize_telemetry,
+    shutdown_telemetry,
+)
 from voicetype.trayicon import TrayIconController, create_tray
 from voicetype.utils import play_sound, type_text
 
@@ -186,10 +190,16 @@ def main():
 
     try:
         # Create app context for tray icon compatibility
+        trace_file_path = None
+        if settings.telemetry.enabled:
+            trace_file_path = _get_trace_file_path(settings.telemetry.trace_file)
+
         ctx = AppContext(
             state=AppState(),
             hotkey_listener=None,  # Will be set later
             log_file_path=log_file_path,
+            telemetry_enabled=settings.telemetry.enabled,
+            trace_file_path=trace_file_path,
         )
         ctx.state.state = State.LISTENING
 
