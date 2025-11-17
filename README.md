@@ -146,6 +146,110 @@ See [settings.example.toml](settings.example.toml) for more examples and detaile
 
 **Note:** If you used `voicetype install` and configured litellm during installation, your API key is stored separately in `~/.config/voicetype/.env`.
 
+## Monitoring Pipeline Performance with OpenTelemetry
+
+VoiceType includes built-in OpenTelemetry instrumentation to track pipeline execution and stage performance. When enabled, traces are exported to a local file for offline analysis.
+
+### Enabling Telemetry
+
+Telemetry is disabled by default. To enable it, add to your `settings.toml`:
+
+```toml
+[telemetry]
+enabled = true
+```
+
+### Trace File Location
+
+Traces are automatically saved to:
+- Linux: `~/.config/voicetype/traces.jsonl`
+- macOS: `~/Library/Application Support/voicetype/traces.jsonl`
+- Windows: `%APPDATA%/voicetype/traces.jsonl`
+
+### What You Can See
+
+Each pipeline execution creates a trace with:
+- **Overall pipeline duration** - Total time from start to finish
+- **Individual stage timings** - How long each stage (RecordAudio, Transcribe, etc.) took
+- **Pipeline metadata** - Pipeline name, ID, stage count
+- **Error tracking** - Any exceptions or failures with stack traces
+
+### Example Trace
+
+Each span is written as a JSON line:
+```json
+{
+  "name": "pipeline.default",
+  "context": {...},
+  "start_time": 1234567890,
+  "end_time": 1234567895,
+  "attributes": {
+    "pipeline.id": "abc-123",
+    "pipeline.name": "default",
+    "pipeline.duration_ms": 5200
+  }
+}
+```
+
+### Managing Trace Files
+
+**Automatic rotation:**
+Trace files are automatically rotated when they reach 10 MB. Rotated files are timestamped (e.g., `traces.20250117_143022.jsonl`) and kept indefinitely.
+
+**View traces:**
+```bash
+# Pretty-print the current trace file
+cat ~/.config/voicetype/traces.jsonl | jq
+
+# View all trace files (including rotated)
+cat ~/.config/voicetype/traces*.jsonl | jq
+
+# Or just view in any text editor
+cat ~/.config/voicetype/traces.jsonl
+```
+
+**Clear old traces:**
+```bash
+# Delete all trace files
+rm ~/.config/voicetype/traces*.jsonl
+```
+
+**Analyze with grep:**
+```bash
+# Find slow stages in current file
+grep "duration_ms" ~/.config/voicetype/traces.jsonl | grep -E "duration_ms\":[0-9]{4,}"
+
+# Search across all trace files
+grep "duration_ms" ~/.config/voicetype/traces*.jsonl | grep -E "duration_ms\":[0-9]{4,}"
+```
+
+### Configuration
+
+**Custom trace file location:**
+```toml
+[telemetry]
+enabled = true
+trace_file = "~/my-custom-traces.jsonl"
+```
+
+**Adjust rotation size or disable rotation:**
+```toml
+[telemetry]
+enabled = true
+rotation_max_size_mb = 50  # Rotate at 50 MB instead of 10 MB
+
+# Or disable rotation entirely
+# rotation_enabled = false
+```
+
+**Export to OTLP endpoint only (disable file export):**
+```toml
+[telemetry]
+enabled = true
+export_to_file = false
+otlp_endpoint = "http://localhost:4317"
+```
+
 ## Usage
 
 -   **If using the Linux systemd service:** The service will start automatically on login. VoiceType will be listening for the hotkey in the background.

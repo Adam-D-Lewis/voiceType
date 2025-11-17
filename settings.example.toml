@@ -14,6 +14,33 @@
 # log_file = "~/custom/logs/voicetype.log"  # Tilde expansion supported
 
 # =============================================================================
+# TELEMETRY CONFIGURATION (OpenTelemetry)
+# =============================================================================
+# Telemetry is disabled by default. To enable, set enabled = true.
+# When enabled, traces are exported to a local file for offline analysis.
+# Traces are saved to ~/.config/voicetype/traces.jsonl (or platform equivalent).
+#
+# View traces with: cat ~/.config/voicetype/traces.jsonl | jq
+#
+# Optional: You can also export to an OTLP endpoint (e.g., a custom OpenTelemetry
+# collector) by setting otlp_endpoint and export_to_file=true for both.
+
+[telemetry]
+enabled = false  # Default: disabled (set to true to enable)
+service_name = "voicetype"  # Service name shown in traces
+export_to_file = true  # Export traces to file (default: true)
+
+# Optional: Export to OTLP endpoint (for custom visualization tools)
+# otlp_endpoint = "http://localhost:4317"  # OTLP gRPC endpoint
+
+# Optional: Custom trace file path
+# trace_file = "~/my-traces.jsonl"  # Default: ~/.config/voicetype/traces.jsonl
+
+# File rotation settings
+rotation_enabled = true  # Enable automatic file rotation (default: true)
+rotation_max_size_mb = 10  # Rotate when file reaches this size in MB (default: 10)
+
+# =============================================================================
 # STAGE DEFINITIONS
 # =============================================================================
 # Define named stage instances with their configurations.
