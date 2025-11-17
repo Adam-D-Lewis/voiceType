@@ -10,20 +10,131 @@ Supports multiple export modes:
 - Both: Export to both OTLP and files simultaneously
 """
 
+import json
 import os
 from pathlib import Path
-from typing import Optional
+from typing import IO, Optional, Sequence
 
 from loguru import logger
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
+    SpanExporter,
+    SpanExportResult,
+)
 
 # Global tracer instance
 _tracer: Optional[trace.Tracer] = None
 _tracer_provider: Optional[TracerProvider] = None
+
+
+class OTLPJSONFileExporter(SpanExporter):
+    """
+    Exports spans to a JSON Lines file in OTLP JSON format.
+
+    Each line in the file is a valid JSON object representing span data
+    that can be imported by OpenTelemetry-compatible tools.
+    """
+
+    def __init__(self, file_handle: IO[str], resource: Resource):
+        """
+        Initialize the JSON file exporter.
+
+        Args:
+            file_handle: Open file handle to write JSON lines to
+            resource: Resource information (service name, etc.)
+        """
+        self.file_handle = file_handle
+        self.resource = resource
+
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        """
+        Export spans to the file in OTLP JSON format.
+
+        Args:
+            spans: Sequence of spans to export
+
+        Returns:
+            SpanExportResult indicating success or failure
+        """
+        if not spans:
+            return SpanExportResult.SUCCESS
+
+        try:
+            for span in spans:
+                # Convert span to OTLP-compatible JSON format
+                span_data = {
+                    "name": span.name,
+                    "context": {
+                        "trace_id": format(span.context.trace_id, "032x"),
+                        "span_id": format(span.context.span_id, "016x"),
+                        "trace_state": (
+                            str(span.context.trace_state)
+                            if span.context.trace_state
+                            else ""
+                        ),
+                    },
+                    "kind": str(span.kind),
+                    "parent_id": (
+                        format(span.parent.span_id, "016x") if span.parent else None
+                    ),
+                    "start_time": span.start_time,
+                    "end_time": span.end_time,
+                    "status": {
+                        "status_code": str(span.status.status_code),
+                        "description": span.status.description,
+                    },
+                    "attributes": dict(span.attributes) if span.attributes else {},
+                    "events": [
+                        {
+                            "name": event.name,
+                            "timestamp": event.timestamp,
+                            "attributes": (
+                                dict(event.attributes) if event.attributes else {}
+                            ),
+                        }
+                        for event in (span.events or [])
+                    ],
+                    "links": [
+                        {
+                            "context": {
+                                "trace_id": format(link.context.trace_id, "032x"),
+                                "span_id": format(link.context.span_id, "016x"),
+                            },
+                            "attributes": (
+                                dict(link.attributes) if link.attributes else {}
+                            ),
+                        }
+                        for link in (span.links or [])
+                    ],
+                    "resource": {
+                        "attributes": (
+                            dict(self.resource.attributes)
+                            if self.resource.attributes
+                            else {}
+                        ),
+                    },
+                }
+
+                # Write as single line JSON (JSONL format)
+                json_line = json.dumps(span_data, default=str)
+                self.file_handle.write(json_line + "\n")
+                self.file_handle.flush()
+
+            return SpanExportResult.SUCCESS
+        except Exception as e:
+            logger.error(f"Failed to export spans to JSON file: {e}")
+            return SpanExportResult.FAILURE
+
+    def shutdown(self) -> None:
+        """Shutdown the exporter and close the file."""
+        try:
+            self.file_handle.close()
+        except Exception as e:
+            logger.warning(f"Error closing trace file: {e}")
 
 
 def _get_trace_file_path(trace_file: Optional[str] = None) -> Path:
@@ -42,7 +153,9 @@ def _get_trace_file_path(trace_file: Optional[str] = None) -> Path:
 
     # Use platform-specific default locations
     if sys.platform == "win32":
-        config_dir = Path(os.environ.get("APPDATA", "~/.config")).expanduser() / "voicetype"
+        config_dir = (
+            Path(os.environ.get("APPDATA", "~/.config")).expanduser() / "voicetype"
+        )
     elif sys.platform == "darwin":
         config_dir = Path.home() / "Library" / "Application Support" / "voicetype"
     else:  # Linux and other Unix-like systems
@@ -123,9 +236,11 @@ def initialize_telemetry(
                 # Open file in append mode
                 trace_file_handle = open(trace_file_path, "a", encoding="utf-8")
 
-                # Use ConsoleSpanExporter to write to file
-                # This writes JSON-formatted spans, one per line (JSONL format)
-                file_exporter = ConsoleSpanExporter(out=trace_file_handle)
+                # Use our custom OTLP JSON exporter
+                # This writes proper OTLP JSON format, one span per line (JSONL format)
+                file_exporter = OTLPJSONFileExporter(
+                    file_handle=trace_file_handle, resource=resource
+                )
                 file_processor = BatchSpanProcessor(file_exporter)
                 _tracer_provider.add_span_processor(file_processor)
                 exporters_configured.append(f"File({trace_file_path})")
@@ -154,7 +269,9 @@ def initialize_telemetry(
             f"exporters={', '.join(exporters_configured)}"
         )
     except Exception as e:
-        logger.warning(f"Failed to initialize telemetry: {e}. Continuing without tracing.")
+        logger.warning(
+            f"Failed to initialize telemetry: {e}. Continuing without tracing."
+        )
         _tracer = None
         _tracer_provider = None
 
