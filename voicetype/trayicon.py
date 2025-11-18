@@ -155,17 +155,17 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
 
     def _toggle_enabled(_icon: pystray._base.Icon, _item: Item):
         # Thread-safe toggling via State
-        is_enabled = ctx.state.state != State.IDLE
+        is_enabled = ctx.state.state == State.ENABLED
         if is_enabled:
-            ctx.state.state = State.IDLE
+            ctx.state.state = State.DISABLED
             _apply_disabled_icon(icon)
         else:
-            ctx.state.state = State.LISTENING
+            ctx.state.state = State.ENABLED
             _apply_enabled_icon(icon)
         _icon.menu = _build_menu(ctx, icon)
         _icon.update_menu()
 
-    is_enabled = ctx.state.state != State.IDLE
+    is_enabled = ctx.state.state == State.ENABLED
     enable_label = "Disable" if is_enabled else "Enable"
 
     # Build menu items list
@@ -468,7 +468,7 @@ def create_tray(ctx: AppContext) -> pystray.Icon:
 
     # Initialize icon appearance according to enabled state
     try:
-        is_enabled = ctx.state.state != State.IDLE
+        is_enabled = ctx.state.state == State.ENABLED
         if is_enabled:
             _apply_enabled_icon(icon)
         else:

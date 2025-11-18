@@ -2,7 +2,6 @@ import argparse
 import os
 import platform
 import sys
-import threading
 from pathlib import Path
 
 from loguru import logger
@@ -201,7 +200,8 @@ def main():
             telemetry_enabled=settings.telemetry.enabled,
             trace_file_path=trace_file_path,
         )
-        ctx.state.state = State.LISTENING
+        # Start with app enabled
+        ctx.state.state = State.ENABLED
 
         # Create tray icon (but don't run it yet)
         tray = create_tray(ctx)
@@ -246,39 +246,25 @@ def main():
             # Create hotkey callbacks that delegate to HotkeyDispatcher
             def on_hotkey_press():
                 """Hotkey press handler - delegates to pipeline manager."""
-                if ctx.state.state == State.LISTENING:
-                    ctx.state.state = State.RECORDING
-                    logger.debug("Hotkey pressed: State -> RECORDING")
+                if ctx.state.state == State.ENABLED:
+                    logger.debug("Hotkey pressed")
                     play_sound(START_RECORD_SOUND)
                     # Trigger pipeline via hotkey dispatcher
                     hotkey_dispatcher._on_press(hotkey_string)
                 else:
-                    logger.warning(
-                        f"Hotkey pressed in unexpected state: {ctx.state.state}"
+                    logger.debug(
+                        f"Hotkey pressed but app is disabled (state: {ctx.state.state})"
                     )
 
             def on_hotkey_release():
                 """Hotkey release handler - delegates to pipeline manager."""
-                if ctx.state.state == State.RECORDING:
-                    ctx.state.state = State.PROCESSING
-                    logger.debug("Hotkey released: State -> PROCESSING")
+                if ctx.state.state == State.ENABLED:
+                    logger.debug("Hotkey released")
                     # Signal release to hotkey dispatcher
                     hotkey_dispatcher._on_release(hotkey_string)
-
-                    # State will be reset to LISTENING by pipeline stages
-                    # Use a short delay to allow pipeline to complete
-                    def reset_state():
-                        import time
-
-                        time.sleep(0.5)
-                        if ctx.state.state == State.PROCESSING:
-                            ctx.state.state = State.LISTENING
-                            logger.debug("State -> LISTENING")
-
-                    threading.Thread(target=reset_state, daemon=True).start()
                 else:
-                    logger.warning(
-                        f"Hotkey released in unexpected state: {ctx.state.state}"
+                    logger.debug(
+                        f"Hotkey released but app is disabled (state: {ctx.state.state})"
                     )
 
             # Create platform-specific listener
