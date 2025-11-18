@@ -17,7 +17,6 @@ import sounddevice as sd
 import soundfile as sf
 from loguru import logger
 
-from voicetype.pipeline import Resource
 from voicetype.pipeline.context import PipelineContext
 from voicetype.pipeline.stage_registry import STAGE_REGISTRY, PipelineStage
 
@@ -48,7 +47,7 @@ class RecordAudio(PipelineStage[None, Optional[str]]):
     - audio_format: Audio format for recordings (default: "wav")
     """
 
-    required_resources = {Resource.AUDIO_INPUT}
+    required_resources = {}
 
     # RMS tracking for volume monitoring
     max_rms = 0

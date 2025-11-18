@@ -61,7 +61,6 @@ class PipelineExecutor:
         pipeline_name: str,
         stages: List[Dict[str, Any]],
         trigger_event: Optional[TriggerEvent] = None,
-        initial_metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """Execute a pipeline asynchronously.
 
@@ -69,7 +68,6 @@ class PipelineExecutor:
             pipeline_name: Name of the pipeline for logging
             stages: List of stage configurations (each with 'func' key)
             trigger_event: Optional trigger event (hotkey/timer)
-            initial_metadata: Optional initial metadata for the pipeline
 
         Returns:
             Pipeline ID if execution started, None if resources unavailable
@@ -105,7 +103,6 @@ class PipelineExecutor:
             pipeline_name,
             stages,
             trigger_event,
-            initial_metadata or {},
         )
 
         # Track active pipeline
@@ -123,7 +120,6 @@ class PipelineExecutor:
         pipeline_name: str,
         stages: List[Dict[str, Any]],
         trigger_event: Optional[TriggerEvent],
-        metadata: Dict[str, Any],
     ):
         """Execute pipeline stages sequentially (runs on worker thread).
 
@@ -135,7 +131,6 @@ class PipelineExecutor:
             pipeline_name: Name of the pipeline for logging
             stages: List of stage configurations
             trigger_event: Optional trigger event
-            metadata: Initial metadata dictionary
         """
         # Get tracer for OpenTelemetry spans
         tracer = get_tracer()
@@ -146,7 +141,6 @@ class PipelineExecutor:
             icon_controller=self.icon_controller,
             trigger_event=trigger_event,
             cancel_requested=threading.Event(),
-            metadata=metadata,
         )
 
         result = None

@@ -222,14 +222,12 @@ class PipelineManager:
         self,
         pipeline_name: str,
         trigger_event: Optional[TriggerEvent] = None,
-        metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """Trigger a pipeline execution.
 
         Args:
             pipeline_name: Name of the pipeline to execute
             trigger_event: Optional trigger event
-            metadata: Optional initial metadata
 
         Returns:
             Pipeline execution ID if started, None if resources unavailable
@@ -247,7 +245,6 @@ class PipelineManager:
             pipeline_name=pipeline.name,
             stages=pipeline.stages,
             trigger_event=trigger_event,
-            initial_metadata=metadata,
         )
 
     def list_pipelines(self) -> List[str]:
