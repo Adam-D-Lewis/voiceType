@@ -40,6 +40,7 @@ class PipelineExecutor:
         resource_manager: ResourceManager,
         icon_controller: IconController,
         max_workers: int = 4,
+        app_state=None,
     ):
         """Initialize the pipeline executor.
 
@@ -47,9 +48,11 @@ class PipelineExecutor:
             resource_manager: Manager for resource locking
             icon_controller: Controller for system tray icon
             max_workers: Maximum number of concurrent pipeline workers
+            app_state: Optional AppState for checking enabled/disabled state
         """
         self.resource_manager = resource_manager
         self.icon_controller = icon_controller
+        self.app_state = app_state
         self.executor = ThreadPoolExecutor(
             max_workers=max_workers, thread_name_prefix="pipeline"
         )
@@ -308,8 +311,17 @@ class PipelineExecutor:
             # Release acquired resources
             self.resource_manager.release(pipeline_id)
 
-            # Reset icon
-            self.icon_controller.set_icon("idle")
+            # Reset icon based on app state
+            if self.app_state:
+                from voicetype.state import State
+
+                if self.app_state.state == State.ENABLED:
+                    self.icon_controller.set_icon("idle")
+                else:
+                    self.icon_controller.set_icon("disabled")
+            else:
+                # Fallback if no app_state provided
+                self.icon_controller.set_icon("idle")
 
             # Span will be automatically ended by the context manager
 

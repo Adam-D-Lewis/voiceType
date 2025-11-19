@@ -159,6 +159,9 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
         if is_enabled:
             ctx.state.state = State.DISABLED
             _apply_disabled_icon(icon)
+            # Cancel all active pipelines when disabling
+            if ctx.pipeline_manager:
+                ctx.pipeline_manager.executor.cancel_all_pipelines()
         else:
             ctx.state.state = State.ENABLED
             _apply_enabled_icon(icon)

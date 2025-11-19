@@ -196,6 +196,7 @@ def main():
         ctx = AppContext(
             state=AppState(),
             hotkey_listener=None,  # Will be set later
+            pipeline_manager=None,  # Will be set later
             log_file_path=log_file_path,
             telemetry_enabled=settings.telemetry.enabled,
             trace_file_path=trace_file_path,
@@ -215,7 +216,11 @@ def main():
             resource_manager=resource_manager,
             icon_controller=icon_controller,
             max_workers=4,
+            app_state=ctx.state,
         )
+
+        # Set pipeline_manager in context
+        ctx.pipeline_manager = pipeline_manager
 
         # Load pipelines
         if settings.pipelines:
@@ -258,14 +263,10 @@ def main():
 
             def on_hotkey_release():
                 """Hotkey release handler - delegates to pipeline manager."""
-                if ctx.state.state == State.ENABLED:
-                    logger.debug("Hotkey released")
-                    # Signal release to hotkey dispatcher
-                    hotkey_dispatcher._on_release(hotkey_string)
-                else:
-                    logger.debug(
-                        f"Hotkey released but app is disabled (state: {ctx.state.state})"
-                    )
+                # Always process release events to cancel active pipelines
+                logger.debug("Hotkey released")
+                # Signal release to hotkey dispatcher
+                hotkey_dispatcher._on_release(hotkey_string)
 
             # Create platform-specific listener
             hotkey_listener = get_platform_listener(
