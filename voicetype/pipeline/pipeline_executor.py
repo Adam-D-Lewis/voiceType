@@ -54,6 +54,9 @@ class PipelineExecutor:
             max_workers=max_workers, thread_name_prefix="pipeline"
         )
         self.active_pipelines: Dict[str, Future] = {}  # pipeline_id -> Future
+        self.cancel_events: Dict[str, threading.Event] = (
+            {}
+        )  # pipeline_id -> cancel_event
         self._shutdown = False
 
     def execute_pipeline(
@@ -96,6 +99,10 @@ class PipelineExecutor:
             )
             return None
 
+        # Create cancel event for this pipeline
+        cancel_event = threading.Event()
+        self.cancel_events[pipeline_id] = cancel_event
+
         # Submit to thread pool (returns immediately)
         future = self.executor.submit(
             self._execute_pipeline,
@@ -103,6 +110,7 @@ class PipelineExecutor:
             pipeline_name,
             stages,
             trigger_event,
+            cancel_event,
         )
 
         # Track active pipeline
@@ -120,6 +128,7 @@ class PipelineExecutor:
         pipeline_name: str,
         stages: List[Dict[str, Any]],
         trigger_event: Optional[TriggerEvent],
+        cancel_event: threading.Event,
     ):
         """Execute pipeline stages sequentially (runs on worker thread).
 
@@ -131,16 +140,17 @@ class PipelineExecutor:
             pipeline_name: Name of the pipeline for logging
             stages: List of stage configurations
             trigger_event: Optional trigger event
+            cancel_event: Event to signal cancellation request
         """
         # Get tracer for OpenTelemetry spans
         tracer = get_tracer()
 
-        # Create pipeline context
+        # Create pipeline context with the shared cancel event
         context = PipelineContext(
             config={},
             icon_controller=self.icon_controller,
             trigger_event=trigger_event,
-            cancel_requested=threading.Event(),
+            cancel_requested=cancel_event,
         )
 
         result = None
@@ -315,8 +325,9 @@ class PipelineExecutor:
         except Exception as e:
             logger.error(f"Pipeline {pipeline_id} failed with exception: {e}")
         finally:
-            # Remove from active pipelines
+            # Remove from active pipelines and cancel events
             self.active_pipelines.pop(pipeline_id, None)
+            self.cancel_events.pop(pipeline_id, None)
 
     def cancel_pipeline(self, pipeline_id: str):
         """Cancel a specific running pipeline.
@@ -324,11 +335,33 @@ class PipelineExecutor:
         Args:
             pipeline_id: Pipeline identifier to cancel
         """
+        if pipeline_id in self.cancel_events:
+            # Signal cancellation to the running pipeline
+            self.cancel_events[pipeline_id].set()
+            logger.info(f"Requested cancellation of pipeline {pipeline_id}")
+
         if pipeline_id in self.active_pipelines:
             future = self.active_pipelines[pipeline_id]
             if not future.done():
                 future.cancel()
-                logger.info(f"Cancelled pipeline {pipeline_id}")
+
+    def cancel_all_pipelines(self):
+        """Request cancellation of all active pipelines.
+
+        This signals all running pipelines to stop gracefully by setting
+        their cancel_requested events. Stages should check this event
+        periodically and stop their work when it's set.
+        """
+        if not self.cancel_events:
+            logger.debug("No active pipelines to cancel")
+            return
+
+        logger.info(
+            f"Requesting cancellation of {len(self.cancel_events)} active pipeline(s)"
+        )
+        for pipeline_id, cancel_event in list(self.cancel_events.items()):
+            cancel_event.set()
+            logger.debug(f"Signaled cancellation for pipeline {pipeline_id}")
 
     def shutdown(self, timeout: float = 5.0):
         """Gracefully shutdown pipeline executor with timeout.
@@ -339,7 +372,10 @@ class PipelineExecutor:
         logger.info("Shutting down pipeline executor...")
         self._shutdown = True
 
-        # Cancel all pending futures
+        # Signal all pipelines to cancel gracefully
+        self.cancel_all_pipelines()
+
+        # Also cancel all pending futures
         for future in self.active_pipelines.values():
             if not future.done():
                 future.cancel()

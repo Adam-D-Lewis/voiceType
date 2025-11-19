@@ -22,7 +22,6 @@ def create_test_context():
         icon_controller=MockIconController(),
         trigger_event=None,
         cancel_requested=threading.Event(),
-        metadata={},
     )
 
 

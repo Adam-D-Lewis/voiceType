@@ -56,7 +56,6 @@ class PipelineContext:
         icon_controller: IconController,
         trigger_event: Optional[TriggerEvent] = None,
         cancel_requested: Optional[threading.Event] = None,
-        metadata: Optional[Dict[str, Any]] = None,
     ):
         """Initialize a new pipeline context.
 
