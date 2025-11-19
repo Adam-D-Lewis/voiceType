@@ -7,10 +7,21 @@ import time
 from typing import Optional
 
 from loguru import logger
+from pydantic import BaseModel, Field
 
 from voicetype.pipeline import Resource
 from voicetype.pipeline.context import PipelineContext
 from voicetype.pipeline.stage_registry import STAGE_REGISTRY, PipelineStage
+
+
+class TypeTextConfig(BaseModel):
+    """Configuration for TypeText stage."""
+
+    char_delay: float = Field(
+        default=0.001,
+        ge=0,
+        description="Delay in seconds between each character (increase if letters are scrambled)",
+    )
 
 
 @STAGE_REGISTRY.register
@@ -35,10 +46,16 @@ class TypeText(PipelineStage[Optional[str], None]):
         """Initialize the type text stage.
 
         Args:
-            config: Stage-specific configuration
+            config: Stage-specific configuration dict
+
+        Raises:
+            ValidationError: If config validation fails
         """
-        self.config = config
-        self.char_delay = config.get("char_delay", 0.001)
+        # Parse and validate config
+        self.cfg = TypeTextConfig(**config)
+
+        # Keep char_delay accessible for compatibility
+        self.char_delay = self.cfg.char_delay
 
     def execute(self, input_data: Optional[str], context: PipelineContext) -> None:
         """Execute text typing.

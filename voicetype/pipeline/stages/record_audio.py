@@ -10,12 +10,13 @@ import sys
 import tempfile
 import threading
 import time
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
 from loguru import logger
+from pydantic import BaseModel, Field, field_validator
 
 from voicetype.pipeline.context import PipelineContext
 from voicetype.pipeline.stage_registry import STAGE_REGISTRY, PipelineStage
@@ -26,6 +27,29 @@ MIN_RMS_RANGE = 0.001  # Minimum RMS range to avoid division by zero
 
 class SoundDeviceError(Exception):
     """Exception raised for audio device and sound processing errors."""
+
+
+class RecordAudioConfig(BaseModel):
+    """Configuration for RecordAudio stage."""
+
+    max_duration: float = Field(
+        default=60.0,
+        gt=0,
+        description="Maximum recording duration in seconds",
+    )
+    minimum_duration: float = Field(
+        default=0.25,
+        ge=0,
+        description="Minimum duration to process in seconds",
+    )
+    device_name: Optional[str] = Field(
+        default=None,
+        description="Optional audio device name (None for system default)",
+    )
+    audio_format: Literal["wav", "mp3", "webm"] = Field(
+        default="wav",
+        description="Audio format for recordings",
+    )
 
 
 @STAGE_REGISTRY.register
@@ -58,20 +82,19 @@ class RecordAudio(PipelineStage[None, Optional[str]]):
         """Initialize the record audio stage.
 
         Args:
-            config: Stage-specific configuration
-        """
-        self.config = config
-        self.audio_format = config.get("audio_format", "wav")
+            config: Stage-specific configuration dict
 
-        if self.audio_format not in ["wav", "mp3", "webm"]:
-            raise ValueError(
-                f"Unsupported audio format: {self.audio_format}. "
-                f"Supported formats are 'wav', 'mp3', and 'webm'."
-            )
+        Raises:
+            ValidationError: If config validation fails
+        """
+        # Parse and validate config
+        self.cfg = RecordAudioConfig(**config)
+
+        # Keep audio_format accessible for compatibility
+        self.audio_format = self.cfg.audio_format
 
         # Initialize audio device
-        device_name = config.get("device_name")
-        self.device_id = self._find_device_id(device_name)
+        self.device_id = self._find_device_id(self.cfg.device_name)
         logger.debug(f"Using input device ID: {self.device_id}")
 
         # Get sample rate from device
@@ -303,32 +326,40 @@ class RecordAudio(PipelineStage[None, Optional[str]]):
         Returns:
             Filepath to audio file or None if recording was too short
         """
+        # Check for cancellation before starting
+        if context.cancel_requested.is_set():
+            logger.info("Recording cancelled before start")
+            return None
+
         # Start recording
         self._start_recording()
         context.icon_controller.set_icon("recording")
         logger.debug("Recording started")
 
-        # Wait for trigger completion (e.g., key release)
-        max_duration = self.config.get("max_duration", 60.0)
-
+        # Wait for trigger completion (e.g., key release) or cancellation
         if context.trigger_event:
-            context.trigger_event.wait_for_completion(timeout=max_duration)
+            context.trigger_event.wait_for_completion(timeout=self.cfg.max_duration)
         else:
             # No trigger event: wait for cancellation or timeout
-            context.cancel_requested.wait(timeout=max_duration)
+            context.cancel_requested.wait(timeout=self.cfg.max_duration)
 
         # Stop recording
         filename, duration = self._stop_recording()
+
+        # If cancelled, we still return None to stop the pipeline
+        if context.cancel_requested.is_set():
+            logger.info("Recording cancelled, discarding audio")
+            return None
+
         logger.debug(f"Recording stopped: duration={duration:.2f}s")
 
         # Store filepath for cleanup
         self.current_recording = filename
 
         # Filter out too-short recordings
-        min_duration = self.config.get("minimum_duration", 0.25)
-        if duration < min_duration:
+        if duration < self.cfg.minimum_duration:
             logger.info(
-                f"Recording too short ({duration:.2f}s < {min_duration}s), filtering out"
+                f"Recording too short ({duration:.2f}s < {self.cfg.minimum_duration}s), filtering out"
             )
             return None
 

@@ -89,6 +89,10 @@ minimum_duration = 0.25  # Minimum audio duration in seconds
 [stage_configs.Transcribe_local]
 stage_class = "Transcribe"
 provider = "local"  # Use local faster-whisper model
+# Local provider options (validated via Pydantic):
+model = "large-v3-turbo"  # Whisper model: "tiny", "base", "small", "medium", "large-v3", "large-v3-turbo"
+language = "en"  # Language code: "en", "es", "fr", "de", etc.
+device = "cuda"  # Device for inference: "cuda" (GPU) or "cpu"
 
 [stage_configs.CorrectTypos_default]
 stage_class = "CorrectTypos"

@@ -54,13 +54,22 @@ rotation_max_size_mb = 10  # Rotate when file reaches this size in MB (default: 
 stage_class = "RecordAudio"
 minimum_duration = 0.25  # Minimum audio duration in seconds
 
+# Local transcription with faster-whisper (offline, no API key needed)
 [stage_configs.Transcribe_local]
 stage_class = "Transcribe"
-provider = "local"  # Use local faster-whisper model
+provider = "local"
+# Options below are specific to the "local" provider:
+model = "large-v3-turbo"  # Whisper model: "tiny", "base", "small", "medium", "large-v3", "large-v3-turbo"
+language = "en"  # Language code: "en", "es", "fr", "de", etc.
+device = "cuda"  # Device for inference: "cuda" (GPU) or "cpu"
 
+# Cloud transcription via LiteLLM/OpenAI (requires OPENAI_API_KEY)
 [stage_configs.Transcribe_cloud]
 stage_class = "Transcribe"
-provider = "litellm"  # Use cloud-based transcription (requires API key)
+provider = "litellm"
+# Options below are specific to the "litellm" provider:
+language = "en"  # Language code for transcription
+# Note: model and device are not used with litellm provider
 
 [stage_configs.CorrectTypos_default]
 stage_class = "CorrectTypos"
@@ -180,7 +189,11 @@ stages = [
 #
 # Transcription Provider Options:
 #   - "local": Uses faster-whisper for local transcription (faster, offline)
+#     - model: Whisper model size (tiny, base, small, medium, large-v3, large-v3-turbo)
+#     - device: "cuda" for GPU or "cpu" for CPU inference
+#     - language: Language code (en, es, fr, de, etc.)
 #   - "litellm": Uses cloud-based transcription (requires API key)
+#     - language: Language code for transcription
 #
 # LLM Model Options (for LLMAgent stage):
 #   - Local: "ollama/llama3.2", "ollama/mistral", "ollama/phi3" (requires Ollama installed)

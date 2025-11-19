@@ -32,6 +32,9 @@ class Settings(BaseSettings):
         },
         "Transcribe": {
             "provider": "local",
+            "model": "tiny",
+            "language": "en",
+            "device": "cpu",
         },
         "CorrectTypos": {
             "case_sensitive": False,

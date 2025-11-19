@@ -4,12 +4,55 @@ This stage processes text through an LLM agent using LiteLLM.
 Supports both local (Ollama) and remote (OpenAI, Anthropic, etc.) providers.
 """
 
-from typing import Optional
+from typing import List, Optional
 
 from loguru import logger
+from pydantic import BaseModel, Field, field_validator
 
 from voicetype.pipeline.context import PipelineContext
 from voicetype.pipeline.stage_registry import STAGE_REGISTRY, PipelineStage
+
+DEFAULT_JARVIS_PROMPT = """You are Jarvis.  You are a part of a speech to text pipeline where a user speaks, the audio is transcribed, and eventually typed out on the keyboard. The user has left a message for you to modify the text that he said in some way before it is typed.  Modify the text as requested and output the modified text.  Output nothing else b/c exactly what you output is what will be typed.  Make sure to remove references to yourself from the output.  The instructions for you should not be part of the output.
+
+e.g.
+User: Hello, Administrator. Okay, uh, actually, Jarvis, make this sound like, um, a cockney accent and spell it as if I had a heavy cockney accent.
+Output: 'Ello Admin.'"""
+
+
+class LLMAgentConfig(BaseModel):
+    """Configuration for LLMAgent stage."""
+
+    model: str = Field(
+        description="Model string (e.g., 'gpt-4', 'claude-3-5-sonnet-20241022', 'ollama/llama3.2')",
+    )
+    system_prompt: str = Field(
+        default=DEFAULT_JARVIS_PROMPT,
+        description="Instructions for the LLM",
+    )
+    trigger_keywords: List[str] = Field(
+        default_factory=list,
+        description="Keywords that must be present to invoke LLM (case-insensitive)",
+    )
+    temperature: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description="Controls randomness (0.0-2.0)",
+    )
+    max_tokens: Optional[int] = Field(
+        default=None,
+        gt=0,
+        description="Maximum response length in tokens",
+    )
+    timeout: int = Field(
+        default=30,
+        gt=0,
+        description="Request timeout in seconds",
+    )
+    fallback_on_error: bool = Field(
+        default=True,
+        description="Return original input on error (True) or None (False)",
+    )
 
 
 @STAGE_REGISTRY.register
@@ -40,30 +83,22 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
         """Initialize the LLM agent stage.
 
         Args:
-            config: Stage-specific configuration
+            config: Stage-specific configuration dict
+
+        Raises:
+            ValidationError: If config validation fails (e.g., model not provided)
         """
-        self.config = config
+        # Parse and validate config
+        self.cfg = LLMAgentConfig(**config)
 
-        # Required parameters
-        if "model" not in config:
-            raise ValueError("LLMAgent stage requires 'model' in config")
-
-        self.model = config["model"]
-        self.system_prompt = config.get(
-            "system_prompt",
-            """You are Jarvis.  You are a part of a speech to text pipeline where a user speaks, the audio is transcribed, and eventually typed out on the keyboard. The user has left a message for you to modify the text that he said in some way before it is typed.  Modify the text as requested and output the modified text.  Output nothing else b/c exactly what you output is what will be typed.  Make sure to remove references to yourself from the output.  The instructions for you should not be part of the output.
-
-        e.g.
-        User: Hello, Administrator. Okay, uh, actually, Jarvis, make this sound like, um, a cockney accent and spell it as if I had a heavy cockney accent.
-        Output: 'Ello Admin.'""",
-        )
-
-        # Optional parameters
-        self.trigger_keywords = config.get("trigger_keywords", [])
-        self.temperature = config.get("temperature")
-        self.max_tokens = config.get("max_tokens")
-        self.timeout = config.get("timeout", 30)
-        self.fallback_on_error = config.get("fallback_on_error", True)
+        # Keep attributes accessible for compatibility
+        self.model = self.cfg.model
+        self.system_prompt = self.cfg.system_prompt
+        self.trigger_keywords = self.cfg.trigger_keywords
+        self.temperature = self.cfg.temperature
+        self.max_tokens = self.cfg.max_tokens
+        self.timeout = self.cfg.timeout
+        self.fallback_on_error = self.cfg.fallback_on_error
 
         # Warn if trigger keywords are not configured
         if not self.trigger_keywords:
