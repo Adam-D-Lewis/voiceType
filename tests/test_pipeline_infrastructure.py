@@ -119,18 +119,6 @@ class TestPipelineContext:
         assert context.icon_controller is icon_controller
         assert context.trigger_event is trigger
         assert isinstance(context.cancel_requested, threading.Event)
-        assert context.metadata == {}
-
-    def test_context_with_metadata(self):
-        """Test context accepts custom metadata."""
-        context = PipelineContext(
-            config={},
-            icon_controller=MockIconController(),
-            metadata={"speech_processor": "mock_processor"},
-        )
-
-        assert "speech_processor" in context.metadata
-        assert context.metadata["speech_processor"] == "mock_processor"
 
 
 class TestResourceManager:
@@ -142,24 +130,24 @@ class TestResourceManager:
         pipeline_id = "test_pipeline_1"
 
         # Acquire resource
-        result = manager.acquire(pipeline_id, {Resource.AUDIO_INPUT}, blocking=False)
+        result = manager.acquire(pipeline_id, {Resource.KEYBOARD}, blocking=False)
         assert result is True
 
         # Resource should be locked
-        assert Resource.AUDIO_INPUT in manager.get_blocked_by({Resource.AUDIO_INPUT})
+        assert Resource.KEYBOARD in manager.get_blocked_by({Resource.KEYBOARD})
 
         # Release resource
         manager.release(pipeline_id)
 
         # Resource should be free
-        assert len(manager.get_blocked_by({Resource.AUDIO_INPUT})) == 0
+        assert len(manager.get_blocked_by({Resource.KEYBOARD})) == 0
 
     def test_acquire_multiple_resources_atomically(self):
         """Test acquiring multiple resources atomically."""
         manager = ResourceManager()
         pipeline_id = "test_pipeline_2"
 
-        resources = {Resource.AUDIO_INPUT, Resource.KEYBOARD}
+        resources = {Resource.CLIPBOARD, Resource.KEYBOARD}
         result = manager.acquire(pipeline_id, resources, blocking=False)
 
         assert result is True
@@ -172,8 +160,8 @@ class TestResourceManager:
         """Test two pipelines can run with different resources."""
         manager = ResourceManager()
 
-        # Pipeline 1 acquires audio
-        result1 = manager.acquire("pipeline_1", {Resource.AUDIO_INPUT}, blocking=False)
+        # Pipeline 1 acquires clipboard
+        result1 = manager.acquire("pipeline_1", {Resource.CLIPBOARD}, blocking=False)
         assert result1 is True
 
         # Pipeline 2 can acquire keyboard (different resource)
@@ -181,7 +169,7 @@ class TestResourceManager:
         assert result2 is True
 
         # Both should be holding their resources
-        assert manager.get_blocked_by({Resource.AUDIO_INPUT}) == {Resource.AUDIO_INPUT}
+        assert manager.get_blocked_by({Resource.CLIPBOARD}) == {Resource.CLIPBOARD}
         assert manager.get_blocked_by({Resource.KEYBOARD}) == {Resource.KEYBOARD}
 
         manager.release("pipeline_1")
@@ -191,21 +179,21 @@ class TestResourceManager:
         """Test two pipelines cannot acquire same resource."""
         manager = ResourceManager()
 
-        # Pipeline 1 acquires audio
-        result1 = manager.acquire("pipeline_1", {Resource.AUDIO_INPUT}, blocking=False)
+        # Pipeline 1 acquires clipboard
+        result1 = manager.acquire("pipeline_1", {Resource.CLIPBOARD}, blocking=False)
         assert result1 is True
 
-        # Pipeline 2 cannot acquire audio (same resource)
-        result2 = manager.acquire("pipeline_2", {Resource.AUDIO_INPUT}, blocking=False)
+        # Pipeline 2 cannot acquire clipboard (same resource)
+        result2 = manager.acquire("pipeline_2", {Resource.CLIPBOARD}, blocking=False)
         assert result2 is False
 
         # Only pipeline 1 should hold the resource
-        assert manager.get_blocked_by({Resource.AUDIO_INPUT}) == {Resource.AUDIO_INPUT}
+        assert manager.get_blocked_by({Resource.CLIPBOARD}) == {Resource.CLIPBOARD}
 
         manager.release("pipeline_1")
 
         # Now pipeline 2 can acquire it
-        result3 = manager.acquire("pipeline_2", {Resource.AUDIO_INPUT}, blocking=False)
+        result3 = manager.acquire("pipeline_2", {Resource.CLIPBOARD}, blocking=False)
         assert result3 is True
 
         manager.release("pipeline_2")
@@ -217,15 +205,15 @@ class TestResourceManager:
         # Pipeline 1 acquires keyboard
         manager.acquire("pipeline_1", {Resource.KEYBOARD}, blocking=False)
 
-        # Pipeline 2 tries to acquire both audio and keyboard
-        # Should fail because keyboard is taken, and should not hold audio either
+        # Pipeline 2 tries to acquire both clipboard and keyboard
+        # Should fail because keyboard is taken, and should not hold clipboard either
         result = manager.acquire(
-            "pipeline_2", {Resource.AUDIO_INPUT, Resource.KEYBOARD}, blocking=False
+            "pipeline_2", {Resource.CLIPBOARD, Resource.KEYBOARD}, blocking=False
         )
         assert result is False
 
-        # Audio should still be available (not locked by pipeline 2)
-        blocked = manager.get_blocked_by({Resource.AUDIO_INPUT, Resource.KEYBOARD})
+        # Clipboard should still be available (not locked by pipeline 2)
+        blocked = manager.get_blocked_by({Resource.CLIPBOARD, Resource.KEYBOARD})
         assert blocked == {Resource.KEYBOARD}  # Only keyboard is locked
 
         manager.release("pipeline_1")
@@ -242,7 +230,7 @@ class TestStageRegistry:
         class TestStage:
             """Test stage"""
 
-            required_resources = {Resource.AUDIO_INPUT}
+            required_resources = {Resource.KEYBOARD}
 
             def __init__(self, config: dict, metadata: dict):
                 pass
@@ -255,7 +243,7 @@ class TestStageRegistry:
         assert metadata.input_type == type(None)
         assert metadata.output_type == str
         assert metadata.description == "Test stage"
-        assert metadata.required_resources == {Resource.AUDIO_INPUT}
+        assert metadata.required_resources == {Resource.KEYBOARD}
 
     def test_register_duplicate_stage_fails(self):
         """Test registering duplicate stage name fails."""

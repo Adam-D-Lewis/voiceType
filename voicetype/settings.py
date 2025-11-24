@@ -3,7 +3,22 @@ from typing import Any, Dict, List, Optional
 
 import toml
 from loguru import logger
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings
+
+
+class TelemetryConfig(BaseModel):
+    """Telemetry configuration for OpenTelemetry tracing."""
+
+    enabled: bool = False
+    service_name: str = "voicetype"
+    export_to_file: bool = True
+    trace_file: Optional[str] = None
+    otlp_endpoint: Optional[str] = None
+
+    # File rotation settings
+    rotation_enabled: bool = True
+    rotation_max_size_mb: int = 10  # Rotate when file reaches this size in MB
 
 
 class Settings(BaseSettings):
@@ -17,6 +32,9 @@ class Settings(BaseSettings):
         },
         "Transcribe": {
             "provider": "local",
+            "model": "tiny",
+            "language": "en",
+            "device": "cpu",
         },
         "CorrectTypos": {
             "case_sensitive": False,
@@ -41,6 +59,9 @@ class Settings(BaseSettings):
             ],
         }
     ]
+
+    # Telemetry configuration (enabled by default with file export)
+    telemetry: TelemetryConfig = TelemetryConfig()
 
     # Path to log file (uses platform defaults if not specified)
     log_file: Optional[Path] = None

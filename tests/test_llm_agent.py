@@ -1,6 +1,7 @@
 """Unit tests for LLMAgent pipeline stage."""
 
 import pytest
+from pydantic import ValidationError
 
 from voicetype.pipeline import PipelineContext
 from voicetype.pipeline.stages.llm_agent import LLMAgent
@@ -22,7 +23,6 @@ def create_test_context():
         icon_controller=MockIconController(),
         trigger_event=None,
         cancel_requested=threading.Event(),
-        metadata={},
     )
 
 
@@ -34,7 +34,7 @@ class TestLLMAgent:
         config = {
             "system_prompt": "Test prompt",
         }
-        with pytest.raises(ValueError, match="requires 'model'"):
+        with pytest.raises(ValidationError, match="Field required"):
             LLMAgent(config)
 
     def test_initialization_with_default_system_prompt(self):

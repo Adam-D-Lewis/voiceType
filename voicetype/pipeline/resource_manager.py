@@ -18,7 +18,6 @@ class Resource(Enum):
     This enables concurrent pipeline execution when resources don't conflict.
     """
 
-    AUDIO_INPUT = "audio_input"  # Microphone/audio capture device
     KEYBOARD = "keyboard"  # Virtual keyboard for typing
     CLIPBOARD = "clipboard"  # System clipboard
 

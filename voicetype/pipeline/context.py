@@ -48,7 +48,6 @@ class PipelineContext:
     - Icon controller for updating system tray
     - Optional trigger event (for hotkey/timer triggers)
     - Cancellation event
-    - Shared metadata dictionary for inter-stage communication
     """
 
     def __init__(
@@ -57,7 +56,6 @@ class PipelineContext:
         icon_controller: IconController,
         trigger_event: Optional[TriggerEvent] = None,
         cancel_requested: Optional[threading.Event] = None,
-        metadata: Optional[Dict[str, Any]] = None,
     ):
         """Initialize a new pipeline context.
 
@@ -66,10 +64,8 @@ class PipelineContext:
             icon_controller: Interface to update system tray icon
             trigger_event: Optional trigger event (hotkey/timer)
             cancel_requested: Event set when pipeline should be cancelled
-            metadata: Shared data between stages (e.g., speech_processor)
         """
         self.config = config
         self.icon_controller = icon_controller
         self.trigger_event = trigger_event
         self.cancel_requested = cancel_requested or threading.Event()
-        self.metadata = metadata or {}

@@ -8,9 +8,10 @@ import enum
 import os
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional, Union
 
 from loguru import logger
+from pydantic import BaseModel, Field
 from pydub import AudioSegment
 from pydub.exceptions import CouldntDecodeError, CouldntEncodeError
 
@@ -29,6 +30,39 @@ class TranscriptionError(Exception):
     """Exception raised for transcription errors."""
 
 
+class LocalTranscribeConfig(BaseModel):
+    """Configuration for local transcription provider."""
+
+    provider: Literal["local"] = "local"
+    model: str = Field(
+        default="large-v3-turbo",
+        description="Whisper model: tiny, base, small, medium, large-v3, large-v3-turbo",
+    )
+    language: str = Field(default="en", description="Language code (e.g., en, es, fr)")
+    device: Literal["cuda", "cpu"] = Field(
+        default="cuda", description="Device for inference"
+    )
+    audio_format: str = Field(default="wav", description="Audio format")
+    history: Optional[str] = Field(
+        default=None, description="Optional context (unused for local)"
+    )
+
+
+class LiteLLMTranscribeConfig(BaseModel):
+    """Configuration for LiteLLM transcription provider."""
+
+    provider: Literal["litellm"] = "litellm"
+    language: str = Field(default="en", description="Language code for transcription")
+    audio_format: str = Field(default="wav", description="Audio format")
+    history: Optional[str] = Field(
+        default=None, description="Optional context for better accuracy"
+    )
+
+
+# Union type for discriminated configuration
+TranscribeConfigUnion = Union[LocalTranscribeConfig, LiteLLMTranscribeConfig]
+
+
 @STAGE_REGISTRY.register
 class Transcribe(PipelineStage[Optional[str], Optional[str]]):
     """Transcribe audio file to text.
@@ -42,8 +76,9 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
 
     Config parameters:
     - provider: STT provider ("local" or "litellm", default: "local")
-    - model: Model name (optional, provider-specific)
+    - model: Model name (default: "large-v3-turbo" for local, provider-specific for litellm)
     - language: Language code (default: "en")
+    - device: Device for local transcription ("cuda" or "cpu", default: "cuda")
     - history: Optional context for better accuracy
     - audio_format: Audio format (default: "wav")
     """
@@ -54,23 +89,42 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         """Initialize the transcribe stage.
 
         Args:
-            config: Stage-specific configuration
+            config: Stage-specific configuration dict
+
+        Raises:
+            ValueError: If config validation fails or provider is unknown
         """
-        self.config = config
-        self.audio_format = config.get("audio_format", "wav")
+        # Parse and validate config based on provider
+        provider = config.get("provider", "local")
+
+        if provider == "local":
+            self.cfg: TranscribeConfigUnion = LocalTranscribeConfig(**config)
+        elif provider == "litellm":
+            self.cfg: TranscribeConfigUnion = LiteLLMTranscribeConfig(**config)
+        else:
+            raise ValueError(
+                f"Unknown provider: {provider}. Must be 'local' or 'litellm'"
+            )
+
+        # Keep audio_format accessible for compatibility
+        self.audio_format = self.cfg.audio_format
 
     def _transcribe_with_local(
         self,
         filename: str,
+        model: str = "large-v3-turbo",
+        language: str = "en",
+        device: str = "cuda",
         history: Optional[str] = None,
-        language: Optional[str] = None,
     ) -> str:
         """Transcribe audio using local Whisper model via speech_recognition.
 
         Args:
             filename: Path to audio file
+            model: Whisper model to use (default: "large-v3-turbo")
+            language: Language code for transcription (default: "en")
+            device: Device to use for inference ("cuda" or "cpu", default: "cuda")
             history: Unused in local transcription
-            language: Unused in local transcription (defaults to English)
 
         Returns:
             str: Transcribed text with leading/trailing whitespace removed
@@ -83,10 +137,10 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         transcribed_text = faster_whisper.recognize(
             None,
             audio_data=audio,
-            model="large-v3-turbo",
-            language="en",
+            model=model,
+            language=language,
             init_options=faster_whisper.InitOptionalParameters(
-                device="cuda",
+                device=device,
             ),
         )
 
@@ -231,32 +285,27 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         context.icon_controller.set_icon("processing")
         logger.debug(f"Transcribing audio file: {input_data}")
 
-        # Get transcription settings
-        provider = self.config.get("provider", "local")
-        history = self.config.get("history")
-        language = self.config.get("language", "en")
+        logger.info(f"Using '{self.cfg.provider}' provider for transcription.")
 
-        # Convert string to enum if needed
-        if isinstance(provider, str):
-            provider = provider.lower()
-            if provider == "litellm":
-                provider_enum = VoiceSettingsProvider.LITELLM
-            elif provider == "local":
-                provider_enum = VoiceSettingsProvider.LOCAL
-            else:
-                raise NotImplementedError(f"Provider '{provider}' is not supported.")
+        # Transcribe based on provider using type-safe config
+        if isinstance(self.cfg, LocalTranscribeConfig):
+            text = self._transcribe_with_local(
+                input_data,
+                model=self.cfg.model,
+                language=self.cfg.language,
+                device=self.cfg.device,
+                history=self.cfg.history,
+            )
+        elif isinstance(self.cfg, LiteLLMTranscribeConfig):
+            text = self._transcribe_with_litellm(
+                input_data,
+                history=self.cfg.history,
+                language=self.cfg.language,
+            )
         else:
-            provider_enum = provider
-
-        logger.info(f"Using '{provider_enum.value}' provider for transcription.")
-
-        # Transcribe based on provider
-        if provider_enum == VoiceSettingsProvider.LITELLM:
-            text = self._transcribe_with_litellm(input_data, history, language)
-        elif provider_enum == VoiceSettingsProvider.LOCAL:
-            text = self._transcribe_with_local(input_data, history, language)
-        else:
-            raise NotImplementedError(f"Provider '{provider_enum}' is not supported.")
+            raise NotImplementedError(
+                f"Provider '{self.cfg.provider}' is not supported."
+            )
 
         # replace multiple spaces with single space
         text = " ".join(text.split())

@@ -110,26 +110,81 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
         except Exception:
             pass
 
+    def _open_traces(_icon: pystray._base.Icon, _item: Item):
+        """Open the trace file in the default application."""
+        from pathlib import Path
+
+        # Get trace file path using the same logic as telemetry.py
+        if hasattr(ctx, "trace_file_path") and ctx.trace_file_path:
+            trace_path = ctx.trace_file_path
+        else:
+            # Fallback to platform defaults (same logic as _get_trace_file_path)
+            if sys.platform == "win32":
+                config_dir = (
+                    Path(os.environ.get("APPDATA", "~/.config")).expanduser()
+                    / "voicetype"
+                )
+            elif sys.platform == "darwin":
+                config_dir = (
+                    Path.home() / "Library" / "Application Support" / "voicetype"
+                )
+            else:  # Linux and other Unix-like systems
+                config_dir = (
+                    Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")).expanduser()
+                    / "voicetype"
+                )
+            trace_path = config_dir / "traces.jsonl"
+
+        # Create trace file if it doesn't exist
+        if not trace_path.exists():
+            try:
+                trace_path.parent.mkdir(parents=True, exist_ok=True)
+                trace_path.touch()
+            except Exception:
+                return
+
+        try:
+            if sys.platform.startswith("linux"):
+                subprocess.Popen(["xdg-open", str(trace_path)])
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(trace_path)])
+            elif sys.platform == "win32":
+                os.startfile(str(trace_path))  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
     def _toggle_enabled(_icon: pystray._base.Icon, _item: Item):
         # Thread-safe toggling via State
-        is_enabled = ctx.state.state != State.IDLE
+        is_enabled = ctx.state.state == State.ENABLED
         if is_enabled:
-            ctx.state.state = State.IDLE
+            ctx.state.state = State.DISABLED
             _apply_disabled_icon(icon)
+            # Cancel all active pipelines when disabling
+            if ctx.pipeline_manager:
+                ctx.pipeline_manager.executor.cancel_all_pipelines()
         else:
-            ctx.state.state = State.LISTENING
+            ctx.state.state = State.ENABLED
             _apply_enabled_icon(icon)
         _icon.menu = _build_menu(ctx, icon)
         _icon.update_menu()
 
-    is_enabled = ctx.state.state != State.IDLE
+    is_enabled = ctx.state.state == State.ENABLED
     enable_label = "Disable" if is_enabled else "Enable"
 
-    return Menu(
+    # Build menu items list
+    menu_items = [
         Item(enable_label, _toggle_enabled, default=True),
         Item("Open Logs", _open_logs),
-        Item("Quit", _quit),
-    )
+    ]
+
+    # Add "Open Traces" menu item if telemetry is enabled
+    if hasattr(ctx, "telemetry_enabled") and ctx.telemetry_enabled:
+        menu_items.append(Item("Open Traces", _open_traces))
+
+    # Add Quit at the end
+    menu_items.append(Item("Quit", _quit))
+
+    return Menu(*menu_items)
 
 
 def set_error_icon(icon: pystray.Icon):
@@ -416,7 +471,7 @@ def create_tray(ctx: AppContext) -> pystray.Icon:
 
     # Initialize icon appearance according to enabled state
     try:
-        is_enabled = ctx.state.state != State.IDLE
+        is_enabled = ctx.state.state == State.ENABLED
         if is_enabled:
             _apply_enabled_icon(icon)
         else:

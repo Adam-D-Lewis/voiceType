@@ -2,7 +2,6 @@ import argparse
 import os
 import platform
 import sys
-import threading
 from pathlib import Path
 
 from loguru import logger
@@ -17,6 +16,11 @@ from voicetype.pipeline import (
 )
 from voicetype.settings import load_settings
 from voicetype.state import AppState, State
+from voicetype.telemetry import (
+    _get_trace_file_path,
+    initialize_telemetry,
+    shutdown_telemetry,
+)
 from voicetype.trayicon import TrayIconController, create_tray
 from voicetype.utils import play_sound, type_text
 
@@ -163,6 +167,17 @@ def main():
     # Configure logging to file + stderr (using custom path from settings if provided)
     log_file_path = configure_logging(settings.log_file)
 
+    # Initialize telemetry (defaults: enabled=True, export_to_file=True)
+    initialize_telemetry(
+        service_name=settings.telemetry.service_name,
+        otlp_endpoint=settings.telemetry.otlp_endpoint,
+        export_to_file=settings.telemetry.export_to_file,
+        trace_file=settings.telemetry.trace_file,
+        enabled=settings.telemetry.enabled,
+        rotation_enabled=settings.telemetry.rotation_enabled,
+        rotation_max_size_mb=settings.telemetry.rotation_max_size_mb,
+    )
+
     logger.info("Starting VoiceType application...")
 
     # Initialize managers
@@ -174,12 +189,20 @@ def main():
 
     try:
         # Create app context for tray icon compatibility
+        trace_file_path = None
+        if settings.telemetry.enabled:
+            trace_file_path = _get_trace_file_path(settings.telemetry.trace_file)
+
         ctx = AppContext(
             state=AppState(),
             hotkey_listener=None,  # Will be set later
+            pipeline_manager=None,  # Will be set later
             log_file_path=log_file_path,
+            telemetry_enabled=settings.telemetry.enabled,
+            trace_file_path=trace_file_path,
         )
-        ctx.state.state = State.LISTENING
+        # Start with app enabled
+        ctx.state.state = State.ENABLED
 
         # Create tray icon (but don't run it yet)
         tray = create_tray(ctx)
@@ -193,7 +216,11 @@ def main():
             resource_manager=resource_manager,
             icon_controller=icon_controller,
             max_workers=4,
+            app_state=ctx.state,
         )
+
+        # Set pipeline_manager in context
+        ctx.pipeline_manager = pipeline_manager
 
         # Load pipelines
         if settings.pipelines:
@@ -224,40 +251,22 @@ def main():
             # Create hotkey callbacks that delegate to HotkeyDispatcher
             def on_hotkey_press():
                 """Hotkey press handler - delegates to pipeline manager."""
-                if ctx.state.state == State.LISTENING:
-                    ctx.state.state = State.RECORDING
-                    logger.debug("Hotkey pressed: State -> RECORDING")
+                if ctx.state.state == State.ENABLED:
+                    logger.debug("Hotkey pressed")
                     play_sound(START_RECORD_SOUND)
                     # Trigger pipeline via hotkey dispatcher
                     hotkey_dispatcher._on_press(hotkey_string)
                 else:
-                    logger.warning(
-                        f"Hotkey pressed in unexpected state: {ctx.state.state}"
+                    logger.debug(
+                        f"Hotkey pressed but app is disabled (state: {ctx.state.state})"
                     )
 
             def on_hotkey_release():
                 """Hotkey release handler - delegates to pipeline manager."""
-                if ctx.state.state == State.RECORDING:
-                    ctx.state.state = State.PROCESSING
-                    logger.debug("Hotkey released: State -> PROCESSING")
-                    # Signal release to hotkey dispatcher
-                    hotkey_dispatcher._on_release(hotkey_string)
-
-                    # State will be reset to LISTENING by pipeline stages
-                    # Use a short delay to allow pipeline to complete
-                    def reset_state():
-                        import time
-
-                        time.sleep(0.5)
-                        if ctx.state.state == State.PROCESSING:
-                            ctx.state.state = State.LISTENING
-                            logger.debug("State -> LISTENING")
-
-                    threading.Thread(target=reset_state, daemon=True).start()
-                else:
-                    logger.warning(
-                        f"Hotkey released in unexpected state: {ctx.state.state}"
-                    )
+                # Always process release events to cancel active pipelines
+                logger.debug("Hotkey released")
+                # Signal release to hotkey dispatcher
+                hotkey_dispatcher._on_release(hotkey_string)
 
             # Create platform-specific listener
             hotkey_listener = get_platform_listener(
@@ -310,6 +319,12 @@ def main():
                 logger.error(
                     f"Error shutting down pipeline manager: {e}", exc_info=True
                 )
+
+        # Shutdown telemetry
+        try:
+            shutdown_telemetry()
+        except Exception as e:
+            logger.error(f"Error shutting down telemetry: {e}", exc_info=True)
 
         logger.info("VoiceType application finished.")
 

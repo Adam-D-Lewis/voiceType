@@ -61,6 +61,7 @@ class PipelineManager:
         resource_manager: ResourceManager,
         icon_controller: IconController,
         max_workers: int = 4,
+        app_state=None,
     ):
         """Initialize the pipeline manager.
 
@@ -68,10 +69,13 @@ class PipelineManager:
             resource_manager: Manager for resource locking
             icon_controller: Controller for system tray icon
             max_workers: Maximum concurrent pipeline workers
+            app_state: Optional AppState for checking enabled/disabled state
         """
         self.resource_manager = resource_manager
         self.icon_controller = icon_controller
-        self.executor = PipelineExecutor(resource_manager, icon_controller, max_workers)
+        self.executor = PipelineExecutor(
+            resource_manager, icon_controller, max_workers, app_state
+        )
         self.pipelines: Dict[str, PipelineConfig] = {}
         self.hotkey_to_pipeline: Dict[str, str] = {}  # hotkey -> pipeline_name
 
@@ -222,14 +226,12 @@ class PipelineManager:
         self,
         pipeline_name: str,
         trigger_event: Optional[TriggerEvent] = None,
-        metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """Trigger a pipeline execution.
 
         Args:
             pipeline_name: Name of the pipeline to execute
             trigger_event: Optional trigger event
-            metadata: Optional initial metadata
 
         Returns:
             Pipeline execution ID if started, None if resources unavailable
@@ -247,7 +249,6 @@ class PipelineManager:
             pipeline_name=pipeline.name,
             stages=pipeline.stages,
             trigger_event=trigger_event,
-            initial_metadata=metadata,
         )
 
     def list_pipelines(self) -> List[str]:

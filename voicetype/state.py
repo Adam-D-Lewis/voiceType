@@ -5,12 +5,15 @@ from enum import Enum, auto
 class State(Enum):
     """
     The state of the application.
+
+    DISABLED: App is disabled and will not respond to hotkeys
+    ENABLED: App is enabled and will respond to hotkeys
+
+    Note: Pipeline execution state is tracked separately by PipelineExecutor.
     """
 
-    IDLE = auto()
-    LISTENING = auto()
-    RECORDING = auto()
-    PROCESSING = auto()
+    DISABLED = auto()
+    ENABLED = auto()
 
 
 class AppState:
@@ -19,7 +22,7 @@ class AppState:
     """
 
     def __init__(self):
-        self._state = State.IDLE
+        self._state = State.DISABLED
         self._lock = threading.Lock()
 
     @property

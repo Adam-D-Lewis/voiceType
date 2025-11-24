@@ -5,12 +5,30 @@ configured typos with their correct spellings.
 """
 
 import re
-from typing import Optional
+from typing import Any, List, Optional
 
 from loguru import logger
+from pydantic import BaseModel, Field
 
 from voicetype.pipeline.context import PipelineContext
 from voicetype.pipeline.stage_registry import STAGE_REGISTRY, PipelineStage
+
+
+class CorrectTyposConfig(BaseModel):
+    """Configuration for CorrectTypos stage."""
+
+    case_sensitive: bool = Field(
+        default=False,
+        description="Default case sensitivity for matching",
+    )
+    whole_word_only: bool = Field(
+        default=True,
+        description="Default whole-word matching",
+    )
+    corrections: List[List[Any]] = Field(
+        default_factory=list,
+        description="List of correction rules: [typo, correction] or [typo, correction, overrides]",
+    )
 
 
 @STAGE_REGISTRY.register
@@ -50,13 +68,17 @@ class CorrectTypos(PipelineStage[Optional[str], Optional[str]]):
         """Initialize the correct typos stage.
 
         Args:
-            config: Stage-specific configuration
-        """
-        self.config = config
+            config: Stage-specific configuration dict
 
-        # Default settings
-        self.case_sensitive = config.get("case_sensitive", False)
-        self.whole_word_only = config.get("whole_word_only", True)
+        Raises:
+            ValidationError: If config validation fails
+        """
+        # Parse and validate config
+        self.cfg = CorrectTyposConfig(**config)
+
+        # Keep settings accessible for internal methods
+        self.case_sensitive = self.cfg.case_sensitive
+        self.whole_word_only = self.cfg.whole_word_only
 
         # Parse and compile correction patterns
         self._patterns = self._parse_and_compile_corrections()
@@ -138,8 +160,8 @@ class CorrectTypos(PipelineStage[Optional[str], Optional[str]]):
         """
         patterns = []
 
-        # Get corrections from config
-        corrections_list = self.config.get("corrections", [])
+        # Get corrections from validated config
+        corrections_list = self.cfg.corrections
 
         for entry in corrections_list:
             if not isinstance(entry, list) or len(entry) < 2:

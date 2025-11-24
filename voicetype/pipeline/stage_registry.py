@@ -103,7 +103,7 @@ class StageRegistry:
             @STAGE_REGISTRY.register
             class RecordAudio:
                 '''Record audio until trigger completes'''
-                required_resources = {Resource.AUDIO_INPUT}
+                required_resources = {Resource.KEYBOARD}
 
                 def execute(self, input_data: None, context: PipelineContext) -> Optional[str]:
                     ...
