@@ -2873,6 +2873,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/madoka-0.7.1-py313hf069bd2_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/markupsafe-3.0.3-py313hd650c13_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/multidict-6.6.3-py313hd650c13_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/nsis-3.11-h2be35fd_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/openai-2.8.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/openssl-3.6.0-h725018a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-25.0-pyh29332c3_1.conda
@@ -6401,6 +6402,13 @@ packages:
   - pkg:pypi/nodeenv?source=hash-mapping
   size: 34574
   timestamp: 1734112236147
+- conda: https://conda.anaconda.org/conda-forge/win-64/nsis-3.11-h2be35fd_0.conda
+  sha256: a9715291511489f877cef73f0d67920a23555e2b269d6b9ba62e2aa1d80e134f
+  md5: 2c37c561b47940ddc507eaa4f67f30ee
+  license: zlib-acknowledgement AND bzip2-1.0.6 AND CPL-1.0 AND LGPL-2.1-or-later
+  purls: []
+  size: 1487291
+  timestamp: 1741518299669
 - pypi: https://files.pythonhosted.org/packages/0c/88/e2eaa6cffb115b85ed7c7c87775cb8bcf0816816bc98ca8dbfa2ee33fe6e/numpy-2.3.5-cp313-cp313-win_amd64.whl
   name: numpy
   version: 2.3.5
@@ -8381,8 +8389,8 @@ packages:
   timestamp: 1761726489722
 - pypi: ./
   name: voicetype2
-  version: 0.1.7.dev34+g3c61986d7.d20251124
-  sha256: 150ede7ca1b81ad58a4fa062ef60569be925ebf0deb6e420a984afafdc8a31f3
+  version: 0.1.7.dev50+g870f2b691.d20251124
+  sha256: 3768668a129c6e0e84ee7f6aa5a8219326dc5c7e81fcaa56d49bfe83a05112d1
   requires_dist:
   - pre-commit ; extra == 'dev'
   - pytest ; extra == 'dev'
