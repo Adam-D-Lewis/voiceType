@@ -85,7 +85,7 @@ ignore = [
 [tool.typos]
 default.extend-ignore-re = ["(?Rm)^.*(#|//)\\s*typos: ignore$"]
 
-[tool.pixi.project]
+[tool.pixi.workspace]
 channels = ["conda-forge", "nvidia"]
 platforms = ["linux-64", "win-64", "osx-64"]
 
@@ -177,7 +177,7 @@ pyinstaller = "*"     # For creating standalone executables
 
 # Windows-specific build dependencies
 [tool.pixi.feature.windows-build.target.win-64.dependencies]
-# NSIS would be installed externally via Chocolatey or download
+nsis = "*"
 
 # Define the 'dev' feature
 [tool.pixi.feature.dev]
