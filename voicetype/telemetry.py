@@ -17,6 +17,8 @@ from typing import IO, Optional, Sequence
 
 from loguru import logger
 from opentelemetry import trace
+
+from voicetype.utils import get_app_data_dir
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
@@ -183,24 +185,11 @@ def _get_trace_file_path(trace_file: Optional[str] = None) -> Path:
     Returns:
         Path to the trace file
     """
-    import sys
-
     if trace_file is not None:
         return Path(trace_file).expanduser().resolve()
 
     # Use platform-specific default locations
-    if sys.platform == "win32":
-        config_dir = (
-            Path(os.environ.get("APPDATA", "~/.config")).expanduser() / "voicetype"
-        )
-    elif sys.platform == "darwin":
-        config_dir = Path.home() / "Library" / "Application Support" / "voicetype"
-    else:  # Linux and other Unix-like systems
-        config_dir = (
-            Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")).expanduser()
-            / "voicetype"
-        )
-
+    config_dir = get_app_data_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
     return config_dir / "traces.jsonl"
 

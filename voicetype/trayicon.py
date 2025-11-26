@@ -17,6 +17,7 @@ from pystray import MenuItem as Item
 from voicetype.app_context import AppContext
 from voicetype.assets.imgs import YELLOW_BG_MIC
 from voicetype.state import State
+from voicetype.utils import get_app_data_dir
 
 
 def _load_tray_image() -> Image.Image:
@@ -79,18 +80,7 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
             log_path = ctx.log_file_path
         else:
             # Fallback to platform defaults if not in context
-            if sys.platform == "win32":
-                config_dir = Path(os.environ.get("APPDATA", "~/.config")) / "voicetype"
-            elif sys.platform == "darwin":
-                config_dir = (
-                    Path.home() / "Library" / "Application Support" / "voicetype"
-                )
-            else:  # Linux and other Unix-like systems
-                config_dir = (
-                    Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")).expanduser()
-                    / "voicetype"
-                )
-            log_path = config_dir / "voicetype.log"
+            log_path = get_app_data_dir() / "voicetype.log"
 
         # Create log file if it doesn't exist
         if not log_path.exists():
@@ -118,22 +108,8 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
         if hasattr(ctx, "trace_file_path") and ctx.trace_file_path:
             trace_path = ctx.trace_file_path
         else:
-            # Fallback to platform defaults (same logic as _get_trace_file_path)
-            if sys.platform == "win32":
-                config_dir = (
-                    Path(os.environ.get("APPDATA", "~/.config")).expanduser()
-                    / "voicetype"
-                )
-            elif sys.platform == "darwin":
-                config_dir = (
-                    Path.home() / "Library" / "Application Support" / "voicetype"
-                )
-            else:  # Linux and other Unix-like systems
-                config_dir = (
-                    Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")).expanduser()
-                    / "voicetype"
-                )
-            trace_path = config_dir / "traces.jsonl"
+            # Fallback to platform defaults
+            trace_path = get_app_data_dir() / "traces.jsonl"
 
         # Create trace file if it doesn't exist
         if not trace_path.exists():

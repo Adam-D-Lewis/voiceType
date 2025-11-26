@@ -6,6 +6,7 @@ This stage transcribes audio files to text using the configured STT provider
 
 import enum
 import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Literal, Optional, Union
@@ -17,6 +18,36 @@ from pydub.exceptions import CouldntDecodeError, CouldntEncodeError
 
 from voicetype.pipeline.context import PipelineContext
 from voicetype.pipeline.stage_registry import STAGE_REGISTRY, PipelineStage
+from voicetype.utils import get_app_data_dir
+
+
+def get_bundled_model_path(model_name: str) -> Optional[Path]:
+    """Get path to bundled Whisper model if it exists.
+
+    Checks for a bundled model in the application's models directory.
+    This is used when running from a PyInstaller bundle.
+
+    Args:
+        model_name: Name of the model (e.g., 'tiny', 'base', 'small')
+
+    Returns:
+        Path to the bundled model directory, or None if not found
+    """
+    # When running from PyInstaller bundle, sys._MEIPASS points to the temp dir
+    if hasattr(sys, "_MEIPASS"):
+        bundled_path = Path(sys._MEIPASS) / "voicetype" / "models" / f"faster-whisper-{model_name}"
+        if bundled_path.exists():
+            logger.debug(f"Found bundled model at {bundled_path}")
+            return bundled_path
+
+    # Also check relative to the voicetype package (for development)
+    package_dir = Path(__file__).parent.parent.parent
+    dev_path = package_dir / "models" / f"faster-whisper-{model_name}"
+    if dev_path.exists():
+        logger.debug(f"Found model at {dev_path}")
+        return dev_path
+
+    return None
 
 
 class VoiceSettingsProvider(enum.Enum):
@@ -41,6 +72,10 @@ class LocalTranscribeConfig(BaseModel):
     language: str = Field(default="en", description="Language code (e.g., en, es, fr)")
     device: Literal["cuda", "cpu"] = Field(
         default="cuda", description="Device for inference"
+    )
+    download_root: Optional[str] = Field(
+        default=None,
+        description="Directory where models are downloaded/cached. If not set, uses standard Hugging Face cache.",
     )
     audio_format: str = Field(default="wav", description="Audio format")
     history: Optional[str] = Field(
@@ -115,6 +150,7 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         model: str = "large-v3-turbo",
         language: str = "en",
         device: str = "cuda",
+        download_root: Optional[str] = None,
         history: Optional[str] = None,
     ) -> str:
         """Transcribe audio using local Whisper model via speech_recognition.
@@ -124,6 +160,7 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             model: Whisper model to use (default: "large-v3-turbo")
             language: Language code for transcription (default: "en")
             device: Device to use for inference ("cuda" or "cpu", default: "cuda")
+            download_root: Directory where models are downloaded/cached (default: None uses HF cache)
             history: Unused in local transcription
 
         Returns:
@@ -134,14 +171,27 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
 
         audio = sr.AudioData.from_file(filename)
 
+        # Check for bundled model first (for PyInstaller builds)
+        model_to_use = model
+        bundled_path = get_bundled_model_path(model)
+        if bundled_path:
+            model_to_use = str(bundled_path)
+            logger.info(f"Using bundled Whisper model from {bundled_path}")
+        else:
+            logger.debug(f"No bundled model found for '{model}', will download if needed")
+
+        # Build init options - default to app data dir for models so they get cleaned up on uninstall
+        init_opts: dict = {"device": device}
+        models_dir = download_root or str(get_app_data_dir() / "models")
+        init_opts["download_root"] = models_dir
+        logger.debug(f"Using model download root: {models_dir}")
+
         transcribed_text = faster_whisper.recognize(
             None,
             audio_data=audio,
-            model=model,
+            model=model_to_use,
             language=language,
-            init_options=faster_whisper.InitOptionalParameters(
-                device=device,
-            ),
+            init_options=faster_whisper.InitOptionalParameters(**init_opts),
         )
 
         # transcribed_text seems to come back with a leading space, so we strip it
@@ -294,6 +344,7 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
                 model=self.cfg.model,
                 language=self.cfg.language,
                 device=self.cfg.device,
+                download_root=self.cfg.download_root,
                 history=self.cfg.history,
             )
         elif isinstance(self.cfg, LiteLLMTranscribeConfig):

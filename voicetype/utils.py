@@ -1,8 +1,30 @@
+import os
+import sys
 import time
+from pathlib import Path
 
 from loguru import logger
 
 from voicetype._vendor import pynput
+
+
+def get_app_data_dir() -> Path:
+    """Get the platform-specific application data directory for voicetype.
+
+    Returns:
+        Path to the voicetype application data directory:
+        - Windows: %APPDATA%/voicetype
+        - macOS: ~/Library/Application Support/voicetype
+        - Linux: $XDG_CONFIG_HOME/voicetype or ~/.config/voicetype
+    """
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:  # Linux and other Unix-like systems
+        base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+
+    return base / "voicetype"
 
 
 def type_text(text):

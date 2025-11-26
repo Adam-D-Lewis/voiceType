@@ -30,7 +30,8 @@ MANIFEST
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
-*.spec
+# Keep voicetype.spec (PyInstaller build configuration)
+!voicetype.spec
 
 # Installer logs
 pip-log.txt
@@ -167,3 +168,6 @@ voicetype/_version.py
 .pixi
 *.egg-info
 settings.toml
+
+# Downloaded Whisper models (bundled during build)
+voicetype/models/

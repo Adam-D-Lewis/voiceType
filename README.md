@@ -93,6 +93,8 @@ provider = "local"  # Use local faster-whisper model
 model = "large-v3-turbo"  # Whisper model: "tiny", "base", "small", "medium", "large-v3", "large-v3-turbo"
 language = "en"  # Language code: "en", "es", "fr", "de", etc.
 device = "cuda"  # Device for inference: "cuda" (GPU) or "cpu"
+# download_root = "C:/models/whisper"  # Optional: custom directory for model downloads
+# Default: %APPDATA%/voicetype/models (Windows), ~/Library/Application Support/voicetype/models (macOS), ~/.config/voicetype/models (Linux)
 
 [stage_configs.CorrectTypos_default]
 stage_class = "CorrectTypos"
@@ -349,7 +351,7 @@ VoiceType includes a vendored version of [pynput](https://github.com/moses-palme
 
 Preferred workflow: Pixi
 
-- Pixi is the preferred way to create and manage the development environment for this project. It ensures reproducible, cross-platform setups using the definitions in environment.yaml and pyproject.toml.
+- Pixi is the preferred way to create and manage the development environment for this project. It ensures reproducible, cross-platform setups using the definitions in pyproject.toml.
 
 Setup Pixi
 - Install Pixi:
@@ -360,10 +362,17 @@ Setup Pixi
   - Verify:
     - pixi --version
 
-Create and activate the environment
-- From the project root:
-  - pixi install -e local
-  - pixi shell -e local
+Development Environments
+
+Available Pixi environments:
+- **local**: Standard development environment (default)
+  - `pixi install -e local && pixi shell -e local`
+- **dev**: Development with testing tools
+  - `pixi install -e dev && pixi shell -e dev`
+- **cpu**: CPU-only (no CUDA dependencies)
+  - `pixi install -e cpu && pixi shell -e cpu`
+- **windows-build**: Build Windows installers (PyInstaller + dependencies)
+  - `pixi install -e windows-build && pixi shell -e windows-build`
 
 Run the application
 - pixi run voicetype
@@ -390,6 +399,28 @@ Pre-commit hooks (recommended)
 - Run on all files:
   - pixi run pre-commit run --all-files
 
+Building Windows Installers (Windows only)
+
+Using Pixi:
+- Setup build environment:
+  - `pixi install -e windows-build`
+  - `pixi shell -e windows-build`
+- Install NSIS (one-time):
+  - Download from https://nsis.sourceforge.io/Download
+  - Or via Chocolatey: `choco install nsis`
+- Build installer:
+  - `pixi run -e windows-build build-windows`
+  - Output: `dist/VoiceType-Setup.exe`
+
+Or build executable only (no installer):
+- `pixi run -e windows-build build-exe`
+- Output: `dist/voicetype/voicetype.exe`
+
+Clean build artifacts:
+- `pixi run -e windows-build clean-build`
+
+See [docs/BUILDING.md](docs/BUILDING.md) for detailed build instructions.
+
 Alternative: Python venv (fallback)
 - Ensure Python 3.11+ is installed.
 - Create and activate a venv:
@@ -402,8 +433,8 @@ Alternative: Python venv (fallback)
   - python -m voicetype
 
 Notes
-- Dependency definitions live in pyproject.toml; additional environment details may be in environment.yaml.
-- After changing dependencies, update pyproject.toml (and environment.yaml if needed), then run:
+- Dependency definitions live in pyproject.toml
+- After changing dependencies, update pyproject.toml then run:
   - pixi install
 ## License
 This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.

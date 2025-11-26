@@ -12,7 +12,6 @@ SERVICE_FILE_PATH = SYSTEMD_USER_DIR / SERVICE_NAME
 APP_CONFIG_DIR = Path.home() / ".config" / "voicetype"
 ENV_FILE_PATH = APP_CONFIG_DIR / ".env"
 
-
 def get_project_root() -> Path:
     """
     Determines the project root directory.
@@ -250,24 +249,26 @@ def service_status():
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Manage VoiceType systemd user service for Linux."
+        description="Manage VoiceType systemd service (Linux only)."
     )
     subparsers = parser.add_subparsers(
         dest="command", help="Available commands", required=True
     )
 
+    # Linux systemd commands
     install_parser = subparsers.add_parser(
-        "install", help="Install and start the systemd service."
+        "install", help="Install and start the systemd service (Linux only)."
     )
     install_parser.set_defaults(func=install_service)
 
     uninstall_parser = subparsers.add_parser(
-        "uninstall", help="Stop, disable and uninstall the systemd service."
+        "uninstall",
+        help="Stop, disable and uninstall the systemd service (Linux only).",
     )
     uninstall_parser.set_defaults(func=uninstall_service)
 
     status_parser = subparsers.add_parser(
-        "status", help="Check the status of the systemd service."
+        "status", help="Check the status of the systemd service (Linux only)."
     )
     status_parser.set_defaults(func=service_status)
 
