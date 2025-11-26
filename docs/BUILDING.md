@@ -129,6 +129,8 @@ makensis build_scripts/windows/installer.nsi
 2. ✅ Creates Start Menu shortcuts
 3. ✅ Registers in Windows Add/Remove Programs
 4. ✅ Creates startup shortcut (auto-start on login)
+5. ✅ Launches VoiceType immediately after install
+6. ✅ Bundles Whisper `tiny` model (no download on first use)
 
 ## Testing the Installer
 
@@ -136,9 +138,9 @@ makensis build_scripts/windows/installer.nsi
 
 1. Run `VoiceType-Setup.exe`
 2. Follow installation wizard
-3. Verify VoiceType starts automatically after login
-4. Check system tray for VoiceType icon
-5. Test hotkey (default: Pause/Break key)
+3. VoiceType should launch automatically and appear in the system tray
+4. Test hotkey (default: Insert key)
+5. Verify auto-start works after reboot
 6. Check logs: `%APPDATA%\voicetype\voicetype.log`
 
 ## Configuration
