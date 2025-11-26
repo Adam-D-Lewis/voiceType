@@ -4,13 +4,25 @@ Scripts for creating VoiceType distribution packages.
 
 ## Quick Start
 
-### Build Windows Installer
+### Build Windows Installer (Recommended)
+
+Using pixi (all dependencies handled automatically):
 
 ```bash
-python build_scripts/build_windows.py --clean
+pixi run -e windows-build build-windows
 ```
 
 This creates `dist/VoiceType-Setup.exe` ready for distribution.
+
+### Alternative: Manual Setup
+
+If not using pixi, install dependencies manually:
+
+```bash
+pip install pyinstaller huggingface_hub
+# Install NSIS: https://nsis.sourceforge.io/Download or `choco install nsis`
+python build_scripts/build_windows.py --clean
+```
 
 ## Scripts
 
@@ -25,21 +37,15 @@ Builds Windows installer using PyInstaller + NSIS.
 
 **Usage:**
 ```bash
-# Clean build (recommended)
-python build_scripts/build_windows.py --clean
+# Using pixi (recommended)
+pixi run -e windows-build build-windows
 
-# Build without cleaning previous artifacts
-python build_scripts/build_windows.py
+# Or directly with Python
+python build_scripts/build_windows.py --clean
 
 # PyInstaller only (skip NSIS installer)
 python build_scripts/build_windows.py --no-installer
 ```
-
-**Requirements:**
-- Python 3.11+
-- PyInstaller: `pip install pyinstaller`
-- NSIS: https://nsis.sourceforge.io/Download
-- huggingface_hub: `pip install huggingface_hub` (for model download)
 
 **Output:**
 - `voicetype/models/` - Downloaded Whisper model (git-ignored)
