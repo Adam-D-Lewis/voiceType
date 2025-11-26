@@ -22,23 +22,14 @@ from voicetype.telemetry import (
     shutdown_telemetry,
 )
 from voicetype.trayicon import TrayIconController, create_tray
-from voicetype.utils import play_sound, type_text
+from voicetype.utils import get_app_data_dir, play_sound, type_text
 
 HERE = Path(__file__).resolve().parent
 
 
 def get_log_file_path() -> Path:
     """Get the default path to the log file in the user's config directory."""
-    if sys.platform == "win32":
-        config_dir = Path(os.environ.get("APPDATA", "~/.config")) / "voicetype"
-    elif sys.platform == "darwin":
-        config_dir = Path.home() / "Library" / "Application Support" / "voicetype"
-    else:  # Linux and other Unix-like systems
-        config_dir = (
-            Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")).expanduser()
-            / "voicetype"
-        )
-
+    config_dir = get_app_data_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
     return config_dir / "voicetype.log"
 

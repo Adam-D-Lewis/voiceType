@@ -6,6 +6,8 @@ from loguru import logger
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 
+from voicetype.utils import get_app_data_dir
+
 
 class TelemetryConfig(BaseModel):
     """Telemetry configuration for OpenTelemetry tracing."""
@@ -109,7 +111,7 @@ def load_settings(settings_file: Path | None = None) -> Settings:
         # Search default locations
         default_locations = [
             Path("settings.toml"),
-            Path.home() / ".config" / "voicetype" / "settings.toml",
+            get_app_data_dir() / "settings.toml",
             Path("/etc/voicetype/settings.toml"),
         ]
 

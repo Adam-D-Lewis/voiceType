@@ -93,6 +93,8 @@ provider = "local"  # Use local faster-whisper model
 model = "large-v3-turbo"  # Whisper model: "tiny", "base", "small", "medium", "large-v3", "large-v3-turbo"
 language = "en"  # Language code: "en", "es", "fr", "de", etc.
 device = "cuda"  # Device for inference: "cuda" (GPU) or "cpu"
+# download_root = "C:/models/whisper"  # Optional: custom directory for model downloads
+# Default: %APPDATA%/voicetype/models (Windows), ~/Library/Application Support/voicetype/models (macOS), ~/.config/voicetype/models (Linux)
 
 [stage_configs.CorrectTypos_default]
 stage_class = "CorrectTypos"
