@@ -13,9 +13,6 @@ exclude = [
     "voicetype/_vendor/pynput/tools/**"
 ]
 
-[tool.hatch.build.targets.wheel.force-include]
-"voicetype/_vendor" = "voicetype/_vendor"
-
 [tool.hatch.version]
 source = "vcs"
 
