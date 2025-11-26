@@ -6,6 +6,7 @@ This stage transcribes audio files to text using the configured STT provider
 
 import enum
 import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Literal, Optional, Union
@@ -17,6 +18,35 @@ from pydub.exceptions import CouldntDecodeError, CouldntEncodeError
 
 from voicetype.pipeline.context import PipelineContext
 from voicetype.pipeline.stage_registry import STAGE_REGISTRY, PipelineStage
+
+
+def get_bundled_model_path(model_name: str) -> Optional[Path]:
+    """Get path to bundled Whisper model if it exists.
+
+    Checks for a bundled model in the application's models directory.
+    This is used when running from a PyInstaller bundle.
+
+    Args:
+        model_name: Name of the model (e.g., 'tiny', 'base', 'small')
+
+    Returns:
+        Path to the bundled model directory, or None if not found
+    """
+    # When running from PyInstaller bundle, sys._MEIPASS points to the temp dir
+    if hasattr(sys, "_MEIPASS"):
+        bundled_path = Path(sys._MEIPASS) / "voicetype" / "models" / f"faster-whisper-{model_name}"
+        if bundled_path.exists():
+            logger.debug(f"Found bundled model at {bundled_path}")
+            return bundled_path
+
+    # Also check relative to the voicetype package (for development)
+    package_dir = Path(__file__).parent.parent.parent
+    dev_path = package_dir / "models" / f"faster-whisper-{model_name}"
+    if dev_path.exists():
+        logger.debug(f"Found model at {dev_path}")
+        return dev_path
+
+    return None
 
 
 class VoiceSettingsProvider(enum.Enum):
@@ -134,10 +164,19 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
 
         audio = sr.AudioData.from_file(filename)
 
+        # Check for bundled model first (for PyInstaller builds)
+        model_to_use = model
+        bundled_path = get_bundled_model_path(model)
+        if bundled_path:
+            model_to_use = str(bundled_path)
+            logger.info(f"Using bundled Whisper model from {bundled_path}")
+        else:
+            logger.debug(f"No bundled model found for '{model}', will download if needed")
+
         transcribed_text = faster_whisper.recognize(
             None,
             audio_data=audio,
-            model=model,
+            model=model_to_use,
             language=language,
             init_options=faster_whisper.InitOptionalParameters(
                 device=device,

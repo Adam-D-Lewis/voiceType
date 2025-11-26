@@ -48,7 +48,6 @@ NSIS script for creating the Windows installer.
 - Creates Start Menu shortcuts
 - Registers in Add/Remove Programs
 - Configures auto-start on login
-- Stores config in `%APPDATA%\voicetype\.env`
 
 **Build manually:**
 ```bash

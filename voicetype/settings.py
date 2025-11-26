@@ -49,7 +49,7 @@ class Settings(BaseSettings):
         {
             "name": "default",
             "enabled": True,
-            "hotkey": "<pause>",
+            "hotkey": "<insert>",
             "stages": [
                 "RecordAudio",
                 "Transcribe",

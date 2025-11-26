@@ -86,20 +86,28 @@ Section "Install"
     IntFmt $0 "0x%08X" $0
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "EstimatedSize" "$0"
 
-    ; Configure VoiceType to start on login
+    ; Configure VoiceType to start on login (create shortcut in user's Startup folder)
     DetailPrint "Configuring VoiceType to start on login..."
-    ExecWait '"$INSTDIR\voicetype.exe" install-startup'
+    SetShellVarContext current  ; Switch to current user context for Startup folder
+    CreateShortCut "$SMSTARTUP\${APPNAME}.lnk" "$INSTDIR\voicetype.exe" "" "$INSTDIR\voicetype.exe" 0
+    SetShellVarContext all  ; Switch back to all users context
+
+    ; Launch VoiceType now (don't wait for it to exit)
+    DetailPrint "Starting VoiceType..."
+    Exec '"$INSTDIR\voicetype.exe"'
 
     ; Show completion message
-    MessageBox MB_OK "${APPNAME} has been installed successfully!$\n$\nVoiceType will start automatically when you log in.$\n$\nYou can find it in the system tray."
+    MessageBox MB_OK "${APPNAME} has been installed successfully!$\n$\nVoiceType is now running in the system tray.$\n$\nIt will start automatically when you log in."
 
 SectionEnd
 
 ; Uninstaller section
 Section "Uninstall"
-    ; Remove from startup
+    ; Remove from startup (current user's Startup folder)
     DetailPrint "Removing VoiceType from startup..."
-    ExecWait '"$INSTDIR\voicetype.exe" uninstall-startup'
+    SetShellVarContext current
+    Delete "$SMSTARTUP\${APPNAME}.lnk"
+    SetShellVarContext all
 
     ; Remove files
     RMDir /r "$INSTDIR"

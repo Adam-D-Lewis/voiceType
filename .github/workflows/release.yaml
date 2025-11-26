@@ -5,6 +5,42 @@ on:
     types: [created]
 
 jobs:
+  build-windows-installer:
+    name: Build Windows Installer
+    runs-on: windows-latest
+    permissions:
+      contents: write  # Required to upload release assets
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: v0.39.5
+
+      - name: Build Windows installer
+        run: pixi run -e windows-build build-windows
+
+      - name: Get version from tag
+        id: get_version
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Rename installer with version
+        shell: bash
+        run: |
+          mv dist/VoiceType-Setup.exe "dist/VoiceType-${{ steps.get_version.outputs.version }}-Setup.exe"
+
+      - name: Upload installer to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/VoiceType-${{ steps.get_version.outputs.version }}-Setup.exe
+
   test-pypi:
     name: Test PyPi release
     runs-on: ubuntu-latest

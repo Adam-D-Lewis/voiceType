@@ -128,9 +128,7 @@ makensis build_scripts/windows/installer.nsi
 1. ✅ Installs to `C:\Program Files\VoiceType\`
 2. ✅ Creates Start Menu shortcuts
 3. ✅ Registers in Windows Add/Remove Programs
-4. ✅ Prompts for voice provider (local/litellm) configuration
-5. ✅ Creates startup shortcut (auto-start on login)
-6. ✅ Stores config in `%APPDATA%\voicetype\.env`
+4. ✅ Creates startup shortcut (auto-start on login)
 
 ## Testing the Installer
 
@@ -138,13 +136,10 @@ makensis build_scripts/windows/installer.nsi
 
 1. Run `VoiceType-Setup.exe`
 2. Follow installation wizard
-3. Choose voice provider:
-   - **local** - Uses faster-whisper (no API key needed)
-   - **litellm** - Uses OpenAI Whisper API (requires API key)
-4. Verify VoiceType starts automatically after login
-5. Check system tray for VoiceType icon
-6. Test hotkey (default: Pause/Break key)
-7. Check logs: `%APPDATA%\voicetype\voicetype.log`
+3. Verify VoiceType starts automatically after login
+4. Check system tray for VoiceType icon
+5. Test hotkey (default: Pause/Break key)
+6. Check logs: `%APPDATA%\voicetype\voicetype.log`
 
 ## Configuration
 
@@ -213,12 +208,7 @@ VoiceType uses the **Windows Startup folder** for auto-start:
 - ✅ No external tools needed
 
 **Installation:**
-```bash
-# Installer automatically runs:
-voicetype.exe install-startup
-```
-
-This creates a PowerShell shortcut pointing to `voicetype.exe`.
+The NSIS installer automatically creates a shortcut in the user's Startup folder using the `CreateShortCut` command. No separate command is needed.
 
 ### Alternative Approaches (Future Consideration)
 
@@ -233,8 +223,6 @@ schtasks /create /tn "VoiceType" /tr "C:\Path\voicetype.exe" /sc onlogon
 # Most professional, requires admin
 nssm install VoiceType "C:\Path\voicetype.exe"
 ```
-
-See TODO comment in [install.py](../voicetype/install.py:20-23) for implementation notes.
 
 ## Troubleshooting
 
@@ -282,11 +270,10 @@ File: "..\..\dist\voicetype\*.*" - NO FILES FOUND
 ### Runtime Issues
 
 **Problem: Startup shortcut not created**
-**Solution:** Check PowerShell execution policy:
-```powershell
-Get-ExecutionPolicy
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
+**Solution:** The NSIS installer creates the shortcut directly. Check if the shortcut exists at:
+`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\VoiceType.lnk`
+
+If missing, you can manually create a shortcut to `C:\Program Files\VoiceType\voicetype.exe` in that folder.
 
 **Problem: Hotkey not working**
 **Solution:** Check if another app is using the Pause/Break key
