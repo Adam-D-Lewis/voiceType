@@ -51,7 +51,7 @@ class Settings(BaseSettings):
         {
             "name": "default",
             "enabled": True,
-            "hotkey": "<pause>",
+            "hotkey": "<ctrl>+$",
             "stages": [
                 "RecordAudio",
                 "Transcribe",

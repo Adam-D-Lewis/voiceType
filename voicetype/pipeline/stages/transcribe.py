@@ -153,7 +153,7 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         download_root: Optional[str] = None,
         history: Optional[str] = None,
     ) -> str:
-        """Transcribe audio using local Whisper model via speech_recognition.
+        """Transcribe audio using local Whisper model via faster-whisper.
 
         Args:
             filename: Path to audio file
@@ -166,10 +166,7 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         Returns:
             str: Transcribed text with leading/trailing whitespace removed
         """
-        import speech_recognition as sr
-        from speech_recognition.recognizers.whisper_local import faster_whisper
-
-        audio = sr.AudioData.from_file(filename)
+        from faster_whisper import WhisperModel
 
         # Check for bundled model first (for PyInstaller builds)
         model_to_use = model
@@ -181,18 +178,29 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             logger.debug(f"No bundled model found for '{model}', will download if needed")
 
         # Build init options - default to app data dir for models so they get cleaned up on uninstall
-        init_opts: dict = {"device": device}
         models_dir = download_root or str(get_app_data_dir() / "models")
-        init_opts["download_root"] = models_dir
         logger.debug(f"Using model download root: {models_dir}")
 
-        transcribed_text = faster_whisper.recognize(
-            None,
-            audio_data=audio,
-            model=model_to_use,
-            language=language,
-            init_options=faster_whisper.InitOptionalParameters(**init_opts),
+        # Determine compute type based on device
+        compute_type = "float16" if device == "cuda" else "int8"
+
+        # Initialize the WhisperModel
+        whisper_model = WhisperModel(
+            model_to_use,
+            device=device,
+            compute_type=compute_type,
+            download_root=models_dir,
         )
+
+        # Transcribe the audio file
+        segments, info = whisper_model.transcribe(
+            filename,
+            language=language,
+            initial_prompt=history,
+        )
+
+        # Combine all segments into a single text
+        transcribed_text = " ".join(segment.text for segment in segments)
 
         # transcribed_text seems to come back with a leading space, so we strip it
         return transcribed_text.strip()
