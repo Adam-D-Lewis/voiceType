@@ -101,7 +101,7 @@ loguru = "*"
 pystray = "*"
 prompt_toolkit = "*"
 pydub = "*"  # for sound
-audioop-lts = { version = "*", markers = "python_version >= '3.13'" }  # for pydub compatibility with Python 3.13+ # necessary until https://github.com/jiaaro/pydub/pull/816 merged into pydub
+audioop-lts = "*"  # for pydub compatibility with Python 3.13+ # necessary until https://github.com/jiaaro/pydub/pull/816 merged into pydub
 playsound3 = "*" # for sound
 soundfile = "*"  # for sound recording
 sounddevice = "*"  # for detecting input devices and recording sound
