@@ -1,4 +1,4 @@
-# voiceType - Type with your voice
+# voiceType - type with your voice
 
 ![voiceType Logo](voicetype/assets/imgs/yellow-splotch-logo.png)
 
