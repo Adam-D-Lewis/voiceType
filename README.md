@@ -1,8 +1,6 @@
-# voiceType
+# voiceType - Type with your voice
 
 ![voiceType Logo](voicetype/assets/imgs/yellow-splotch-logo.png)
-
-Type with your voice.
 
 [![Tests](https://github.com/Adam-D-Lewis/voicetype/actions/workflows/tests.yaml/badge.svg)](https://github.com/Adam-D-Lewis/voicetype/actions/workflows/tests.yaml)
 
