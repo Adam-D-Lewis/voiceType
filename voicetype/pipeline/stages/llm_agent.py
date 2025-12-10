@@ -7,7 +7,7 @@ Supports both local (Ollama) and remote (OpenAI, Anthropic, etc.) providers.
 from typing import List, Optional
 
 from loguru import logger
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from voicetype.pipeline.context import PipelineContext
 from voicetype.pipeline.stage_registry import STAGE_REGISTRY, PipelineStage
@@ -24,6 +24,10 @@ class LLMAgentConfig(BaseModel):
 
     model: str = Field(
         description="Model string (e.g., 'gpt-4', 'claude-3-5-sonnet-20241022', 'ollama/llama3.2')",
+    )
+    api_base: Optional[str] = Field(
+        default=None,
+        description="Custom API base URL (e.g., 'http://myserver:11434' for remote Ollama)",
     )
     system_prompt: str = Field(
         default=DEFAULT_JARVIS_PROMPT,
@@ -60,7 +64,7 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
     """Process text through an LLM agent.
 
     Uses LiteLLM to send text to an LLM for processing. Supports any
-    provider that LiteLLM supports (OpenAI, Anthropic, Gemini, Ollama, etc.).
+    provider that LiteLLM supports (OpenAI, Anthropic, Gemini, Ollama, etc.).  See https://docs.litellm.ai/docs/providers to determine appropriate values for specific providers.
 
     Type signature: PipelineStage[Optional[str], Optional[str]]
     - Input: Optional[str] (text to process or None)
@@ -93,6 +97,7 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
 
         # Keep attributes accessible for compatibility
         self.model = self.cfg.model
+        self.api_base = self.cfg.api_base
         self.system_prompt = self.cfg.system_prompt
         self.trigger_keywords = self.cfg.trigger_keywords
         self.temperature = self.cfg.temperature
@@ -110,7 +115,7 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
 
         logger.debug(
             f"Initialized LLM agent with model={self.model}, "
-            f"temperature={self.temperature}, max_tokens={self.max_tokens}"
+            f"api_base={self.api_base}, temperature={self.temperature}, max_tokens={self.max_tokens}"
         )
 
     def execute(
@@ -164,6 +169,8 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
                 "timeout": self.timeout,
             }
 
+            if self.api_base is not None:
+                completion_kwargs["api_base"] = self.api_base
             if self.temperature is not None:
                 completion_kwargs["temperature"] = self.temperature
             if self.max_tokens is not None:
