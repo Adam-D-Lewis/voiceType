@@ -57,19 +57,40 @@ minimum_duration = 0.25  # Minimum audio duration in seconds
 # Local transcription with faster-whisper (offline, no API key needed)
 [stage_configs.Transcribe_local]
 stage_class = "Transcribe"
-provider = "local"
-# Options below are specific to the "local" provider:
-model = "large-v3-turbo"  # Whisper model: "tiny", "base", "small", "medium", "large-v3", "large-v3-turbo"
 language = "en"  # Language code: "en", "es", "fr", "de", etc.
+
+[stage_configs.Transcribe_local.runtime]
+provider = "local"
+model = "large-v3-turbo"  # Whisper model: "tiny", "base", "small", "medium", "large-v3", "large-v3-turbo"
 device = "cuda"  # Device for inference: "cuda" (GPU) or "cpu"
 
 # Cloud transcription via LiteLLM/OpenAI (requires OPENAI_API_KEY)
 [stage_configs.Transcribe_cloud]
 stage_class = "Transcribe"
-provider = "litellm"
-# Options below are specific to the "litellm" provider:
 language = "en"  # Language code for transcription
-# Note: model and device are not used with litellm provider
+
+[stage_configs.Transcribe_cloud.runtime]
+provider = "litellm"
+model = "whisper-1"  # LiteLLM model identifier (e.g., whisper-1, azure/whisper)
+
+# Robust transcription with fallbacks (tries GPU -> CPU -> Cloud API)
+[stage_configs.Transcribe_robust]
+stage_class = "Transcribe"
+language = "en"
+
+[stage_configs.Transcribe_robust.runtime]
+provider = "local"
+model = "large-v3-turbo"
+device = "cuda"  # Try GPU first
+
+[[stage_configs.Transcribe_robust.fallback_runtimes]]
+provider = "local"
+model = "large-v3-turbo"
+device = "cpu"  # Fall back to CPU if GPU fails
+
+[[stage_configs.Transcribe_robust.fallback_runtimes]]
+provider = "litellm"
+model = "whisper-1"  # Fall back to cloud API as last resort
 
 [stage_configs.CorrectTypos_default]
 stage_class = "CorrectTypos"
@@ -187,13 +208,25 @@ stages = [
 #   - Modifiers: <ctrl>+<alt>+p, <shift>+<f1>, etc.
 #   - Regular keys: a, b, 1, 2, etc.
 #
-# Transcription Provider Options:
+# Transcription Configuration:
+#   The Transcribe stage uses a unified runtime configuration with fallback support.
+#
+#   Runtime types (set via "provider" field):
 #   - "local": Uses faster-whisper for local transcription (faster, offline)
 #     - model: Whisper model size (tiny, base, small, medium, large-v3, large-v3-turbo)
 #     - device: "cuda" for GPU or "cpu" for CPU inference
+#   - "litellm": Uses cloud-based transcription (requires OPENAI_API_KEY)
+#     - model: LiteLLM model identifier (e.g., whisper-1, azure/whisper)
+#
+#   Shared settings (apply to all runtimes):
 #     - language: Language code (en, es, fr, de, etc.)
-#   - "litellm": Uses cloud-based transcription (requires API key)
-#     - language: Language code for transcription
+#     - history: Optional context/prompt to improve accuracy
+#     - download_root: Custom directory for local model downloads
+#
+#   Fallback support:
+#     - Configure fallback_runtimes to try alternative runtimes if the primary fails
+#     - Fallbacks can mix local and cloud runtimes (e.g., GPU -> CPU -> API)
+#     - See Transcribe_robust example above
 #
 # LLM Model Options (for LLMAgent stage):
 #   - Local: "ollama/llama3.2", "ollama/mistral", "ollama/phi3" (requires Ollama installed)
