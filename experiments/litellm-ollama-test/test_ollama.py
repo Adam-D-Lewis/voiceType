@@ -3,7 +3,7 @@
 import litellm
 
 # Enable debug mode
-litellm._turn_on_debug()
+# litellm._turn_on_debug()
 
 OLLAMA_BASE_URL = "http://mantra.adamdlewis.com:11434"
 MODEL = "ollama/ministral-3:8b"
@@ -30,6 +30,7 @@ def test_basic_completion():
 
         print("Success!")
         print(f"Response: {response.choices[0].message.content}")
+        breakpoint()
 
     except Exception as e:
         print(f"Error: {type(e).__name__}: {e}")
