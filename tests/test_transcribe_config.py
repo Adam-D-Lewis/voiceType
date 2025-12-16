@@ -64,7 +64,6 @@ class TestTranscribeConfig:
         assert config.runtime.provider == "local"
         assert config.language == "en"
         assert config.audio_format == "wav"
-        assert config.history is None
         assert config.download_root is None
         assert config.fallback_runtimes == []
 
@@ -182,10 +181,8 @@ class TestTranscribeStageInit:
             config={
                 "runtime": {"provider": "local"},
                 "language": "ja",
-                "history": "Previous context",
                 "download_root": "/custom/models",
             }
         )
         assert stage.cfg.language == "ja"
-        assert stage.cfg.history == "Previous context"
         assert stage.cfg.download_root == "/custom/models"
