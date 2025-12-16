@@ -76,77 +76,12 @@ VoiceType can be configured using a `settings.toml` file. The application looks 
 
 ### Available Settings
 
-VoiceType uses a pipeline-based configuration system. Create a `settings.toml` file with any of the following options:
+VoiceType uses a pipeline-based configuration system. See [settings.example.toml](settings.example.toml) for a complete, documented example configuration including:
 
-```toml
-# Define named stage instances with their configurations
-[stage_configs.RecordAudio_default]
-stage_class = "RecordAudio"
-minimum_duration = 0.25  # Minimum audio duration in seconds
-
-[stage_configs.Transcribe_local]
-stage_class = "Transcribe"
-provider = "local"  # Use local faster-whisper model
-# Local provider options (validated via Pydantic):
-model = "large-v3-turbo"  # Whisper model: "tiny", "base", "small", "medium", "large-v3", "large-v3-turbo"
-language = "en"  # Language code: "en", "es", "fr", "de", etc.
-device = "cuda"  # Device for inference: "cuda" (GPU) or "cpu"
-# download_root = "C:/models/whisper"  # Optional: custom directory for model downloads
-# Default: %APPDATA%/voicetype/models (Windows), ~/Library/Application Support/voicetype/models (macOS), ~/.config/voicetype/models (Linux)
-
-[stage_configs.CorrectTypos_default]
-stage_class = "CorrectTypos"
-case_sensitive = false
-whole_word_only = true
-corrections = [
-    ["machinelearning", "machine learning"],
-]
-
-[stage_configs.TypeText_default]
-stage_class = "TypeText"
-
-# Define pipelines that reference stage instances
-[[pipelines]]
-name = "default"
-enabled = true
-hotkey = "<pause>"
-stages = [
-    "RecordAudio_default",
-    "Transcribe_local",
-    "CorrectTypos_default",
-    "TypeText_default",
-]
-```
-
-**Stage Configuration Formats:**
-
-You can define stage configurations in two ways:
-
-1. **Named instance with `stage_class` field** (recommended for reusability):
-   ```toml
-   [stage_configs.RecordAudio_custom]
-   stage_class = "RecordAudio"
-   minimum_duration = 1.0
-   ```
-
-2. **Direct class reference** (simpler for single use):
-   ```toml
-   [stage_configs.RecordAudio]
-   minimum_duration = 0.5
-   ```
-   When the configuration key matches a stage class name and no `stage_class` field is present, it's treated as a direct class reference.
-
-Both formats are fully supported and can be mixed in the same configuration file.
-
-**Benefits of this approach:**
-- Define stage configurations once, reuse across multiple pipelines
-- Easily override individual stages without duplicating entire pipeline
-- Use the same stage type multiple times with different configurations
-- Reference stages by class name directly for simpler configurations
-
-**Important:** `stage_class` is a reserved field name used to specify which stage class to instantiate. Stage implementations cannot use `stage_class` as a configuration parameter name.
-
-See [settings.example.toml](settings.example.toml) for more examples and detailed configuration options.
+- Stage definitions (RecordAudio, Transcribe, CorrectTypos, TypeText, LLMAgent)
+- Local and cloud transcription options with fallback support
+- Pipeline configuration with hotkey bindings
+- Telemetry and logging settings
 
 **Note:** If you used `voicetype install` and configured litellm during installation, your API key is stored separately in `~/.config/voicetype/.env`.
 
