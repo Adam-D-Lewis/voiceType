@@ -123,10 +123,6 @@ class TranscribeConfig(BaseModel):
         default="wav",
         description="Audio format for processing",
     )
-    history: Optional[str] = Field(
-        default=None,
-        description="Optional context/prompt to improve transcription accuracy",
-    )
     download_root: Optional[str] = Field(
         default=None,
         description="Directory for model downloads (local provider only)",
@@ -152,7 +148,6 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
     - fallback_runtimes: List of fallback runtimes to try if primary fails
     - language: Language code for transcription
     - audio_format: Audio format for processing
-    - history: Optional context/prompt for better accuracy
     - download_root: Directory for model downloads (local provider only)
     """
 
@@ -186,7 +181,6 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         runtime: LocalSTTRuntime,
         language: str = "en",
         download_root: Optional[str] = None,
-        history: Optional[str] = None,
     ) -> str:
         """Transcribe audio using a local Whisper runtime.
 
@@ -195,7 +189,6 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             runtime: LocalSTTRuntime configuration to use
             language: Language code for transcription (default: "en")
             download_root: Directory where models are downloaded/cached
-            history: Optional context for transcription
 
         Returns:
             str: Transcribed text with leading/trailing whitespace removed
@@ -238,7 +231,6 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         segments, info = whisper_model.transcribe(
             filename,
             language=language,
-            initial_prompt=history,
         )
 
         # Combine all segments into a single text
@@ -252,7 +244,6 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         filename: str,
         runtime: LiteLLMSTTRuntime,
         language: str = "en",
-        history: Optional[str] = None,
     ) -> str:
         """Transcribe audio using LiteLLM API runtime.
 
@@ -262,7 +253,6 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             filename: Path to the audio file to transcribe
             runtime: LiteLLMSTTRuntime configuration to use
             language: Language code for transcription
-            history: Optional context to improve transcription accuracy
 
         Returns:
             str: Transcribed text
@@ -336,7 +326,6 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
                 transcript = litellm.transcription(
                     model=runtime.model,
                     file=fh,
-                    prompt=history,
                     language=language,
                 )
                 transcript_text = transcript.text
@@ -383,14 +372,12 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
                 runtime=runtime,
                 language=self.cfg.language,
                 download_root=self.cfg.download_root,
-                history=self.cfg.history,
             )
         elif isinstance(runtime, LiteLLMSTTRuntime):
             return self._transcribe_with_litellm_runtime(
                 filename=filename,
                 runtime=runtime,
                 language=self.cfg.language,
-                history=self.cfg.history,
             )
         else:
             raise TranscriptionError(f"Unknown runtime type: {type(runtime).__name__}")
