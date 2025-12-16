@@ -70,6 +70,21 @@ def _quit(icon: pystray._base.Icon, item: Item):
     icon.stop()
 
 
+def _restart(icon: pystray._base.Icon, item: Item):
+    """Restart the VoiceType application to reload configuration."""
+    import os
+    import sys
+
+    # Stop the tray icon first
+    icon.stop()
+
+    # Re-execute the application
+    # Use sys.executable to get the Python interpreter path
+    # and sys.argv to preserve command-line arguments
+    python = sys.executable
+    os.execv(python, [python] + sys.argv)
+
+
 def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
     def _open_logs(_icon: pystray._base.Icon, _item: Item):
         """Open the log file in the default application."""
@@ -157,7 +172,8 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
     if hasattr(ctx, "telemetry_enabled") and ctx.telemetry_enabled:
         menu_items.append(Item("Open Traces", _open_traces))
 
-    # Add Quit at the end
+    # Add Restart and Quit at the end
+    menu_items.append(Item("Restart", _restart))
     menu_items.append(Item("Quit", _quit))
 
     return Menu(*menu_items)
