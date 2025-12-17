@@ -427,20 +427,6 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             f"Last error: {type(last_error).__name__}: {last_error}"
         )
 
-    def _cleanup_audio_file(self, filename: str) -> None:
-        """Clean up the original audio file after transcription.
-
-        Args:
-            filename: Path to the audio file to remove
-        """
-        try:
-            Path(filename).unlink(missing_ok=True)
-            logger.debug(f"Cleaned up original recording file: {filename}")
-        except OSError as e:
-            logger.debug(
-                f"Warning: Could not remove original recording file {filename}: {e}"
-            )
-
     def execute(
         self, input_data: Optional[str], context: PipelineContext
     ) -> Optional[str]:
@@ -466,9 +452,6 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
 
         # Transcribe with fallback support
         text = self._transcribe_with_fallbacks(input_data)
-
-        # Cleanup the original audio file
-        self._cleanup_audio_file(input_data)
 
         # Replace multiple spaces with single space
         text = " ".join(text.split())

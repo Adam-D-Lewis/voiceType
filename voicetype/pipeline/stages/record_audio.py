@@ -395,11 +395,18 @@ class RecordAudio(PipelineStage[None, Optional[str]]):
 
         Called by pipeline manager in finally block.
         """
-        if self.current_recording and self.cleanup_audio_files:
-            if os.path.exists(self.current_recording):
-                try:
-                    os.unlink(self.current_recording)
-                    logger.debug(f"Cleaned up temp file: {self.current_recording}")
-                except Exception as e:
-                    logger.warning(f"Failed to cleanup {self.current_recording}: {e}")
+        if self.current_recording is None:
+            # nothing to cleanup
+            return
+        if not self.cleanup_audio_files:
+            # cleanup disabled
+            self.current_recording = None
+            return
+
+        if os.path.exists(self.current_recording):
+            try:
+                os.unlink(self.current_recording)
+                logger.debug(f"Cleaned up temp file: {self.current_recording}")
+            except Exception as e:
+                logger.warning(f"Failed to cleanup {self.current_recording}: {e}")
             self.current_recording = None
