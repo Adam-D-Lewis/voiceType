@@ -16,7 +16,7 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 from loguru import logger
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from voicetype.pipeline.context import PipelineContext
 from voicetype.pipeline.stage_registry import STAGE_REGISTRY, PipelineStage
@@ -27,6 +27,11 @@ MIN_RMS_RANGE = 0.001  # Minimum RMS range to avoid division by zero
 
 class SoundDeviceError(Exception):
     """Exception raised for audio device and sound processing errors."""
+
+
+def _default_audio_storage_path() -> str:
+    """Get the default audio storage path: /tmp/voicetype/ (or platform equivalent)."""
+    return os.path.join(tempfile.gettempdir(), "voicetype")
 
 
 class RecordAudioConfig(BaseModel):
@@ -49,6 +54,14 @@ class RecordAudioConfig(BaseModel):
     audio_format: Literal["wav", "mp3", "webm"] = Field(
         default="wav",
         description="Audio format for recordings",
+    )
+    audio_storage_path: str = Field(
+        default_factory=_default_audio_storage_path,
+        description="Directory to store audio recordings (default: /tmp/voicetype/ or platform equivalent)",
+    )
+    cleanup_audio_files: bool = Field(
+        default=True,
+        description="Whether to delete the audio recordings during cleanup",
     )
 
 
@@ -96,6 +109,11 @@ class RecordAudio(PipelineStage[None, Optional[str]]):
         # Initialize audio device
         self.device_id = self._find_device_id(self.cfg.device_name)
         logger.debug(f"Using input device ID: {self.device_id}")
+        self.cleanup_audio_files = self.cfg.cleanup_audio_files
+
+        # Store audio storage path
+        self.audio_storage_path = self.cfg.audio_storage_path
+        logger.debug(f"Audio storage path: {self.audio_storage_path}")
 
         # Get sample rate from device
         try:
@@ -217,7 +235,14 @@ class RecordAudio(PipelineStage[None, Optional[str]]):
         self._stop_event.clear()
 
         try:
-            temp_wav = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+            # Ensure directory exists (may have been deleted since init)
+            os.makedirs(self.audio_storage_path, exist_ok=True)
+            temp_wav = tempfile.NamedTemporaryFile(
+                prefix="recording_",
+                suffix=".wav",
+                dir=self.audio_storage_path,
+                delete=False,
+            )
             self.temp_wav = temp_wav.name
             temp_wav.close()
 
@@ -370,7 +395,7 @@ class RecordAudio(PipelineStage[None, Optional[str]]):
 
         Called by pipeline manager in finally block.
         """
-        if self.current_recording:
+        if self.current_recording and self.cleanup_audio_files:
             if os.path.exists(self.current_recording):
                 try:
                     os.unlink(self.current_recording)
