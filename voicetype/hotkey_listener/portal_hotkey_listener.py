@@ -32,12 +32,14 @@ class PortalHotkeyListener(HotkeyListener):
         self,
         on_hotkey_press: Optional[Callable[[], None]] = None,
         on_hotkey_release: Optional[Callable[[], None]] = None,
+        log_key_repeat_debug: bool = False,
     ):
         """Initialize the portal hotkey listener.
 
         Args:
             on_hotkey_press: Callback function to execute when the hotkey is pressed.
             on_hotkey_release: Callback function to execute when the hotkey is released.
+            log_key_repeat_debug: Whether to log key repeat debug messages.
         """
         super().__init__(on_hotkey_press, on_hotkey_release)
         self._bus = None
@@ -48,6 +50,20 @@ class PortalHotkeyListener(HotkeyListener):
         self._running = False
         self._shortcuts_iface = None
         self._preferred_trigger: str = "Pause"
+        self._log_key_repeat_debug = log_key_repeat_debug
+        self._logged_debug_hint = (
+            False  # Track if we've shown the hint about debug logging
+        )
+        # Track key state to handle key repeat
+        # Portal sends Activated/Deactivated pairs for each key repeat, so we need
+        # to use a delayed release approach: only trigger release if no Activated
+        # signal arrives within the debounce window
+        self._key_is_pressed = False
+        self._pending_release_task: Optional[asyncio.TimerHandle] = None
+        # Debounce threshold in seconds - if no Activated signal arrives within
+        # this time after a Deactivated, we consider it a real release
+        # (typical key repeat is ~30ms intervals, so 100ms is safe)
+        self._debounce_threshold_sec = 0.1
 
     def set_hotkey(self, hotkey: str) -> None:
         """Set the preferred hotkey trigger.
@@ -139,17 +155,55 @@ class PortalHotkeyListener(HotkeyListener):
         """Create a GlobalShortcuts session and bind our shortcut."""
         try:
             from dbus_next import Variant
+            from dbus_next import introspection as intr
             from dbus_next.aio import MessageBus
             from dbus_next.constants import BusType
 
             self._bus = await MessageBus(bus_type=BusType.SESSION).connect()
 
-            # Get introspection for the portal
-            introspection = await self._bus.introspect(
-                self.PORTAL_BUS_NAME, self.PORTAL_OBJECT_PATH
+            # Manually define the GlobalShortcuts interface to avoid introspection issues
+            # with other interfaces on the same object path (e.g., power-saver-enabled property)
+            shortcuts_introspection = intr.Node.parse(
+                """
+            <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+             "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+            <node>
+              <interface name="org.freedesktop.portal.GlobalShortcuts">
+                <method name="CreateSession">
+                  <arg type="a{sv}" name="options" direction="in"/>
+                  <arg type="o" name="handle" direction="out"/>
+                </method>
+                <method name="BindShortcuts">
+                  <arg type="o" name="session_handle" direction="in"/>
+                  <arg type="a(sa{sv})" name="shortcuts" direction="in"/>
+                  <arg type="s" name="parent_window" direction="in"/>
+                  <arg type="a{sv}" name="options" direction="in"/>
+                  <arg type="o" name="handle" direction="out"/>
+                </method>
+                <method name="ListShortcuts">
+                  <arg type="o" name="session_handle" direction="in"/>
+                  <arg type="a{sv}" name="options" direction="in"/>
+                  <arg type="o" name="handle" direction="out"/>
+                </method>
+                <signal name="Activated">
+                  <arg type="o" name="session_handle"/>
+                  <arg type="s" name="shortcut_id"/>
+                  <arg type="t" name="timestamp"/>
+                  <arg type="a{sv}" name="options"/>
+                </signal>
+                <signal name="Deactivated">
+                  <arg type="o" name="session_handle"/>
+                  <arg type="s" name="shortcut_id"/>
+                  <arg type="t" name="timestamp"/>
+                  <arg type="a{sv}" name="options"/>
+                </signal>
+              </interface>
+            </node>
+            """
             )
+
             proxy = self._bus.get_proxy_object(
-                self.PORTAL_BUS_NAME, self.PORTAL_OBJECT_PATH, introspection
+                self.PORTAL_BUS_NAME, self.PORTAL_OBJECT_PATH, shortcuts_introspection
             )
 
             self._shortcuts_iface = proxy.get_interface(self.SHORTCUTS_INTERFACE)
@@ -172,10 +226,23 @@ class PortalHotkeyListener(HotkeyListener):
                 return False
 
             # Step 3: Subscribe to Activated/Deactivated signals
+            logger.debug("Subscribing to Activated signal...")
             self._shortcuts_iface.on_activated(self._on_shortcut_activated)
+            logger.debug("Subscribing to Deactivated signal...")
             self._shortcuts_iface.on_deactivated(self._on_shortcut_deactivated)
 
-            logger.info("Portal GlobalShortcuts session ready")
+            logger.info(
+                "Portal GlobalShortcuts session ready and listening for signals"
+            )
+            logger.info(f"Monitoring session: {self._session_handle}")
+            logger.info(f"Shortcut ID: {self._shortcut_id}")
+
+            # Store the actual bound trigger for user display
+            if hasattr(self, "_actual_bound_trigger"):
+                logger.info(
+                    f"IMPORTANT: Use the shortcut shown in the system dialog, NOT '{self._preferred_trigger}'"
+                )
+
             return True
 
         except Exception as e:
@@ -185,6 +252,7 @@ class PortalHotkeyListener(HotkeyListener):
     async def _create_session(self, sender: str, session_token: str) -> Optional[str]:
         """Create a GlobalShortcuts session."""
         from dbus_next import Variant
+        from dbus_next import introspection as intr
 
         request_token = f"req_{secrets.token_hex(8)}"
         expected_request_path = (
@@ -221,12 +289,25 @@ class PortalHotkeyListener(HotkeyListener):
                 )
 
         # Subscribe to the Response signal on the expected request path
+        # Use manual introspection to avoid issues with other properties
+        request_introspection_xml = intr.Node.parse(
+            """
+        <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+         "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+        <node>
+          <interface name="org.freedesktop.portal.Request">
+            <signal name="Response">
+              <arg type="u" name="response"/>
+              <arg type="a{sv}" name="results"/>
+            </signal>
+          </interface>
+        </node>
+        """
+        )
+
         try:
-            request_introspection = await self._bus.introspect(
-                self.PORTAL_BUS_NAME, expected_request_path
-            )
             request_proxy = self._bus.get_proxy_object(
-                self.PORTAL_BUS_NAME, expected_request_path, request_introspection
+                self.PORTAL_BUS_NAME, expected_request_path, request_introspection_xml
             )
             request_iface = request_proxy.get_interface(self.REQUEST_INTERFACE)
             request_iface.on_response(on_response)
@@ -248,11 +329,8 @@ class PortalHotkeyListener(HotkeyListener):
         # If we couldn't subscribe to request path, try subscribing now
         if not response_future.done():
             try:
-                request_introspection = await self._bus.introspect(
-                    self.PORTAL_BUS_NAME, request_handle
-                )
                 request_proxy = self._bus.get_proxy_object(
-                    self.PORTAL_BUS_NAME, request_handle, request_introspection
+                    self.PORTAL_BUS_NAME, request_handle, request_introspection_xml
                 )
                 request_iface = request_proxy.get_interface(self.REQUEST_INTERFACE)
                 request_iface.on_response(on_response)
@@ -273,6 +351,7 @@ class PortalHotkeyListener(HotkeyListener):
     async def _bind_shortcuts(self, sender: str) -> bool:
         """Bind our recording shortcut to the session."""
         from dbus_next import Variant
+        from dbus_next import introspection as intr
 
         request_token = f"bind_{secrets.token_hex(8)}"
         expected_request_path = (
@@ -286,7 +365,39 @@ class PortalHotkeyListener(HotkeyListener):
                 return
             if response_code == 0:
                 shortcuts = results.get("shortcuts", [])
-                logger.info(f"Shortcuts bound: {shortcuts}")
+                logger.info(f"Shortcuts bound successfully: {shortcuts}")
+                # Extract and log the actual trigger that was bound
+                try:
+                    if shortcuts and hasattr(shortcuts, "value"):
+                        shortcuts_list = shortcuts.value
+                    else:
+                        shortcuts_list = shortcuts
+
+                    if shortcuts_list:
+                        for shortcut in shortcuts_list:
+                            shortcut_id = shortcut[0]
+                            shortcut_props = shortcut[1]
+                            trigger = shortcut_props.get("trigger_description")
+                            if trigger:
+                                trigger_value = (
+                                    trigger.value
+                                    if hasattr(trigger, "value")
+                                    else trigger
+                                )
+                                self._actual_bound_trigger = trigger_value
+                                logger.warning(
+                                    f"Portal bound shortcut '{shortcut_id}' to trigger: {trigger_value}"
+                                )
+                                if (
+                                    self._preferred_trigger.lower()
+                                    not in str(trigger_value).lower()
+                                ):
+                                    logger.warning(
+                                        f"NOTE: Portal changed your preferred trigger '{self._preferred_trigger}' to '{trigger_value}'"
+                                    )
+                except Exception as e:
+                    logger.debug(f"Could not parse trigger description: {e}")
+
                 response_future.set_result(True)
             elif response_code == 1:
                 logger.warning("User cancelled shortcut binding")
@@ -297,12 +408,25 @@ class PortalHotkeyListener(HotkeyListener):
                 )
 
         # Subscribe to Response signal
+        # Use manual introspection to avoid issues with other properties
+        request_introspection_xml = intr.Node.parse(
+            """
+        <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+         "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+        <node>
+          <interface name="org.freedesktop.portal.Request">
+            <signal name="Response">
+              <arg type="u" name="response"/>
+              <arg type="a{sv}" name="results"/>
+            </signal>
+          </interface>
+        </node>
+        """
+        )
+
         try:
-            request_introspection = await self._bus.introspect(
-                self.PORTAL_BUS_NAME, expected_request_path
-            )
             request_proxy = self._bus.get_proxy_object(
-                self.PORTAL_BUS_NAME, expected_request_path, request_introspection
+                self.PORTAL_BUS_NAME, expected_request_path, request_introspection_xml
             )
             request_iface = request_proxy.get_interface(self.REQUEST_INTERFACE)
             request_iface.on_response(on_response)
@@ -310,14 +434,15 @@ class PortalHotkeyListener(HotkeyListener):
             logger.debug(f"Could not subscribe to request path before call: {e}")
 
         # Define our shortcut
+        # Note: Must be a list of lists, not list of tuples, for dbus-next
         shortcuts = [
-            (
+            [
                 self._shortcut_id,
                 {
                     "description": Variant("s", "Start/stop voice recording"),
                     "preferred_trigger": Variant("s", self._preferred_trigger),
                 },
-            )
+            ]
         ]
 
         options = {
@@ -335,11 +460,8 @@ class PortalHotkeyListener(HotkeyListener):
         # If we couldn't subscribe to request path, try subscribing now
         if not response_future.done():
             try:
-                request_introspection = await self._bus.introspect(
-                    self.PORTAL_BUS_NAME, request_handle
-                )
                 request_proxy = self._bus.get_proxy_object(
-                    self.PORTAL_BUS_NAME, request_handle, request_introspection
+                    self.PORTAL_BUS_NAME, request_handle, request_introspection_xml
                 )
                 request_iface = request_proxy.get_interface(self.REQUEST_INTERFACE)
                 request_iface.on_response(on_response)
@@ -361,20 +483,102 @@ class PortalHotkeyListener(HotkeyListener):
     def _on_shortcut_activated(
         self, session_handle: str, shortcut_id: str, timestamp: int, options: dict
     ):
-        """Called when the shortcut is pressed."""
+        """Called when the shortcut is pressed.
+
+        Note: The XDG Portal GlobalShortcuts API sends Activated/Deactivated pairs
+        for each key repeat event (not just the initial press). We handle this by:
+        1. Cancelling any pending release when we receive an Activated signal
+        2. Only triggering press callback on the first Activated (when not already pressed)
+        """
+        if self._log_key_repeat_debug:
+            logger.debug(
+                f"Portal signal received - Activated: session={session_handle}, shortcut={shortcut_id}, timestamp={timestamp}"
+            )
         if shortcut_id == self._shortcut_id:
-            logger.debug(f"Shortcut activated: {shortcut_id} at {timestamp}")
+            # Cancel any pending release - this Activated means the key is still held
+            if self._pending_release_task is not None:
+                self._pending_release_task.cancel()
+                self._pending_release_task = None
+                if self._log_key_repeat_debug:
+                    logger.debug("Cancelled pending release (key repeat detected)")
+
+            if self._key_is_pressed:
+                # Key is already pressed, this is a key repeat - ignore
+                if self._log_key_repeat_debug:
+                    logger.debug(
+                        "Ignoring key repeat Activated signal (key already pressed)"
+                    )
+                elif not self._logged_debug_hint:
+                    logger.debug(
+                        "Key repeat signals detected (this is normal). "
+                        "Set log_key_repeat_debug = true in settings.toml for detailed logs."
+                    )
+                    self._logged_debug_hint = True
+                return
+
+            self._key_is_pressed = True
+            logger.info(f"Shortcut activated: {shortcut_id} at {timestamp}")
             if self.on_hotkey_press:
                 self.on_hotkey_press()
+        else:
+            logger.warning(
+                f"Received activation for unknown shortcut: {shortcut_id} (expected: {self._shortcut_id})"
+            )
 
     def _on_shortcut_deactivated(
         self, session_handle: str, shortcut_id: str, timestamp: int, options: dict
     ):
-        """Called when the shortcut is released."""
+        """Called when the shortcut is released.
+
+        Note: The XDG Portal sends Deactivated for both real releases AND key repeats.
+        We use a delayed release approach: schedule the release callback after a short
+        delay. If an Activated signal arrives before the delay expires (indicating key
+        repeat), we cancel the pending release.
+        """
+        if self._log_key_repeat_debug:
+            logger.debug(
+                f"Portal signal received - Deactivated: session={session_handle}, shortcut={shortcut_id}, timestamp={timestamp}"
+            )
         if shortcut_id == self._shortcut_id:
-            logger.debug(f"Shortcut deactivated: {shortcut_id} at {timestamp}")
-            if self.on_hotkey_release:
-                self.on_hotkey_release()
+            if not self._key_is_pressed:
+                # Key wasn't pressed - ignore (shouldn't happen normally)
+                if self._log_key_repeat_debug:
+                    logger.debug("Ignoring Deactivated signal (key not pressed)")
+                return
+
+            # Cancel any existing pending release (shouldn't happen, but be safe)
+            if self._pending_release_task is not None:
+                self._pending_release_task.cancel()
+                self._pending_release_task = None
+
+            # Schedule a delayed release - will be cancelled if Activated arrives
+            if self._log_key_repeat_debug:
+                logger.debug(
+                    f"Scheduling delayed release in {self._debounce_threshold_sec}s"
+                )
+            if self._loop:
+                self._pending_release_task = self._loop.call_later(
+                    self._debounce_threshold_sec,
+                    self._execute_release,
+                    shortcut_id,
+                    timestamp,
+                )
+            else:
+                # Fallback: if no loop, execute immediately (shouldn't happen)
+                logger.warning("No event loop available, executing release immediately")
+                self._execute_release(shortcut_id, timestamp)
+        else:
+            logger.warning(
+                f"Received deactivation for unknown shortcut: {shortcut_id} (expected: {self._shortcut_id})"
+            )
+
+    def _execute_release(self, shortcut_id: str, timestamp: int):
+        """Execute the actual release callback after debounce delay."""
+        self._pending_release_task = None
+        self._key_is_pressed = False
+        logger.info(f"Shortcut deactivated: {shortcut_id} at {timestamp}")
+        if self.on_hotkey_release:
+            self.on_hotkey_release()
 
     def start_listening(self) -> None:
         """Start the portal hotkey listener.
@@ -436,6 +640,11 @@ class PortalHotkeyListener(HotkeyListener):
 
         self._running = False
         logger.info("Stopping portal hotkey listener...")
+
+        # Cancel any pending release task
+        if self._pending_release_task is not None:
+            self._pending_release_task.cancel()
+            self._pending_release_task = None
 
         if self._loop:
             # Schedule loop stop from the loop's thread

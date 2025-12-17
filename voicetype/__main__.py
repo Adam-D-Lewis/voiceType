@@ -67,7 +67,12 @@ def configure_logging(log_file: Path | None = None) -> Path:
     return log_file
 
 
-def get_platform_listener(on_press: callable, on_release: callable) -> HotkeyListener:
+def get_platform_listener(
+    on_press: callable,
+    on_release: callable,
+    method: str = "auto",
+    log_key_repeat_debug: bool = False,
+) -> HotkeyListener:
     """Detect the platform/session and return a listener instance.
 
     This function uses the factory function from the hotkey_listener module
@@ -78,6 +83,8 @@ def get_platform_listener(on_press: callable, on_release: callable) -> HotkeyLis
     Args:
         on_press: Callback function to execute when the hotkey is pressed.
         on_release: Callback function to execute when the hotkey is released.
+        method: Hotkey listener method ("auto", "portal", or "pynput")
+        log_key_repeat_debug: Whether to log key repeat debug messages (portal only)
 
     Returns:
         An appropriate HotkeyListener instance for the current platform.
@@ -96,6 +103,8 @@ def get_platform_listener(on_press: callable, on_release: callable) -> HotkeyLis
         return create_hotkey_listener(
             on_hotkey_press=on_press,
             on_hotkey_release=on_release,
+            method=method,
+            log_key_repeat_debug=log_key_repeat_debug,
         )
     except Exception as e:
         logger.error(f"Failed to initialize hotkey listener: {e}", exc_info=True)
@@ -233,7 +242,10 @@ def main():
 
             # Create platform-specific listener
             hotkey_listener = get_platform_listener(
-                on_press=on_hotkey_press, on_release=on_hotkey_release
+                on_press=on_hotkey_press,
+                on_release=on_hotkey_release,
+                method=settings.hotkey_listener,
+                log_key_repeat_debug=settings.log_key_repeat_debug,
             )
             hotkey_listener.set_hotkey(hotkey_string)
 

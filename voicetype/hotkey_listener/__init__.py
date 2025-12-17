@@ -23,19 +23,24 @@ __all__ = [
 def create_hotkey_listener(
     on_hotkey_press: Optional[Callable[[], None]] = None,
     on_hotkey_release: Optional[Callable[[], None]] = None,
+    method: str = "auto",
+    log_key_repeat_debug: bool = False,
 ) -> HotkeyListener:
     """Create the appropriate hotkey listener for the current platform.
 
     This factory function selects the best hotkey listener implementation
-    based on the current environment:
+    based on the current environment and the specified method:
 
-    Priority:
-    1. On Wayland with GlobalShortcuts portal support: Use PortalHotkeyListener
-    2. Otherwise: Use PynputHotkeyListener (X11, macOS, Windows)
+    Methods:
+    - "auto" (default): Try portal on Wayland, fall back to pynput
+    - "portal": Force XDG Portal GlobalShortcuts (Wayland only)
+    - "pynput": Force pynput listener (works on X11, may need XWayland on Wayland)
 
     Args:
         on_hotkey_press: Callback function to execute when the hotkey is pressed.
         on_hotkey_release: Callback function to execute when the hotkey is released.
+        method: Hotkey listener method ("auto", "portal", or "pynput")
+        log_key_repeat_debug: Whether to log key repeat debug messages (portal only)
 
     Returns:
         An appropriate HotkeyListener instance for the current platform.
@@ -43,13 +48,28 @@ def create_hotkey_listener(
     Raises:
         RuntimeError: If no suitable hotkey listener can be initialized.
     """
+    # Force pynput if requested
+    if method == "pynput":
+        logger.info("Using pynput hotkey listener (forced by configuration)")
+        return PynputHotkeyListener(
+            on_hotkey_press=on_hotkey_press,
+            on_hotkey_release=on_hotkey_release,
+        )
+
     # Check if we're on Wayland
     wayland_display = os.environ.get("WAYLAND_DISPLAY")
     xdg_session_type = os.environ.get("XDG_SESSION_TYPE")
     is_wayland = wayland_display or xdg_session_type == "wayland"
 
-    if is_wayland:
-        logger.info("Wayland session detected")
+    # Try portal if on Wayland (or forced)
+    if is_wayland or method == "portal":
+        if is_wayland:
+            logger.info("Wayland session detected")
+
+        if method == "portal" and not is_wayland:
+            logger.warning(
+                "Portal method requested but not on Wayland. Trying anyway..."
+            )
 
         try:
             from .portal_hotkey_listener import (
@@ -62,8 +82,15 @@ def create_hotkey_listener(
                 return PortalHotkeyListener(
                     on_hotkey_press=on_hotkey_press,
                     on_hotkey_release=on_hotkey_release,
+                    log_key_repeat_debug=log_key_repeat_debug,
                 )
             else:
+                if method == "portal":
+                    raise RuntimeError(
+                        "Portal method requested but GlobalShortcuts portal not available. "
+                        "Your desktop environment may not support this feature yet. "
+                        "Supported: GNOME 48+, KDE Plasma, Hyprland."
+                    )
                 logger.warning(
                     "Wayland detected but GlobalShortcuts portal not available. "
                     "Your desktop environment may not support this feature yet. "
@@ -71,6 +98,11 @@ def create_hotkey_listener(
                     "Falling back to pynput (may require XWayland or root)."
                 )
         except ImportError as e:
+            if method == "portal":
+                raise RuntimeError(
+                    f"Portal method requested but dbus-next not available: {e}. "
+                    "Install with: pip install dbus-next"
+                )
             logger.warning(
                 f"Portal listener not available (missing dbus-next?): {e}. "
                 "Install with: pip install dbus-next"
