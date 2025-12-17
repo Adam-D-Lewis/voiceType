@@ -8,7 +8,7 @@ from loguru import logger
 
 from voicetype.app_context import AppContext
 from voicetype.assets.sounds import EMPTY_SOUND, ERROR_SOUND, START_RECORD_SOUND
-from voicetype.hotkey_listener.hotkey_listener import HotkeyListener
+from voicetype.hotkey_listener import HotkeyListener, create_hotkey_listener
 from voicetype.pipeline import (
     HotkeyDispatcher,
     PipelineManager,
@@ -68,66 +68,38 @@ def configure_logging(log_file: Path | None = None) -> Path:
 
 
 def get_platform_listener(on_press: callable, on_release: callable) -> HotkeyListener:
-    """Detect the platform/session and return a listener instance (callbacks bound later)."""
+    """Detect the platform/session and return a listener instance.
+
+    This function uses the factory function from the hotkey_listener module
+    to automatically select the appropriate listener based on the platform:
+    - Wayland with GlobalShortcuts portal: PortalHotkeyListener
+    - X11, Windows, macOS: PynputHotkeyListener
+
+    Args:
+        on_press: Callback function to execute when the hotkey is pressed.
+        on_release: Callback function to execute when the hotkey is released.
+
+    Returns:
+        An appropriate HotkeyListener instance for the current platform.
+
+    Raises:
+        RuntimeError: If no suitable hotkey listener can be initialized.
+    """
     system = platform.system()
+    logger.info(f"Detected platform: {system}")
 
     if system == "Linux":
         session_type = os.environ.get("XDG_SESSION_TYPE", "unknown").lower()
-        logger.info(f"Detected Linux with session type: {session_type}")
+        logger.info(f"Linux session type: {session_type}")
 
-        if session_type == "wayland":
-            # Check if XWayland is available
-            xwayland_available = os.environ.get("XWAYLAND_DISPLAY") is not None
-            if xwayland_available:
-                logger.info("XWayland appears to be available.")
-            else:
-                raise NotImplementedError(
-                    "Wayland hotkey listener only currently implemented for XWayland."
-                )
-
-        # Default to pynput listener for Linux X11
-        logger.info("Using pynput listener for Linux.")
-        try:
-            from voicetype.hotkey_listener.pynput_hotkey_listener import (
-                PynputHotkeyListener,
-            )
-
-            return PynputHotkeyListener(
-                on_hotkey_press=on_press, on_hotkey_release=on_release
-            )
-        except Exception as e:
-            logger.error(f"Failed to initialize pynput listener: {e}", exc_info=True)
-            raise RuntimeError("Could not initialize Linux hotkey listener.") from e
-
-    elif system == "Windows":
-        logger.info("Using pynput listener for Windows.")
-        try:
-            from voicetype.hotkey_listener.pynput_hotkey_listener import (
-                PynputHotkeyListener,
-            )
-
-            return PynputHotkeyListener(
-                on_hotkey_press=on_press, on_hotkey_release=on_release
-            )
-        except Exception as e:
-            logger.error(f"Failed to initialize pynput listener: {e}", exc_info=True)
-            raise RuntimeError("Could not initialize Windows hotkey listener.") from e
-
-    elif system == "Darwin":  # macOS
-        logger.info("Using pynput listener for macOS.")
-        try:
-            from voicetype.hotkey_listener.pynput_hotkey_listener import (
-                PynputHotkeyListener,
-            )
-
-            return PynputHotkeyListener(
-                on_hotkey_press=on_press, on_hotkey_release=on_release
-            )
-        except Exception as e:
-            logger.error(f"Failed to initialize pynput listener: {e}", exc_info=True)
-            raise RuntimeError("Could not initialize macOS hotkey listener.") from e
-    else:
-        raise OSError(f"Unsupported operating system: {system}")
+    try:
+        return create_hotkey_listener(
+            on_hotkey_press=on_press,
+            on_hotkey_release=on_release,
+        )
+    except Exception as e:
+        logger.error(f"Failed to initialize hotkey listener: {e}", exc_info=True)
+        raise RuntimeError(f"Could not initialize hotkey listener on {system}.") from e
 
 
 def unload_stt_model():
