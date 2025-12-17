@@ -10,7 +10,9 @@ import sys
 import tempfile
 import threading
 import time
+from datetime import datetime
 from typing import Any, Literal, Optional
+from uuid import uuid4
 
 import numpy as np
 import sounddevice as sd
@@ -237,14 +239,13 @@ class RecordAudio(PipelineStage[None, Optional[str]]):
         try:
             # Ensure directory exists (may have been deleted since init)
             os.makedirs(self.audio_storage_path, exist_ok=True)
-            temp_wav = tempfile.NamedTemporaryFile(
-                prefix="recording_",
-                suffix=".wav",
-                dir=self.audio_storage_path,
-                delete=False,
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[
+                :-3
+            ]  # trim to milliseconds
+            short_uuid = uuid4().hex[:8]
+            self.temp_wav = os.path.join(
+                self.audio_storage_path, f"recording_{timestamp}_{short_uuid}.wav"
             )
-            self.temp_wav = temp_wav.name
-            temp_wav.close()
 
             self.audio_file = sf.SoundFile(
                 self.temp_wav,
