@@ -63,10 +63,10 @@ Restart=always
 RestartSec=5
 # Ensures Python output is not buffered, useful for journald logging
 Environment="PYTHONUNBUFFERED=1"
+# Force GTK to use X11 backend (via XWayland) for system tray support on Wayland
+Environment="GDK_BACKEND=x11"
 # Load environment variables from the specified file
 EnvironmentFile={environment_file_path}
-# StandardOutput=journal # Systemd default for user services
-# StandardError=journal  # Systemd default for user services
 
 [Install]
 # Enable this service for the default user target (starts on login)
