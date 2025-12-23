@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=VoiceType
+GenericName=Voice Typing
+Comment=Type with your voice using speech-to-text
+Exec=voicetype
+Icon=audio-input-microphone
+Terminal=false
+Categories=Utility;Accessibility;
+Keywords=voice;typing;speech;transcription;dictation;
+StartupNotify=false
+NoDisplay=true

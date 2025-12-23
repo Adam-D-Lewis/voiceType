@@ -5,12 +5,24 @@ import subprocess
 import sys
 from pathlib import Path
 
-SERVICE_NAME = "voicetype.service"
+# Application ID in reverse-DNS format (required for XDG Portal GlobalShortcuts on GNOME)
+APP_ID = "io.github.voicetype.VoiceType"
+
+# Systemd service naming follows the format: app-<ApplicationID>.service
+# This allows xdg-desktop-portal to derive the correct app_id from cgroups
+SERVICE_NAME = f"app-{APP_ID}.service"
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
 SERVICE_FILE_PATH = SYSTEMD_USER_DIR / SERVICE_NAME
 
 APP_CONFIG_DIR = Path.home() / ".config" / "voicetype"
 ENV_FILE_PATH = APP_CONFIG_DIR / ".env"
+
+# Desktop file paths
+DESKTOP_FILE_NAME = f"{APP_ID}.desktop"
+DESKTOP_SOURCE_PATH = Path(__file__).parent / "assets" / DESKTOP_FILE_NAME
+DESKTOP_INSTALL_DIR = Path.home() / ".local" / "share" / "applications"
+DESKTOP_INSTALL_PATH = DESKTOP_INSTALL_DIR / DESKTOP_FILE_NAME
+
 
 def get_project_root() -> Path:
     """
@@ -51,10 +63,10 @@ Restart=always
 RestartSec=5
 # Ensures Python output is not buffered, useful for journald logging
 Environment="PYTHONUNBUFFERED=1"
+# Force GTK to use X11 backend (via XWayland) for system tray support on Wayland
+Environment="GDK_BACKEND=x11"
 # Load environment variables from the specified file
 EnvironmentFile={environment_file_path}
-# StandardOutput=journal # Systemd default for user services
-# StandardError=journal  # Systemd default for user services
 
 [Install]
 # Enable this service for the default user target (starts on login)
@@ -136,6 +148,28 @@ def install_service():
         )
         sys.exit(1)
 
+    # Install .desktop file (required for XDG Portal GlobalShortcuts on GNOME/Wayland)
+    # The portal uses the .desktop file to validate the application identity
+    DESKTOP_INSTALL_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        import shutil
+
+        if DESKTOP_SOURCE_PATH.exists():
+            shutil.copy(DESKTOP_SOURCE_PATH, DESKTOP_INSTALL_PATH)
+            print(f"Desktop file installed at {DESKTOP_INSTALL_PATH}")
+        else:
+            print(
+                f"Warning: Desktop file not found at {DESKTOP_SOURCE_PATH}. "
+                "Global shortcuts may not work on Wayland/GNOME.",
+                file=sys.stderr,
+            )
+    except IOError as e:
+        print(
+            f"Warning: Could not install desktop file: {e}. "
+            "Global shortcuts may not work on Wayland/GNOME.",
+            file=sys.stderr,
+        )
+
     # Create systemd service file
     service_content = get_service_file_content()
     SYSTEMD_USER_DIR.mkdir(parents=True, exist_ok=True)
@@ -190,6 +224,19 @@ def uninstall_service():
     run_systemctl_command(["stop", SERVICE_NAME], ignore_errors=True)
     run_systemctl_command(["disable", SERVICE_NAME], ignore_errors=True)
 
+    # Also clean up old service name (voicetype.service) for backward compatibility
+    old_service_name = "voicetype.service"
+    old_service_path = SYSTEMD_USER_DIR / old_service_name
+    if old_service_path.exists():
+        print(f"Found old service file, cleaning up: {old_service_name}")
+        run_systemctl_command(["stop", old_service_name], ignore_errors=True)
+        run_systemctl_command(["disable", old_service_name], ignore_errors=True)
+        try:
+            old_service_path.unlink()
+            print(f"Old service file removed: {old_service_path}")
+        except OSError as e:
+            print(f"Error removing old service file: {e}", file=sys.stderr)
+
     if SERVICE_FILE_PATH.exists():
         try:
             SERVICE_FILE_PATH.unlink()
@@ -203,6 +250,19 @@ def uninstall_service():
         print(f"Service file {SERVICE_FILE_PATH} not found.")
 
     run_systemctl_command(["daemon-reload"])  # Reload even if files were not present
+
+    # Remove the .desktop file
+    if DESKTOP_INSTALL_PATH.exists():
+        try:
+            DESKTOP_INSTALL_PATH.unlink()
+            print(f"Desktop file removed: {DESKTOP_INSTALL_PATH}")
+        except OSError as e:
+            print(
+                f"Error removing desktop file {DESKTOP_INSTALL_PATH}: {e}",
+                file=sys.stderr,
+            )
+    else:
+        print(f"Desktop file {DESKTOP_INSTALL_PATH} not found.")
 
     # Remove the .env file
     if ENV_FILE_PATH.exists():
