@@ -58,7 +58,7 @@ def configure_logging(log_file: Path | None = None) -> Path:
         retention=3,  # Keep 3 old log files
         compression="zip",  # Compress rotated logs
         level="DEBUG",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
         backtrace=True,
         diagnose=True,
     )
