@@ -301,17 +301,20 @@ pip uninstall voicetype
 On Linux, VoiceType uses a **two-process architecture** to handle a conflict between keyboard capture and the system tray:
 
 1. **The Problem:**
-   - `pynput` (keyboard capture) requires root access to read from `/dev/input`
+   - Keyboard capture requires root access to read from `/dev/input` devices
    - `pystray` (system tray) requires access to the user's D-Bus session
    - Running the entire app as root breaks the tray icon
 
 2. **The Solution:**
-   - **Privileged Listener** (`voicetype-listener.service`): Runs as root, captures keyboard events, sends them over a Unix socket
+   - **Privileged Listener** (`voicetype-listener.service`): Runs as root, uses evdev to capture keyboard events directly from `/dev/input`, sends hotkey events over a Unix socket
    - **Main Application** (`voicetype.service`): Runs as your user, handles the tray icon, transcription, and typing
 
 3. **Communication:**
    - The two processes communicate via a Unix socket at `/run/user/<uid>/voicetype-hotkey.sock`
    - The socket is created by the privileged listener with permissions allowing the user to connect
+
+4. **Wayland Support:**
+   - The evdev-based listener works on both X11 and Wayland, as it reads directly from kernel input devices rather than relying on X11 APIs
 
 This architecture is **only needed on Linux**. On Windows and macOS, `pynput` works without elevated privileges, so a single process handles everything.
 
@@ -326,9 +329,10 @@ VoiceType uses a pipeline-based architecture with resource-based concurrency con
 - Execution flow and lifecycle
 - Design principles and extension points
 
-### Vendored Dependencies
+### Platform-Specific Keyboard Handling
 
-VoiceType includes a vendored version of [pynput](https://github.com/moses-palmer/pynput) located in `voicetype/_vendor/pynput/`. This vendored version includes a not-yet-merged bug fix and allows for better control over keyboard/mouse input handling functionality across different platforms
+- **Linux**: Uses direct evdev access for keyboard capture (works on both X11 and Wayland)
+- **Windows/macOS**: Uses pynput for keyboard capture
 
 ## Development
 

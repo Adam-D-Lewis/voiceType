@@ -9,6 +9,10 @@ Solution: Run this listener as a separate process with sudo, while the main
 application (with the tray icon) runs as the regular user. Communication
 happens over Unix domain sockets.
 
+This listener uses direct evdev access instead of pynput's uinput backend,
+because the uinput backend requires `dumpkeys` which doesn't work in
+graphical environments (X11/Wayland).
+
 Note: This is only needed on Linux. On Windows and macOS, pynput works
 without elevated privileges.
 
@@ -20,7 +24,6 @@ Usage (Linux only):
 import argparse
 import json
 import os
-import platform
 import signal
 import socket
 import sys
@@ -36,11 +39,10 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from loguru import logger
 
-# Use uinput backend for pynput on Linux - works better when running as root
-# Must be set before importing pynput
-if platform.system() == "Linux":
-    os.environ["PYNPUT_BACKEND_KEYBOARD"] = "uinput"
-    os.environ["PYNPUT_BACKEND_MOUSE"] = "dummy"
+from voicetype.hotkey_listener.evdev_listener import (
+    EvdevKeyboardListener,
+    parse_hotkey,
+)
 
 
 def is_tcp_address(address: str) -> bool:
@@ -49,7 +51,11 @@ def is_tcp_address(address: str) -> bool:
 
 
 class PrivilegedListener:
-    """Keyboard listener that communicates over sockets (Unix or TCP)."""
+    """Keyboard listener that communicates over sockets (Unix or TCP).
+
+    Uses direct evdev access instead of pynput, which works on both X11 and
+    Wayland without requiring dumpkeys.
+    """
 
     def __init__(self, socket_address: str, hotkey: str):
         """Initialize the listener.
@@ -63,10 +69,10 @@ class PrivilegedListener:
         self.hotkey = hotkey
         self._socket: Optional[socket.socket] = None
         self._conn: Optional[socket.socket] = None
-        self._listener = None
+        self._evdev_listener: Optional[EvdevKeyboardListener] = None
         self._running = False
-        self._hotkey_combination: Optional[set] = None
-        self._pressed_keys: set = set()
+        self._hotkey_codes: set[int] = set()
+        self._pressed_keys: set[int] = set()
         self._hotkey_pressed: bool = False
         self._lock = threading.Lock()
 
@@ -102,56 +108,57 @@ class PrivilegedListener:
         self._socket.listen(1)
 
     def _parse_hotkey(self, hotkey: str) -> None:
-        """Parse the hotkey string into a key combination."""
-        import pynput
-
-        keyboard = pynput.keyboard
+        """Parse the hotkey string into a set of evdev key codes."""
         try:
-            self._hotkey_combination = set(keyboard.HotKey.parse(hotkey))
+            self._hotkey_codes = parse_hotkey(hotkey)
             self.hotkey = hotkey
-            logger.info(f"Hotkey set to: {hotkey} -> {self._hotkey_combination}")
+            logger.info(f"Hotkey set to: {hotkey} -> codes {self._hotkey_codes}")
         except ValueError as e:
             logger.error(f"Error parsing hotkey: {e}")
 
-    def _on_press(self, key) -> None:
-        """Handle key press events."""
-        logger.debug(f"Key press detected: {key}")
-        if key is None or self._hotkey_combination is None or self._listener is None:
+    def _on_press(self, key_code: int) -> None:
+        """Handle key press events.
+
+        Args:
+            key_code: The evdev key code that was pressed.
+        """
+        logger.debug(f"Key press detected: code={key_code}")
+        if not self._hotkey_codes:
             return
 
         with self._lock:
-            canonical_key = self._listener.canonical(key)
+            self._pressed_keys.add(key_code)
             logger.debug(
-                f"Canonical key: {canonical_key}, hotkey combo: {self._hotkey_combination}"
+                f"Pressed keys: {self._pressed_keys}, hotkey codes: {self._hotkey_codes}"
             )
-            self._pressed_keys.add(canonical_key)
 
-            if not self._hotkey_pressed and self._hotkey_combination.issubset(
+            if not self._hotkey_pressed and self._hotkey_codes.issubset(
                 self._pressed_keys
             ):
                 self._hotkey_pressed = True
+                logger.info("Hotkey pressed!")
                 self._send_message({"type": "press"})
 
-    def _on_release(self, key) -> None:
-        """Handle key release events."""
-        if key is None or self._hotkey_combination is None or self._listener is None:
+    def _on_release(self, key_code: int) -> None:
+        """Handle key release events.
+
+        Args:
+            key_code: The evdev key code that was released.
+        """
+        if not self._hotkey_codes:
             return
 
-        canonical_key = self._listener.canonical(key)
-
         with self._lock:
-            if self._hotkey_pressed and canonical_key in self._hotkey_combination:
-                any_hotkey_key_pressed = any(
-                    k in self._pressed_keys
-                    for k in self._hotkey_combination
-                    if k != canonical_key
-                )
-                if not any_hotkey_key_pressed:
+            if self._hotkey_pressed and key_code in self._hotkey_codes:
+                # Check if any other hotkey keys are still pressed
+                remaining_hotkey_keys = self._hotkey_codes - {key_code}
+                still_pressed = remaining_hotkey_keys & self._pressed_keys
+                if not still_pressed:
                     self._hotkey_pressed = False
+                    logger.info("Hotkey released!")
                     self._send_message({"type": "release"})
 
-            if canonical_key in self._pressed_keys:
-                self._pressed_keys.remove(canonical_key)
+            self._pressed_keys.discard(key_code)
 
     def _send_message(self, msg: dict) -> None:
         """Send a JSON message to the connected client."""
@@ -202,9 +209,6 @@ class PrivilegedListener:
 
     def run(self) -> None:
         """Run the privileged listener."""
-        import pynput
-
-        keyboard = pynput.keyboard
 
         # Set up signal handlers
         def signal_handler(signum, frame):
@@ -220,13 +224,13 @@ class PrivilegedListener:
         # Set up socket
         self._setup_socket()
 
-        # Start keyboard listener
-        self._listener = keyboard.Listener(
+        # Start evdev keyboard listener
+        self._evdev_listener = EvdevKeyboardListener(
             on_press=self._on_press,
             on_release=self._on_release,
         )
-        self._listener.start()
-        logger.info("Keyboard listener started")
+        self._evdev_listener.start()
+        logger.info("Evdev keyboard listener started")
 
         self._running = True
 
@@ -253,10 +257,9 @@ class PrivilegedListener:
         """Clean up resources."""
         self._running = False
 
-        if self._listener:
-            self._listener.stop()
-            self._listener.join()
-            logger.info("Keyboard listener stopped")
+        if self._evdev_listener:
+            self._evdev_listener.stop()
+            logger.info("Evdev keyboard listener stopped")
 
         if self._conn:
             try:
