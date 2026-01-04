@@ -74,8 +74,7 @@ class TypeText(PipelineStage[Optional[str], None]):
         logger.debug(f"Typing text: {input_data}")
 
         # Import keyboard controller
-        # Import from _vendor package which sets up sys.path correctly
-        from voicetype._vendor import pynput
+        import pynput
 
         keyboard = pynput.keyboard.Controller()
 

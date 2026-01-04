@@ -39,7 +39,8 @@ from loguru import logger
 # Use uinput backend for pynput on Linux - works better when running as root
 # Must be set before importing pynput
 if platform.system() == "Linux":
-    os.environ["PYNPUT_BACKEND"] = "uinput"
+    os.environ["PYNPUT_BACKEND_KEYBOARD"] = "uinput"
+    os.environ["PYNPUT_BACKEND_MOUSE"] = "dummy"
 
 
 def is_tcp_address(address: str) -> bool:
@@ -102,7 +103,7 @@ class PrivilegedListener:
 
     def _parse_hotkey(self, hotkey: str) -> None:
         """Parse the hotkey string into a key combination."""
-        from voicetype._vendor import pynput
+        import pynput
 
         keyboard = pynput.keyboard
         try:
@@ -114,11 +115,15 @@ class PrivilegedListener:
 
     def _on_press(self, key) -> None:
         """Handle key press events."""
+        logger.debug(f"Key press detected: {key}")
         if key is None or self._hotkey_combination is None or self._listener is None:
             return
 
         with self._lock:
             canonical_key = self._listener.canonical(key)
+            logger.debug(
+                f"Canonical key: {canonical_key}, hotkey combo: {self._hotkey_combination}"
+            )
             self._pressed_keys.add(canonical_key)
 
             if not self._hotkey_pressed and self._hotkey_combination.issubset(
@@ -197,7 +202,7 @@ class PrivilegedListener:
 
     def run(self) -> None:
         """Run the privileged listener."""
-        from voicetype._vendor import pynput
+        import pynput
 
         keyboard = pynput.keyboard
 

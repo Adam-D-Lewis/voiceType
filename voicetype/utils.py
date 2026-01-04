@@ -3,9 +3,8 @@ import sys
 import time
 from pathlib import Path
 
+import pynput
 from loguru import logger
-
-from voicetype._vendor import pynput
 
 
 def get_app_data_dir() -> Path:

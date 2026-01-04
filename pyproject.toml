@@ -6,12 +6,6 @@ build-backend = "hatchling.build"
 packages = [
     "voicetype"
 ]
-exclude = [
-    "voicetype/_vendor/pynput/setup.py",
-    "voicetype/_vendor/pynput/docs/**",
-    "voicetype/_vendor/pynput/tests/**",
-    "voicetype/_vendor/pynput/tools/**"
-]
 
 [tool.hatch.version]
 source = "vcs"
@@ -27,7 +21,6 @@ authors = [{ name = "Adam Lewis" }]
 license = "Apache-2.0"
 license-files = [
     "LICENSE",
-    "voicetype/_vendor/pynput/COPYING.LGPL",
 ]
 requires-python = ">=3.11"
 keywords = ["speech-recognition", "voice-typing", "accessibility", "transcription"]
@@ -50,6 +43,7 @@ dynamic = ["version"]
 [project.scripts]
 voicetype = "voicetype.install:main"
 run-voicetype = "voicetype.__main__:main"
+rl-voicetype = "voicetype.scripts.run_linux:main"
 
 [project.optional-dependencies]
 dev = [
@@ -94,6 +88,7 @@ gobject-introspection = "*"
 pygobject = "*"
 loguru = ">=0.7.3,<0.8"
 litellm = ">=1.75"
+pynput = "*"
 
 [tool.pixi.pypi-dependencies]
 # "pyaudio",  # was causing me problems with audio
@@ -114,8 +109,7 @@ opentelemetry-sdk = "*"
 opentelemetry-exporter-otlp = "*"
 opentelemetry-instrumentation = "*"
 
-# the following dependencies come from vendoring in pynput
-six = "*"
+# six = "*"  # pynput dependency
 
 # Define the 'local' feature
 [tool.pixi.feature.local]
@@ -130,16 +124,13 @@ faster-whisper = "*"
 [tool.pixi.feature.local.dependencies]
 
 # Platform-scoped dependencies
-[tool.pixi.target.osx-64.pypi-dependencies]
-# the following dependencies come from vendoring in pynput
-pyobjc-framework-ApplicationServices = ">=8.0"
-pyobjc-framework-Quartz = ">=8.0"
+# [tool.pixi.target.osx-64.pypi-dependencies]
+# pynput dependencies for macOS
+# pyobjc-framework-ApplicationServices = ">=8.0"
+# pyobjc-framework-Quartz = ">=8.0"
 
 [tool.pixi.target.linux-64.pypi-dependencies]
 dasbus = "*" # wayland - Linux only
-# the following dependencies come from vendoring in pynput
-evdev = ">=1.3"
-python-xlib = ">=0.17"
 
 [tool.pixi.feature.local.target.linux-64.dependencies]
 

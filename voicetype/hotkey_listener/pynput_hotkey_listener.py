@@ -1,9 +1,8 @@
 import threading
 from typing import Callable, Optional, Set
 
+import pynput
 from loguru import logger
-
-from voicetype._vendor import pynput
 
 from .hotkey_listener import HotkeyListener
 
