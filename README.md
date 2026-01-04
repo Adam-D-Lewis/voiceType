@@ -15,8 +15,9 @@
 
 - Python 3.8+
 - `pip` (Python package installer)
-- For Linux installation: `systemd` (common in most modern Linux distributions).
-- An OpenAI API Key (if using OpenAI for transcription).
+- For Linux installation: `systemd` (common in most modern Linux distributions)
+- For Linux: `sudo` access (required for keyboard capture - see [Linux Architecture](#linux-architecture))
+- An OpenAI API Key (if using OpenAI for transcription)
 
 ## Installation
 
@@ -53,16 +54,19 @@ pip install voicetype2
     This command reads `pyproject.toml`, installs all necessary dependencies, and makes the `voicetype` script available (callable as `python -m voicetype`).
 
 4.  **Run the installation script (for Linux with systemd):**
-    If you are on Linux and want to run VoiceType as a systemd user service (recommended for background operation and auto-start on login), use the CLI entrypoint installed with the package. Ensure you're in the environment where you installed dependencies.
+    If you are on Linux and want to run VoiceType as a systemd service (recommended for background operation and auto-start on login), use the CLI entrypoint installed with the package. Ensure you're in the environment where you installed dependencies.
     ```bash
     voicetype install
     ```
-    During install you'll be prompted to choose a provider [litellm, local]. If you choose `litellm` you'll then be prompted for your `OPENAI_API_KEY`. Values are stored in `~/.config/voicetype/.env` with restricted permissions.
+    During install you'll be prompted to:
+    - Choose a provider [litellm, local]. If you choose `litellm` you'll be prompted for your `OPENAI_API_KEY`
+    - Enter a hotkey (default: `<pause>`)
 
-    The script will:
-    - Create a systemd service file at `~/.config/systemd/user/voicetype.service`.
-    - Store your OpenAI API key in `~/.config/voicetype/.env` (with restricted permissions).
-    - Reload the systemd user daemon, enable the `voicetype.service` to start on login, and start it immediately.
+    The script will create **two systemd services** (see [Linux Architecture](#linux-architecture)):
+    - `voicetype-listener.service` - System service running as root for keyboard capture
+    - `voicetype.service` - User service running as your user for the tray icon
+
+    Configuration is stored in `~/.config/voicetype/.env` with restricted permissions.
 
     For other operating systems, or if you prefer not to use the systemd service on Linux, you can run the application directly after installation (see Usage).
 
@@ -191,9 +195,25 @@ otlp_endpoint = "http://localhost:4317"
 
 ## Usage
 
--   **If using the Linux systemd service:** The service will start automatically on login. VoiceType will be listening for the hotkey in the background.
--   **To run manually (e.g., for testing or on non-Linux systems):**
-    Activate your virtual environment and run:
+-   **If using the Linux systemd service:** Both services will start automatically on login. VoiceType will be listening for the hotkey in the background.
+
+-   **To run manually on Linux (for testing):**
+    You need to run two processes in separate terminals:
+
+    **Terminal 1 - Start the privileged keyboard listener:**
+    ```bash
+    sudo python -m voicetype.hotkey_listener.privileged_listener \
+        --socket /run/user/$(id -u)/voicetype-hotkey.sock \
+        --hotkey "<pause>"
+    ```
+
+    **Terminal 2 - Start the main application:**
+    ```bash
+    python -m voicetype
+    ```
+
+-   **To run on Windows or macOS:**
+    No privilege separation is needed. Simply run:
     ```bash
     python -m voicetype
     ```
@@ -212,58 +232,88 @@ If you used `voicetype install`:
     ```bash
     voicetype status
     ```
-    Alternatively:
+    Or check each service individually:
     ```bash
     systemctl --user status voicetype.service
+    sudo systemctl status voicetype-listener.service
     ```
 
 -   **View service logs:**
     ```bash
+    # Main application logs
     journalctl --user -u voicetype.service -f
+
+    # Keyboard listener logs
+    sudo journalctl -u voicetype-listener.service -f
     ```
 
--   **Restart the service:**
+-   **Restart the services:**
     (e.g., after changing the `OPENAI_API_KEY` in `~/.config/voicetype/.env`)
     ```bash
     systemctl --user restart voicetype.service
+    sudo systemctl restart voicetype-listener.service
     ```
 
--   **Stop the service:**
+-   **Stop the services:**
     ```bash
     systemctl --user stop voicetype.service
+    sudo systemctl stop voicetype-listener.service
     ```
 
--   **Start the service manually (if not enabled to start on login):**
+-   **Start the services manually:**
     ```bash
+    sudo systemctl start voicetype-listener.service
     systemctl --user start voicetype.service
     ```
 
 -   **Disable auto-start on login:**
     ```bash
     systemctl --user disable voicetype.service
+    sudo systemctl disable voicetype-listener.service
     ```
 
 -   **Enable auto-start on login (if previously disabled):**
     ```bash
+    sudo systemctl enable voicetype-listener.service
     systemctl --user enable voicetype.service
     ```
 
 ## Uninstallation (Linux with systemd)
 
-To stop the service, disable auto-start, and remove the systemd service file and associated configuration:
+To stop the services, disable auto-start, and remove the systemd service files and associated configuration:
 ```bash
 voicetype uninstall
 ```
 This will:
-- Stop and disable the `voicetype.service`.
-- Remove the service file (`~/.config/systemd/user/voicetype.service`).
-- Remove the environment file (`~/.config/voicetype/.env` containing your API key).
-- Attempt to remove the application configuration directory (`~/.config/voicetype`) if it's empty.
+- Stop and disable both `voicetype.service` and `voicetype-listener.service`
+- Remove the user service file (`~/.config/systemd/user/voicetype.service`)
+- Remove the system service file (`/etc/systemd/system/voicetype-listener.service`)
+- Remove the environment file (`~/.config/voicetype/.env` containing your API key)
+- Attempt to remove the application configuration directory (`~/.config/voicetype`) if it's empty
 
 If you installed the package using `pip install .`, you can uninstall it from your Python environment with:
 ```bash
 pip uninstall voicetype
 ```
+
+## Linux Architecture
+
+On Linux, VoiceType uses a **two-process architecture** to handle a conflict between keyboard capture and the system tray:
+
+1. **The Problem:**
+   - `pynput` (keyboard capture) requires root access to read from `/dev/input`
+   - `pystray` (system tray) requires access to the user's D-Bus session
+   - Running the entire app as root breaks the tray icon
+
+2. **The Solution:**
+   - **Privileged Listener** (`voicetype-listener.service`): Runs as root, captures keyboard events, sends them over a Unix socket
+   - **Main Application** (`voicetype.service`): Runs as your user, handles the tray icon, transcription, and typing
+
+3. **Communication:**
+   - The two processes communicate via a Unix socket at `/run/user/<uid>/voicetype-hotkey.sock`
+   - The socket is created by the privileged listener with permissions allowing the user to connect
+
+This architecture is **only needed on Linux**. On Windows and macOS, `pynput` works without elevated privileges, so a single process handles everything.
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.

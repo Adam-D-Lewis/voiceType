@@ -68,7 +68,12 @@ def configure_logging(log_file: Path | None = None) -> Path:
 
 
 def get_platform_listener(on_press: callable, on_release: callable) -> HotkeyListener:
-    """Detect the platform/session and return a listener instance (callbacks bound later)."""
+    """Detect the platform/session and return a listener instance (callbacks bound later).
+
+    On Linux, returns a SocketHotkeyListener that connects to a separate privileged
+    listener process (required for keyboard capture without running main app as root).
+    On Windows/macOS, returns the regular pynput listener.
+    """
     system = platform.system()
 
     if system == "Linux":
@@ -85,19 +90,29 @@ def get_platform_listener(on_press: callable, on_release: callable) -> HotkeyLis
                     "Wayland hotkey listener only currently implemented for XWayland."
                 )
 
-        # Default to pynput listener for Linux X11
-        logger.info("Using pynput listener for Linux.")
+        # On Linux, always use socket listener to connect to privileged process
+        logger.info("Using socket listener (requires privileged listener running).")
         try:
-            from voicetype.hotkey_listener.pynput_hotkey_listener import (
-                PynputHotkeyListener,
+            from voicetype.hotkey_listener.socket_listener import (
+                SocketHotkeyListener,
+                get_socket_path,
             )
 
-            return PynputHotkeyListener(
-                on_hotkey_press=on_press, on_hotkey_release=on_release
+            socket_path = get_socket_path()
+            logger.info(f"Will connect to privileged listener at: {socket_path}")
+            return SocketHotkeyListener(
+                on_hotkey_press=on_press,
+                on_hotkey_release=on_release,
+                socket_address=socket_path,
             )
         except Exception as e:
-            logger.error(f"Failed to initialize pynput listener: {e}", exc_info=True)
-            raise RuntimeError("Could not initialize Linux hotkey listener.") from e
+            logger.error(f"Failed to initialize socket listener: {e}", exc_info=True)
+            raise RuntimeError(
+                "Could not initialize socket listener. "
+                "Make sure the privileged listener is running with: "
+                f"sudo python -m voicetype.hotkey_listener.privileged_listener "
+                f"--socket <socket_path> --hotkey '<hotkey>'"
+            ) from e
 
     elif system == "Windows":
         logger.info("Using pynput listener for Windows.")
