@@ -110,7 +110,7 @@ def get_platform_listener(on_press: callable, on_release: callable) -> HotkeyLis
             raise RuntimeError(
                 "Could not initialize socket listener. "
                 "Make sure the privileged listener is running with: "
-                f"sudo python -m voicetype.hotkey_listener.privileged_listener "
+                f"sudo python -m voicetype.hotkey_listener.privileged_service "
                 f"--socket <socket_path> --hotkey '<hotkey>'"
             ) from e
 

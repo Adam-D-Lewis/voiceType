@@ -209,12 +209,12 @@ windows-build = ["windows-build"]  # For building Windows installers
 
 # Pixi tasks for dev environment (Linux)
 [tool.pixi.feature.dev.tasks]
-# Run VoiceType on Linux (starts both privileged listener and main app)
+# Run VoiceType on Linux (starts both privileged service and main app)
 voicetype = { cmd = "bash $PIXI_PROJECT_ROOT/scripts/run-linux.sh", description = "Run VoiceType (Linux, requires sudo)" }
-# Start only the privileged keyboard listener (for manual control)
-start-listener = { cmd = "sudo $PIXI_PROJECT_ROOT/.pixi/envs/dev/bin/python -m voicetype.hotkey_listener.privileged_listener --socket /run/user/$(id -u)/voicetype-hotkey.sock --hotkey '<pause>'", description = "Start privileged keyboard listener only" }
-# Start only the main app (requires listener already running)
-start-app = { cmd = "python -m voicetype", description = "Start main app only (requires listener)" }
+# Start only the privileged keyboard service (for manual control)
+start-service = { cmd = "sudo $PIXI_PROJECT_ROOT/.pixi/envs/dev/bin/python -m voicetype.hotkey_listener.privileged_service --socket /run/user/$(id -u)/voicetype-hotkey.sock --hotkey '<pause>'", description = "Start privileged keyboard service only" }
+# Start only the main app (requires service already running)
+start-app = { cmd = "python -m voicetype", description = "Start main app only (requires privileged service)" }
 
 # Pixi tasks for building
 [tool.pixi.feature.windows-build.tasks]

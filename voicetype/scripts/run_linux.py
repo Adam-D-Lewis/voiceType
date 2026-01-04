@@ -127,14 +127,14 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Start the privileged listener
-    print("Starting privileged keyboard listener (requires sudo)...")
+    print("Starting privileged keyboard service (requires sudo)...")
     listener_cmd = [
         "sudo",
         "-E",
         python,
         "-u",  # Unbuffered output
         "-m",
-        "voicetype.hotkey_listener.privileged_listener",
+        "voicetype.hotkey_listener.privileged_service",
         "--socket",
         _socket_path,
         "--hotkey",

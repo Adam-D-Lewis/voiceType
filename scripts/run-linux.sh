@@ -89,9 +89,9 @@ cleanup() {
 trap cleanup EXIT
 trap 'cleanup; exit 0' INT TERM
 
-# Start the privileged listener in the background
-echo "Starting privileged keyboard listener (requires sudo)..."
-sudo -E "$PYTHON" -u -m voicetype.hotkey_listener.privileged_listener \
+# Start the privileged service in the background
+echo "Starting privileged keyboard service (requires sudo)..."
+sudo -E "$PYTHON" -u -m voicetype.hotkey_listener.privileged_service \
     --socket "$SOCKET_PATH" \
     --hotkey "$HOTKEY" &
 LISTENER_PID=$!

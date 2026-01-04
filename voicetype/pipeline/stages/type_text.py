@@ -1,8 +1,13 @@
 """Type text stage for pipeline execution.
 
 This stage types text character-by-character using the virtual keyboard.
+
+On Linux, this uses the privileged service for typing (via socket) to ensure
+reliable keyboard input on both X11 and Wayland. On Windows/macOS, it uses
+pynput directly.
 """
 
+import platform
 import time
 from typing import Optional
 
@@ -73,17 +78,52 @@ class TypeText(PipelineStage[Optional[str], None]):
 
         logger.debug(f"Typing text: {input_data}")
 
-        # Import keyboard controller
+        if platform.system() == "Linux":
+            # On Linux, use privileged service for typing (works on Wayland)
+            self._type_via_socket(input_data)
+        else:
+            # On Windows/macOS, use pynput directly
+            self._type_with_pynput(input_data)
+
+        context.icon_controller.set_icon("idle")
+        logger.debug("Typing complete")
+
+    def _type_via_socket(self, text: str) -> None:
+        """Type text via the privileged service socket.
+
+        This is used on Linux to ensure reliable typing on both X11 and Wayland.
+
+        Args:
+            text: The text to type.
+        """
+        from voicetype.hotkey_listener.socket_listener import get_active_socket_listener
+
+        listener = get_active_socket_listener()
+        if listener is not None and listener.is_connected():
+            logger.debug("Typing via privileged service")
+            listener.type_text(text, self.char_delay)
+        else:
+            # Fallback to direct pynput (may not work on Wayland)
+            logger.warning(
+                "Privileged service not connected, falling back to direct pynput"
+            )
+            self._type_with_pynput(text)
+
+    def _type_with_pynput(self, text: str) -> None:
+        """Type text directly using pynput.
+
+        This is used on Windows/macOS, or as a fallback on Linux.
+
+        Args:
+            text: The text to type.
+        """
         import pynput
 
         keyboard = pynput.keyboard.Controller()
 
         # Type each character with a delay to prevent scrambled letters
-        for i, char in enumerate(input_data):
+        for i, char in enumerate(text):
             keyboard.type(char)
             # Don't sleep after the last character
-            if self.char_delay > 0 and i < len(input_data) - 1:
+            if self.char_delay > 0 and i < len(text) - 1:
                 time.sleep(self.char_delay)
-
-        context.icon_controller.set_icon("idle")
-        logger.debug("Typing complete")

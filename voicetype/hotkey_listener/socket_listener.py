@@ -1,8 +1,12 @@
-"""Cross-platform socket-based hotkey listener for privilege separation.
+"""Cross-platform socket-based client for the privileged keyboard service.
 
-This module provides a hotkey listener that communicates over sockets,
-allowing the keyboard listener to run in a separate process with elevated
-privileges while the main application runs as a regular user.
+This module provides a client that communicates over sockets with a privileged
+service, allowing keyboard capture and typing to run in a separate process
+with elevated privileges while the main application runs as a regular user.
+
+Features:
+- Receives hotkey press/release events from the privileged service
+- Sends text to be typed by the privileged service (works on Wayland)
 
 On Linux: Uses Unix domain sockets (faster, more secure)
 On Windows/macOS: Uses TCP localhost sockets
@@ -21,6 +25,20 @@ from typing import Callable, Optional
 from loguru import logger
 
 from .hotkey_listener import HotkeyListener
+
+# Module-level reference to the active socket listener for text typing
+_active_socket_listener: Optional["SocketHotkeyListener"] = None
+
+
+def get_active_socket_listener() -> Optional["SocketHotkeyListener"]:
+    """Get the currently active socket listener.
+
+    This is used by the TypeText stage to send text for typing on Linux.
+
+    Returns:
+        The active SocketHotkeyListener instance, or None if not available.
+    """
+    return _active_socket_listener
 
 
 def get_socket_path() -> str:
@@ -46,10 +64,12 @@ def get_socket_path() -> str:
 
 
 class SocketHotkeyListener(HotkeyListener):
-    """Hotkey listener that receives events over a socket.
+    """Client for the privileged keyboard service.
 
-    This listener connects to a privileged listener process running with
-    elevated permissions and receives hotkey events from it.
+    This client connects to a privileged service running with elevated
+    permissions and:
+    - Receives hotkey press/release events
+    - Sends text to be typed (for reliable Wayland support)
     """
 
     def __init__(
@@ -137,21 +157,23 @@ class SocketHotkeyListener(HotkeyListener):
                 break
 
     def _handle_message(self, msg: dict) -> None:
-        """Handle a message from the privileged listener."""
+        """Handle a message from the privileged service."""
         msg_type = msg.get("type")
         if msg_type == "ready":
-            logger.info("Privileged listener ready")
+            logger.info("Privileged service ready")
             self._connected.set()
         elif msg_type == "press":
             self._trigger_hotkey_press()
         elif msg_type == "release":
             self._trigger_hotkey_release()
         elif msg_type == "ack":
-            logger.debug("Received ack from listener")
+            logger.debug("Received ack from service")
         elif msg_type == "pong":
-            logger.debug("Received pong from listener")
+            logger.debug("Received pong from service")
+        elif msg_type == "type_complete":
+            logger.debug("Text typing completed by privileged service")
         elif msg_type == "error":
-            logger.error(f"Error from listener: {msg.get('message')}")
+            logger.error(f"Error from service: {msg.get('message')}")
 
     def start_listening(self) -> None:
         """Start listening for hotkey events.
@@ -181,7 +203,7 @@ class SocketHotkeyListener(HotkeyListener):
         except ConnectionRefusedError:
             raise ConnectionRefusedError(
                 "Privileged listener not running. Start it with: "
-                f"sudo python -m voicetype.hotkey_listener.privileged_listener "
+                f"sudo python -m voicetype.hotkey_listener.privileged_service "
                 f'--socket {self._socket_address} --hotkey "{self._hotkey}"'
             )
 
@@ -201,10 +223,46 @@ class SocketHotkeyListener(HotkeyListener):
         if self._hotkey:
             self._send_message({"type": "set_hotkey", "hotkey": self._hotkey})
 
-        logger.info("Connected to privileged listener")
+        logger.info("Connected to privileged service")
+
+        # Send display environment info for X11 typing support
+        self._send_display_info()
+
+        # Register as the active socket listener for text typing
+        global _active_socket_listener
+        _active_socket_listener = self
+
+    def _send_display_info(self) -> None:
+        """Send display environment info to the privileged service.
+
+        This allows the privileged service to set up X11 access for pynput
+        keyboard typing on X11 systems.
+        """
+        display = os.environ.get("DISPLAY", "")
+        xauthority = os.environ.get("XAUTHORITY", "")
+        wayland_display = os.environ.get("WAYLAND_DISPLAY", "")
+
+        if display or xauthority or wayland_display:
+            self._send_message(
+                {
+                    "type": "set_display",
+                    "display": display,
+                    "xauthority": xauthority,
+                    "wayland_display": wayland_display,
+                }
+            )
+            logger.debug(
+                f"Sent display info: DISPLAY={display}, "
+                f"XAUTHORITY={xauthority}, WAYLAND_DISPLAY={wayland_display}"
+            )
 
     def stop_listening(self) -> None:
         """Stop listening for hotkey events."""
+        # Unregister as the active socket listener
+        global _active_socket_listener
+        if _active_socket_listener is self:
+            _active_socket_listener = None
+
         self._running = False
 
         if self._socket:
@@ -224,3 +282,35 @@ class SocketHotkeyListener(HotkeyListener):
 
         self._connected.clear()
         logger.info("Socket listener stopped")
+
+    def is_connected(self) -> bool:
+        """Check if connected to the privileged service.
+
+        Returns:
+            True if connected and ready, False otherwise.
+        """
+        return self._connected.is_set() and self._socket is not None
+
+    def type_text(self, text: str, char_delay: float = 0.001) -> None:
+        """Send text to the privileged service for typing.
+
+        This sends the text over the socket to be typed by the privileged
+        service using pynput, which works reliably on both X11 and Wayland.
+
+        Args:
+            text: The text to type.
+            char_delay: Delay in seconds between each character.
+
+        Raises:
+            RuntimeError: If not connected to the privileged service.
+        """
+        if not self.is_connected():
+            raise RuntimeError("Not connected to privileged service")
+
+        self._send_message(
+            {
+                "type": "type_text",
+                "text": text,
+                "char_delay": char_delay,
+            }
+        )

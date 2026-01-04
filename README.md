@@ -200,9 +200,9 @@ otlp_endpoint = "http://localhost:4317"
 -   **To run manually on Linux (for testing):**
     You need to run two processes in separate terminals:
 
-    **Terminal 1 - Start the privileged keyboard listener:**
+    **Terminal 1 - Start the privileged keyboard service:**
     ```bash
-    sudo python -m voicetype.hotkey_listener.privileged_listener \
+    sudo python -m voicetype.hotkey_listener.privileged_service \
         --socket /run/user/$(id -u)/voicetype-hotkey.sock \
         --hotkey "<pause>"
     ```
@@ -235,7 +235,7 @@ If you used `voicetype install`:
     Or check each service individually:
     ```bash
     systemctl --user status voicetype.service
-    sudo systemctl status voicetype-listener.service
+    sudo systemctl status voicetype-service.service
     ```
 
 -   **View service logs:**
@@ -243,38 +243,38 @@ If you used `voicetype install`:
     # Main application logs
     journalctl --user -u voicetype.service -f
 
-    # Keyboard listener logs
-    sudo journalctl -u voicetype-listener.service -f
+    # Keyboard service logs
+    sudo journalctl -u voicetype-service.service -f
     ```
 
 -   **Restart the services:**
     (e.g., after changing the `OPENAI_API_KEY` in `~/.config/voicetype/.env`)
     ```bash
     systemctl --user restart voicetype.service
-    sudo systemctl restart voicetype-listener.service
+    sudo systemctl restart voicetype-service.service
     ```
 
 -   **Stop the services:**
     ```bash
     systemctl --user stop voicetype.service
-    sudo systemctl stop voicetype-listener.service
+    sudo systemctl stop voicetype-service.service
     ```
 
 -   **Start the services manually:**
     ```bash
-    sudo systemctl start voicetype-listener.service
+    sudo systemctl start voicetype-service.service
     systemctl --user start voicetype.service
     ```
 
 -   **Disable auto-start on login:**
     ```bash
     systemctl --user disable voicetype.service
-    sudo systemctl disable voicetype-listener.service
+    sudo systemctl disable voicetype-service.service
     ```
 
 -   **Enable auto-start on login (if previously disabled):**
     ```bash
-    sudo systemctl enable voicetype-listener.service
+    sudo systemctl enable voicetype-service.service
     systemctl --user enable voicetype.service
     ```
 
@@ -285,9 +285,9 @@ To stop the services, disable auto-start, and remove the systemd service files a
 voicetype uninstall
 ```
 This will:
-- Stop and disable both `voicetype.service` and `voicetype-listener.service`
+- Stop and disable both `voicetype.service` and `voicetype-service.service`
 - Remove the user service file (`~/.config/systemd/user/voicetype.service`)
-- Remove the system service file (`/etc/systemd/system/voicetype-listener.service`)
+- Remove the system service file (`/etc/systemd/system/voicetype-service.service`)
 - Remove the environment file (`~/.config/voicetype/.env` containing your API key)
 - Attempt to remove the application configuration directory (`~/.config/voicetype`) if it's empty
 
@@ -298,23 +298,26 @@ pip uninstall voicetype
 
 ## Linux Architecture
 
-On Linux, VoiceType uses a **two-process architecture** to handle a conflict between keyboard capture and the system tray:
+On Linux, VoiceType uses a **two-process architecture** to handle a conflict between keyboard I/O and the system tray:
 
 1. **The Problem:**
    - Keyboard capture requires root access to read from `/dev/input` devices
+   - Reliable keyboard typing on Wayland also benefits from elevated privileges
    - `pystray` (system tray) requires access to the user's D-Bus session
    - Running the entire app as root breaks the tray icon
 
 2. **The Solution:**
-   - **Privileged Listener** (`voicetype-listener.service`): Runs as root, uses evdev to capture keyboard events directly from `/dev/input`, sends hotkey events over a Unix socket
-   - **Main Application** (`voicetype.service`): Runs as your user, handles the tray icon, transcription, and typing
+   - **Privileged Service** (`voicetype-service.service`): Runs as root, uses evdev to capture keyboard events directly from `/dev/input`, and handles keyboard typing via pynput (works reliably on Wayland)
+   - **Main Application** (`voicetype.service`): Runs as your user, handles the tray icon, transcription, and orchestrates the pipeline
 
 3. **Communication:**
    - The two processes communicate via a Unix socket at `/run/user/<uid>/voicetype-hotkey.sock`
-   - The socket is created by the privileged listener with permissions allowing the user to connect
+   - The socket is created by the privileged service with permissions allowing the user to connect
+   - Bidirectional: hotkey events flow from service → app, text to type flows from app → service
 
 4. **Wayland Support:**
-   - The evdev-based listener works on both X11 and Wayland, as it reads directly from kernel input devices rather than relying on X11 APIs
+   - The evdev-based listener works on both X11 and Wayland for keyboard capture
+   - Keyboard typing via the privileged service also works reliably on Wayland
 
 This architecture is **only needed on Linux**. On Windows and macOS, `pynput` works without elevated privileges, so a single process handles everything.
 

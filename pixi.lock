@@ -9600,8 +9600,8 @@ packages:
   timestamp: 1761726489722
 - pypi: ./
   name: voicetype2
-  version: 0.2.1.dev18+g1e51ee1a9.d20260104
-  sha256: 8a8d7388db9c9269779d2a7b7d60a6ef0c0e1dbe97d32fced6936d410736eed0
+  version: 0.2.1.dev22+g61c9db2c2.d20260104
+  sha256: 9c8646f2038d99a71e0c9674246b97f4f35b17234e38a30fcb426e351c020a70
   requires_dist:
   - pre-commit ; extra == 'dev'
   - pytest ; extra == 'dev'

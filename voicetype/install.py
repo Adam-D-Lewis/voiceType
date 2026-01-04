@@ -10,10 +10,10 @@ SERVICE_NAME = "voicetype.service"
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
 SERVICE_FILE_PATH = SYSTEMD_USER_DIR / SERVICE_NAME
 
-# System service (privileged keyboard listener)
-LISTENER_SERVICE_NAME = "voicetype-listener.service"
+# System service (privileged keyboard service - handles capture and typing)
+PRIVILEGED_SERVICE_NAME = "voicetype-service.service"
 SYSTEMD_SYSTEM_DIR = Path("/etc/systemd/system")
-LISTENER_SERVICE_FILE_PATH = SYSTEMD_SYSTEM_DIR / LISTENER_SERVICE_NAME
+PRIVILEGED_SERVICE_FILE_PATH = SYSTEMD_SYSTEM_DIR / PRIVILEGED_SERVICE_NAME
 
 APP_CONFIG_DIR = Path.home() / ".config" / "voicetype"
 ENV_FILE_PATH = APP_CONFIG_DIR / ".env"
@@ -33,27 +33,28 @@ def get_project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def get_listener_service_file_content(hotkey: str = "<pause>") -> str:
-    """Generates the content for the privileged listener systemd service file.
+def get_privileged_service_file_content(hotkey: str = "<pause>") -> str:
+    """Generates the content for the privileged service systemd service file.
 
-    This service runs as root to access /dev/input for keyboard events.
+    This service runs as root to:
+    - Access /dev/input for keyboard capture (via evdev)
+    - Type text reliably on all display servers including Wayland (via pynput)
     """
     python_executable = sys.executable
     project_root = get_project_root()
     socket_path = str(SOCKET_PATH)
 
     exec_start = (
-        f"{shlex.quote(python_executable)} -m voicetype.hotkey_listener.privileged_listener "
+        f"{shlex.quote(python_executable)} -m voicetype.hotkey_listener.privileged_service "
         f"--socket {shlex.quote(socket_path)} --hotkey {shlex.quote(hotkey)}"
     )
     working_directory = shlex.quote(str(project_root))
 
     # Get the user who will connect to this socket
     user_id = os.getuid()
-    user_name = os.environ.get("USER", os.environ.get("LOGNAME", ""))
 
     return f"""[Unit]
-Description=VoiceType Privileged Keyboard Listener
+Description=VoiceType Privileged Keyboard Service
 # Start after user session is available
 After=user@{user_id}.service
 Wants=user@{user_id}.service
@@ -64,7 +65,7 @@ ExecStart={exec_start}
 WorkingDirectory={working_directory}
 Restart=always
 RestartSec=5
-# Run as root to access /dev/input
+# Run as root to access /dev/input and for reliable keyboard typing
 User=root
 # Pass through environment variables for socket permissions
 Environment="PYTHONUNBUFFERED=1"
@@ -95,9 +96,11 @@ def get_service_file_content() -> str:
 
     return f"""[Unit]
 Description=VoiceType Application
-# Start after the graphical session and the privileged listener are available
-After=graphical-session.target {LISTENER_SERVICE_NAME}
-Requires={LISTENER_SERVICE_NAME}
+# Start after the graphical session is available
+# Note: The privileged listener (voicetype-listener.service) is a system service,
+# so we cannot use After=/Requires= for it from a user service. The main app
+# handles connection to the listener via socket with retry logic.
+After=graphical-session.target
 # If the graphical session is stopped, this service will be stopped too
 PartOf=graphical-session.target
 
@@ -164,12 +167,12 @@ def install_service():
     """Installs and starts both VoiceType systemd services.
 
     On Linux, VoiceType requires two services:
-    1. A privileged system service (voicetype-listener.service) that runs as root
-       to capture keyboard events from /dev/input
+    1. A privileged system service (voicetype-service.service) that runs as root
+       for keyboard capture and typing (works on Wayland)
     2. A user service (voicetype.service) that runs the main app with tray icon
     """
     print("Installing VoiceType systemd services...")
-    print("  - Privileged listener (system service, runs as root)")
+    print("  - Privileged service (system service, runs as root for keyboard I/O)")
     print("  - Main application (user service, runs as your user)")
     print()
 
@@ -219,12 +222,12 @@ def install_service():
         )
         sys.exit(1)
 
-    # --- Install privileged listener service (system service) ---
-    print(f"\nInstalling privileged listener service ({LISTENER_SERVICE_NAME})...")
+    # --- Install privileged service (system service) ---
+    print(f"\nInstalling privileged service ({PRIVILEGED_SERVICE_NAME})...")
     print("This requires sudo access to create system service files.")
 
-    listener_service_content = get_listener_service_file_content(hotkey)
-    listener_service_path = str(LISTENER_SERVICE_FILE_PATH)
+    privileged_service_content = get_privileged_service_file_content(hotkey)
+    privileged_service_path = str(PRIVILEGED_SERVICE_FILE_PATH)
 
     try:
         # Write to temp file first, then use sudo to move it
@@ -233,26 +236,27 @@ def install_service():
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".service", delete=False
         ) as f:
-            f.write(listener_service_content)
+            f.write(privileged_service_content)
             temp_path = f.name
 
         # Use sudo to copy the file to /etc/systemd/system/
-        subprocess.run(["sudo", "cp", temp_path, listener_service_path], check=True)
+        subprocess.run(["sudo", "cp", temp_path, privileged_service_path], check=True)
         os.unlink(temp_path)
-        print(f"Listener service file created at {listener_service_path}")
+        print(f"Privileged service file created at {privileged_service_path}")
     except subprocess.CalledProcessError as e:
         print(
-            f"Error writing listener service file (sudo required): {e}", file=sys.stderr
+            f"Error writing privileged service file (sudo required): {e}",
+            file=sys.stderr,
         )
         sys.exit(1)
     except IOError as e:
-        print(f"Error writing listener service file: {e}", file=sys.stderr)
+        print(f"Error writing privileged service file: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Enable and start the listener service
+    # Enable and start the privileged service
     run_systemctl_command(["daemon-reload"], system=True)
-    run_systemctl_command(["enable", LISTENER_SERVICE_NAME], system=True)
-    run_systemctl_command(["start", LISTENER_SERVICE_NAME], system=True)
+    run_systemctl_command(["enable", PRIVILEGED_SERVICE_NAME], system=True)
+    run_systemctl_command(["start", PRIVILEGED_SERVICE_NAME], system=True)
 
     # --- Install user service (main app) ---
     print(f"\nInstalling user service ({SERVICE_NAME})...")
@@ -282,7 +286,7 @@ def install_service():
     print("VoiceType services installed and started!")
     print(f"{'='*60}")
     print(f"\nServices running:")
-    print(f"  - {LISTENER_SERVICE_NAME} (system, as root)")
+    print(f"  - {PRIVILEGED_SERVICE_NAME} (system, as root)")
     print(f"  - {SERVICE_NAME} (user, as {os.environ.get('USER', 'you')})")
 
     if "OPENAI_API_KEY" in env_vars:
@@ -297,11 +301,11 @@ def install_service():
 
     print("\nCheck service status:")
     print(f"  systemctl --user status {SERVICE_NAME}")
-    print(f"  sudo systemctl status {LISTENER_SERVICE_NAME}")
+    print(f"  sudo systemctl status {PRIVILEGED_SERVICE_NAME}")
 
     print("\nView logs:")
     print(f"  journalctl --user -u {SERVICE_NAME} -f")
-    print(f"  sudo journalctl -u {LISTENER_SERVICE_NAME} -f")
+    print(f"  sudo journalctl -u {PRIVILEGED_SERVICE_NAME} -f")
 
 
 def uninstall_service():
@@ -337,26 +341,26 @@ def uninstall_service():
 
     run_systemctl_command(["daemon-reload"])  # Reload even if files were not present
 
-    # --- Uninstall privileged listener service ---
-    print(f"\nUninstalling privileged listener service ({LISTENER_SERVICE_NAME})...")
+    # --- Uninstall privileged service ---
+    print(f"\nUninstalling privileged service ({PRIVILEGED_SERVICE_NAME})...")
     print("This requires sudo access.")
 
     run_systemctl_command(
-        ["stop", LISTENER_SERVICE_NAME], ignore_errors=True, system=True
+        ["stop", PRIVILEGED_SERVICE_NAME], ignore_errors=True, system=True
     )
     run_systemctl_command(
-        ["disable", LISTENER_SERVICE_NAME], ignore_errors=True, system=True
+        ["disable", PRIVILEGED_SERVICE_NAME], ignore_errors=True, system=True
     )
 
-    listener_service_path = str(LISTENER_SERVICE_FILE_PATH)
+    privileged_service_path = str(PRIVILEGED_SERVICE_FILE_PATH)
     try:
         subprocess.run(
-            ["sudo", "rm", "-f", listener_service_path],
+            ["sudo", "rm", "-f", privileged_service_path],
             check=False,  # Don't fail if file doesn't exist
         )
-        print(f"Listener service file removed: {listener_service_path}")
+        print(f"Privileged service file removed: {privileged_service_path}")
     except Exception as e:
-        print(f"Error removing listener service file: {e}", file=sys.stderr)
+        print(f"Error removing privileged service file: {e}", file=sys.stderr)
 
     run_systemctl_command(["daemon-reload"], system=True)
 
@@ -407,10 +411,10 @@ def service_status():
         sys.exit(1)
 
     print(f"{'='*60}")
-    print(f"Privileged Listener Service ({LISTENER_SERVICE_NAME}):")
+    print(f"Privileged Service ({PRIVILEGED_SERVICE_NAME}):")
     print(f"{'='*60}")
     run_systemctl_command(
-        ["status", LISTENER_SERVICE_NAME], ignore_errors=True, system=True
+        ["status", PRIVILEGED_SERVICE_NAME], ignore_errors=True, system=True
     )
 
     print(f"\n{'='*60}")

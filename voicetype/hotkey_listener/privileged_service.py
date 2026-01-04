@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
-"""Privileged keyboard listener that runs as a separate process.
+"""Privileged service that runs as a separate process for keyboard I/O.
 
-On Linux, pynput requires root access to read from /dev/input, but pystray
-(the system tray library) needs access to the user's D-Bus session. Running
-the entire app as root breaks pystray.
+On Linux, keyboard capture requires root access to read from /dev/input, and
+reliable keyboard typing (especially on Wayland) benefits from running with
+elevated privileges. However, pystray (the system tray library) needs access
+to the user's D-Bus session. Running the entire app as root breaks pystray.
 
-Solution: Run this listener as a separate process with sudo, while the main
+Solution: Run this service as a separate process with sudo, while the main
 application (with the tray icon) runs as the regular user. Communication
 happens over Unix domain sockets.
 
-This listener uses direct evdev access instead of pynput's uinput backend,
-because the uinput backend requires `dumpkeys` which doesn't work in
-graphical environments (X11/Wayland).
+This service:
+- Uses direct evdev access for keyboard capture (works on X11 and Wayland)
+- Uses pynput for keyboard typing (works reliably as root on all platforms)
 
 Note: This is only needed on Linux. On Windows and macOS, pynput works
-without elevated privileges.
+without elevated privileges for both capture and typing.
 
 Usage (Linux only):
-    sudo python -m voicetype.hotkey_listener.privileged_listener \\
+    sudo python -m voicetype.hotkey_listener.privileged_service \\
         --socket /run/user/1000/voicetype-hotkey.sock --hotkey "<pause>"
 """
 
@@ -28,6 +29,7 @@ import signal
 import socket
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -50,15 +52,16 @@ def is_tcp_address(address: str) -> bool:
     return ":" in address and not address.startswith("/")
 
 
-class PrivilegedListener:
-    """Keyboard listener that communicates over sockets (Unix or TCP).
+class PrivilegedService:
+    """Privileged service for keyboard capture and typing over sockets.
 
-    Uses direct evdev access instead of pynput, which works on both X11 and
-    Wayland without requiring dumpkeys.
+    Uses direct evdev access for keyboard capture (works on both X11 and
+    Wayland without requiring dumpkeys) and pynput for keyboard typing
+    (works reliably as root).
     """
 
     def __init__(self, socket_address: str, hotkey: str):
-        """Initialize the listener.
+        """Initialize the service.
 
         Args:
             socket_address: Socket address (Unix path or host:port for TCP)
@@ -75,6 +78,10 @@ class PrivilegedListener:
         self._pressed_keys: set[int] = set()
         self._hotkey_pressed: bool = False
         self._lock = threading.Lock()
+        # Display environment for X11 typing
+        self._display: str = ""
+        self._xauthority: str = ""
+        self._wayland_display: str = ""
 
     def _setup_socket(self) -> None:
         """Set up the socket server (Unix domain or TCP)."""
@@ -201,14 +208,65 @@ class PrivilegedListener:
             if hotkey:
                 self._parse_hotkey(hotkey)
                 self._send_message({"type": "ack"})
+        elif msg_type == "set_display":
+            # Store display environment for X11 typing
+            self._display = msg.get("display", "")
+            self._xauthority = msg.get("xauthority", "")
+            self._wayland_display = msg.get("wayland_display", "")
+            logger.info(
+                f"Display info received: DISPLAY={self._display}, "
+                f"XAUTHORITY={self._xauthority}, WAYLAND_DISPLAY={self._wayland_display}"
+            )
+        elif msg_type == "type_text":
+            text = msg.get("text", "")
+            char_delay = msg.get("char_delay", 0.001)
+            self._type_text(text, char_delay)
         elif msg_type == "stop":
             logger.info("Received stop command")
             self._running = False
         elif msg_type == "ping":
             self._send_message({"type": "pong"})
 
+    def _type_text(self, text: str, char_delay: float) -> None:
+        """Type text using pynput keyboard controller.
+
+        Args:
+            text: The text to type.
+            char_delay: Delay in seconds between each character.
+        """
+        if not text:
+            logger.debug("No text to type")
+            self._send_message({"type": "type_complete"})
+            return
+
+        logger.debug(f"Typing text: {text[:50]}{'...' if len(text) > 50 else ''}")
+
+        # Set up display environment for X11 access
+        # This is needed because the privileged service runs as root and
+        # doesn't have the user's display environment by default
+        if self._display:
+            os.environ["DISPLAY"] = self._display
+            logger.debug(f"Set DISPLAY={self._display}")
+        if self._xauthority:
+            os.environ["XAUTHORITY"] = self._xauthority
+            logger.debug(f"Set XAUTHORITY={self._xauthority}")
+
+        try:
+            import pynput.keyboard
+
+            keyboard = pynput.keyboard.Controller()
+            for i, char in enumerate(text):
+                keyboard.type(char)
+                if char_delay > 0 and i < len(text) - 1:
+                    time.sleep(char_delay)
+            logger.debug("Typing complete")
+            self._send_message({"type": "type_complete"})
+        except Exception as e:
+            logger.error(f"Error typing text: {e}")
+            self._send_message({"type": "error", "message": f"Typing failed: {e}"})
+
     def run(self) -> None:
-        """Run the privileged listener."""
+        """Run the privileged service."""
 
         # Set up signal handlers
         def signal_handler(signum, frame):
@@ -286,7 +344,7 @@ class PrivilegedListener:
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Privileged keyboard listener for VoiceType"
+        description="Privileged keyboard service for VoiceType"
     )
     parser.add_argument(
         "--socket",
@@ -314,17 +372,17 @@ def main():
     logger.add(
         sys.stderr,
         level=args.log_level,
-        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>privileged_listener</cyan> - {message}",
+        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>privileged_service</cyan> - {message}",
     )
 
     # Verify we have root privileges
     if os.geteuid() != 0:
         logger.warning(
-            "Running without root privileges - keyboard capture may not work"
+            "Running without root privileges - keyboard capture and typing may not work"
         )
 
-    listener = PrivilegedListener(args.socket, args.hotkey)
-    listener.run()
+    service = PrivilegedService(args.socket, args.hotkey)
+    service.run()
 
 
 if __name__ == "__main__":
