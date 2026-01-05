@@ -12,7 +12,7 @@ happens over Unix domain sockets.
 
 This service:
 - Uses direct evdev access for keyboard capture (works on X11 and Wayland)
-- Uses pynput for keyboard typing (works reliably as root on all platforms)
+- Uses ydotool for keyboard typing (works with non-QWERTY layouts and Wayland)
 
 Note: This is only needed on Linux. On Windows and macOS, pynput works
 without elevated privileges for both capture and typing.
@@ -29,7 +29,6 @@ import signal
 import socket
 import sys
 import threading
-import time
 from pathlib import Path
 from typing import Optional
 
@@ -56,8 +55,8 @@ class PrivilegedService:
     """Privileged service for keyboard capture and typing over sockets.
 
     Uses direct evdev access for keyboard capture (works on both X11 and
-    Wayland without requiring dumpkeys) and pynput for keyboard typing
-    (works reliably as root).
+    Wayland without requiring dumpkeys) and ydotool for keyboard typing
+    (works correctly with non-QWERTY layouts like Dvorak).
     """
 
     def __init__(self, socket_address: str, hotkey: str):
@@ -228,12 +227,18 @@ class PrivilegedService:
             self._send_message({"type": "pong"})
 
     def _type_text(self, text: str, char_delay: float) -> None:
-        """Type text using pynput keyboard controller.
+        """Type text using ydotool.
+
+        ydotool works correctly with non-QWERTY keyboard layouts (like Dvorak)
+        and works on both X11 and Wayland.
 
         Args:
             text: The text to type.
             char_delay: Delay in seconds between each character.
         """
+        import shutil
+        import subprocess
+
         if not text:
             logger.debug("No text to type")
             self._send_message({"type": "type_complete"})
@@ -241,29 +246,39 @@ class PrivilegedService:
 
         logger.debug(f"Typing text: {text[:50]}{'...' if len(text) > 50 else ''}")
 
-        # Set up display environment for X11 access
-        # This is needed because the privileged service runs as root and
-        # doesn't have the user's display environment by default
-        if self._display:
-            os.environ["DISPLAY"] = self._display
-            logger.debug(f"Set DISPLAY={self._display}")
-        if self._xauthority:
-            os.environ["XAUTHORITY"] = self._xauthority
-            logger.debug(f"Set XAUTHORITY={self._xauthority}")
+        if not shutil.which("ydotool"):
+            logger.error("ydotool not found in PATH - cannot type text")
+            self._send_message(
+                {"type": "error", "message": "ydotool not found - please install it"}
+            )
+            return
 
         try:
-            import pynput.keyboard
+            # ydotool type command with delay between keystrokes
+            # --key-delay is in milliseconds
+            delay_ms = int(char_delay * 1000)
+            cmd = ["ydotool", "type", "--key-delay", str(delay_ms), "--", text]
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode != 0:
+                logger.error(f"ydotool failed: {result.stderr}")
+                self._send_message(
+                    {"type": "error", "message": f"ydotool failed: {result.stderr}"}
+                )
+                return
 
-            keyboard = pynput.keyboard.Controller()
-            for i, char in enumerate(text):
-                keyboard.type(char)
-                if char_delay > 0 and i < len(text) - 1:
-                    time.sleep(char_delay)
-            logger.debug("Typing complete")
+            logger.debug("Typing complete via ydotool")
             self._send_message({"type": "type_complete"})
+        except subprocess.TimeoutExpired:
+            logger.error("ydotool timed out")
+            self._send_message({"type": "error", "message": "ydotool timed out"})
         except Exception as e:
-            logger.error(f"Error typing text: {e}")
-            self._send_message({"type": "error", "message": f"Typing failed: {e}"})
+            logger.error(f"ydotool error: {e}")
+            self._send_message({"type": "error", "message": f"ydotool error: {e}"})
 
     def run(self) -> None:
         """Run the privileged service."""
