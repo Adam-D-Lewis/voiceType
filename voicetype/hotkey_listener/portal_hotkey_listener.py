@@ -219,7 +219,7 @@ class PortalHotkeyListener(HotkeyListener):
 
             # Generate unique tokens for handle paths
             sender = self._bus.unique_name.replace(":", "").replace(".", "_")
-            session_token = f"voicetype_{secrets.token_hex(8)}"
+            session_token = f"voicetype_session"
 
             # Step 1: Create session
             session_handle = await self._create_session(sender, session_token)
