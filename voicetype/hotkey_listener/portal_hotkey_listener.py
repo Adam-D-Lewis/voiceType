@@ -3,6 +3,11 @@
 This module provides a hotkey listener that uses the XDG Desktop Portal
 GlobalShortcuts API to capture global hotkeys on Wayland without requiring
 root privileges. Works on GNOME 48+, KDE Plasma, and Hyprland.
+
+Spec: https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.GlobalShortcuts.html
+
+Note: GNOME's portal is currently version 1, which lacks ConfigureShortcuts
+for rebinding. Track progress: https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/issues/197
 """
 
 import asyncio
@@ -191,6 +196,12 @@ class PortalHotkeyListener(HotkeyListener):
                 </method>
                 <method name="ListShortcuts">
                   <arg type="o" name="session_handle" direction="in"/>
+                  <arg type="a{sv}" name="options" direction="in"/>
+                  <arg type="o" name="handle" direction="out"/>
+                </method>
+                <method name="ConfigureShortcuts">
+                  <arg type="o" name="session_handle" direction="in"/>
+                  <arg type="s" name="parent_window" direction="in"/>
                   <arg type="a{sv}" name="options" direction="in"/>
                   <arg type="o" name="handle" direction="out"/>
                 </method>
@@ -489,6 +500,123 @@ class PortalHotkeyListener(HotkeyListener):
             logger.error(f"BindShortcuts failed: {e}")
             return False
 
+    async def _configure_shortcuts(self, sender: str) -> bool:
+        """Show the configuration dialog to let user change shortcut bindings.
+
+        This uses ConfigureShortcuts (added in portal version 2) which allows
+        reconfiguring shortcuts after the initial BindShortcuts call.
+        Unlike BindShortcuts, this can be called multiple times on the same session.
+        """
+        from dbus_next import Variant
+        from dbus_next import introspection as intr
+
+        request_token = f"conf_{secrets.token_hex(8)}"
+        expected_request_path = (
+            f"/org/freedesktop/portal/desktop/request/{sender}/{request_token}"
+        )
+
+        response_future: asyncio.Future = asyncio.get_event_loop().create_future()
+
+        def on_response(response_code, results):
+            if response_future.done():
+                return
+            if response_code == 0:
+                shortcuts = results.get("shortcuts", [])
+                logger.info(f"Shortcuts configured successfully: {shortcuts}")
+                # Extract and log the actual trigger that was bound
+                try:
+                    if shortcuts and hasattr(shortcuts, "value"):
+                        shortcuts_list = shortcuts.value
+                    else:
+                        shortcuts_list = shortcuts
+
+                    if shortcuts_list:
+                        for shortcut in shortcuts_list:
+                            shortcut_id = shortcut[0]
+                            shortcut_props = shortcut[1]
+                            trigger = shortcut_props.get("trigger_description")
+                            if trigger:
+                                trigger_value = (
+                                    trigger.value
+                                    if hasattr(trigger, "value")
+                                    else trigger
+                                )
+                                self._actual_bound_trigger = trigger_value
+                                logger.warning(
+                                    f"Portal configured shortcut '{shortcut_id}' to trigger: {trigger_value}"
+                                )
+                except Exception as e:
+                    logger.debug(f"Could not parse trigger description: {e}")
+
+                response_future.set_result(True)
+            elif response_code == 1:
+                logger.warning("User cancelled shortcut configuration")
+                response_future.set_result(False)
+            else:
+                response_future.set_exception(
+                    Exception(f"ConfigureShortcuts failed: {response_code}")
+                )
+
+        # Subscribe to Response signal
+        request_introspection_xml = intr.Node.parse(
+            """
+        <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+         "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+        <node>
+          <interface name="org.freedesktop.portal.Request">
+            <signal name="Response">
+              <arg type="u" name="response"/>
+              <arg type="a{sv}" name="results"/>
+            </signal>
+          </interface>
+        </node>
+        """
+        )
+
+        try:
+            request_proxy = self._bus.get_proxy_object(
+                self.PORTAL_BUS_NAME, expected_request_path, request_introspection_xml
+            )
+            request_iface = request_proxy.get_interface(self.REQUEST_INTERFACE)
+            request_iface.on_response(on_response)
+        except Exception as e:
+            logger.debug(f"Could not subscribe to request path before call: {e}")
+
+        options = {
+            "handle_token": Variant("s", request_token),
+        }
+
+        # parent_window can be empty for CLI/background apps
+        parent_window = ""
+
+        request_handle = await self._shortcuts_iface.call_configure_shortcuts(
+            self._session_handle, parent_window, options
+        )
+        logger.debug(f"ConfigureShortcuts request: {request_handle}")
+
+        # If we couldn't subscribe to request path, try subscribing now
+        if not response_future.done():
+            try:
+                request_proxy = self._bus.get_proxy_object(
+                    self.PORTAL_BUS_NAME, request_handle, request_introspection_xml
+                )
+                request_iface = request_proxy.get_interface(self.REQUEST_INTERFACE)
+                request_iface.on_response(on_response)
+            except Exception as e:
+                logger.debug(f"Could not subscribe to actual request handle: {e}")
+
+        try:
+            success = await asyncio.wait_for(
+                response_future, timeout=60.0
+            )  # User interaction
+            return success
+        except asyncio.TimeoutError:
+            logger.error("Timeout waiting for ConfigureShortcuts response")
+            return False
+        except Exception as e:
+            logger.error(f"ConfigureShortcuts failed: {e}")
+            return False
+
     def _on_shortcut_activated(
         self, session_handle: str, shortcut_id: str, timestamp: int, options: dict
     ):
@@ -691,13 +819,14 @@ class PortalHotkeyListener(HotkeyListener):
         logger.info("Portal hotkey listener stopped")
 
     def rebind_shortcut(self) -> bool:
-        """Force the portal to show the shortcut binding dialog again.
+        """Force the portal to show the shortcut configuration dialog again.
 
-        This allows the user to change their hotkey binding. The dialog
-        will appear with the current preferred_trigger as the suggestion.
+        This allows the user to change their hotkey binding. On portal version 2+,
+        uses ConfigureShortcuts. On portal version 1, recreates the session
+        (which triggers a new BindShortcuts dialog).
 
         Returns:
-            True if rebinding succeeded, False otherwise.
+            True if configuration succeeded, False otherwise.
 
         Raises:
             RuntimeError: If the listener is not running.
@@ -710,9 +839,25 @@ class PortalHotkeyListener(HotkeyListener):
         rebind_complete = threading.Event()
         rebind_result: list = [False]
 
-        def do_rebind():
+        async def do_rebind_async():
             sender = self._bus.unique_name.replace(":", "").replace(".", "_")
-            future = asyncio.ensure_future(self._bind_shortcuts(sender))
+            # Try ConfigureShortcuts first (portal version 2+)
+            try:
+                result = await self._configure_shortcuts(sender)
+                return result
+            except Exception as e:
+                if "No such method" in str(e) or "ConfigureShortcuts" in str(e):
+                    logger.info(
+                        "ConfigureShortcuts not available (portal v1), "
+                        "recreating session to rebind"
+                    )
+                    # Fall back to recreating session for portal v1
+                    return await self._recreate_session_for_rebind(sender)
+                else:
+                    raise
+
+        def do_rebind():
+            future = asyncio.ensure_future(do_rebind_async())
 
             def on_done(fut):
                 try:
@@ -729,6 +874,78 @@ class PortalHotkeyListener(HotkeyListener):
         # Wait for user interaction (60s timeout like initial bind)
         rebind_complete.wait(timeout=65.0)
         return rebind_result[0]
+
+    async def _recreate_session_for_rebind(self, sender: str) -> bool:
+        """Recreate the portal session to allow rebinding shortcuts.
+
+        This is the fallback for portal version 1 which doesn't have
+        ConfigureShortcuts. We close the current session and create a new one,
+        which will show the BindShortcuts dialog again.
+        """
+        from dbus_next import introspection as intr
+
+        # Unsubscribe from current signals
+        try:
+            self._shortcuts_iface.off_activated(self._on_shortcut_activated)
+            self._shortcuts_iface.off_deactivated(self._on_shortcut_deactivated)
+        except Exception as e:
+            logger.debug(f"Error unsubscribing from signals: {e}")
+
+        old_session = self._session_handle
+        self._session_handle = None
+
+        # Explicitly close the old session via D-Bus Session.Close() method
+        logger.info(f"Closing old session: {old_session}")
+        try:
+            session_introspection = intr.Node.parse(
+                """
+            <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+             "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+            <node>
+              <interface name="org.freedesktop.portal.Session">
+                <method name="Close">
+                </method>
+              </interface>
+            </node>
+            """
+            )
+            session_proxy = self._bus.get_proxy_object(
+                self.PORTAL_BUS_NAME, old_session, session_introspection
+            )
+            session_iface = session_proxy.get_interface(
+                "org.freedesktop.portal.Session"
+            )
+            await session_iface.call_close()
+            logger.info("Old session closed successfully")
+            # Give the portal a moment to clean up
+            await asyncio.sleep(0.2)
+        except Exception as e:
+            logger.warning(f"Error closing old session (may already be closed): {e}")
+            # Continue anyway - session might have been closed already
+
+        # Create new session with a unique token to avoid conflicts
+        session_token = f"voicetype_session_{secrets.token_hex(4)}"
+        new_session = await self._create_session(sender, session_token)
+        if not new_session:
+            logger.error("Failed to create new session for rebind")
+            return False
+
+        self._session_handle = new_session
+        logger.info(f"New session created: {new_session}")
+
+        # Bind shortcuts again (this shows the dialog)
+        success = await self._bind_shortcuts(sender)
+        if not success:
+            return False
+
+        # Re-subscribe to signals
+        logger.debug("Re-subscribing to Activated signal...")
+        self._shortcuts_iface.on_activated(self._on_shortcut_activated)
+        logger.debug("Re-subscribing to Deactivated signal...")
+        self._shortcuts_iface.on_deactivated(self._on_shortcut_deactivated)
+
+        logger.info("Session recreated and shortcuts rebound successfully")
+        return True
 
 
 def is_portal_available() -> bool:

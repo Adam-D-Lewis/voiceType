@@ -12,8 +12,7 @@ import sys
 import time
 
 # Add parent directory to path for imports
-sys.path.insert(0, "/home/balast/CodingProjects/voiceType")
-
+# sys.path.insert(0, "/home/balast/CodingProjects/voiceType")
 from voicetype.hotkey_listener.portal_hotkey_listener import (
     PortalHotkeyListener,
     is_portal_available,
