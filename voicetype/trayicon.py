@@ -6,7 +6,9 @@ from typing import Optional, Tuple
 
 from PIL import Image, ImageDraw
 
-# Valid values: 'gtk', 'appindicator', 'xorg', 'dummy' (fallback/test)
+# Valid pystray backends: 'gtk', 'appindicator', 'xorg', 'dummy'
+# On Linux, use GTK backend with GDK_BACKEND=x11 (set in systemd service) for Wayland support.
+# This uses XWayland for the tray icon, which works reliably on both X11 and Wayland sessions.
 if sys.platform == "linux":
     os.environ.setdefault("PYSTRAY_BACKEND", "gtk")
 
