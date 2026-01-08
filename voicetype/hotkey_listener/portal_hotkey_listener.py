@@ -690,6 +690,46 @@ class PortalHotkeyListener(HotkeyListener):
         self._shortcuts_iface = None
         logger.info("Portal hotkey listener stopped")
 
+    def rebind_shortcut(self) -> bool:
+        """Force the portal to show the shortcut binding dialog again.
+
+        This allows the user to change their hotkey binding. The dialog
+        will appear with the current preferred_trigger as the suggestion.
+
+        Returns:
+            True if rebinding succeeded, False otherwise.
+
+        Raises:
+            RuntimeError: If the listener is not running.
+        """
+        if not self._running or not self._loop or not self._session_handle:
+            raise RuntimeError(
+                "Portal listener is not running. Call start_listening() first."
+            )
+
+        rebind_complete = threading.Event()
+        rebind_result: list = [False]
+
+        def do_rebind():
+            sender = self._bus.unique_name.replace(":", "").replace(".", "_")
+            future = asyncio.ensure_future(self._bind_shortcuts(sender))
+
+            def on_done(fut):
+                try:
+                    rebind_result[0] = fut.result()
+                except Exception as e:
+                    logger.error(f"Rebind failed: {e}")
+                    rebind_result[0] = False
+                rebind_complete.set()
+
+            future.add_done_callback(on_done)
+
+        self._loop.call_soon_threadsafe(do_rebind)
+
+        # Wait for user interaction (60s timeout like initial bind)
+        rebind_complete.wait(timeout=65.0)
+        return rebind_result[0]
+
 
 def is_portal_available() -> bool:
     """Check if the GlobalShortcuts portal is available.
