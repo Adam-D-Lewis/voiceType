@@ -5,12 +5,22 @@ import subprocess
 import sys
 from pathlib import Path
 
+# User service (main app with tray icon)
 SERVICE_NAME = "voicetype.service"
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
 SERVICE_FILE_PATH = SYSTEMD_USER_DIR / SERVICE_NAME
 
+# System service (privileged keyboard service - handles capture and typing)
+PRIVILEGED_SERVICE_NAME = "voicetype-service.service"
+SYSTEMD_SYSTEM_DIR = Path("/etc/systemd/system")
+PRIVILEGED_SERVICE_FILE_PATH = SYSTEMD_SYSTEM_DIR / PRIVILEGED_SERVICE_NAME
+
 APP_CONFIG_DIR = Path.home() / ".config" / "voicetype"
 ENV_FILE_PATH = APP_CONFIG_DIR / ".env"
+
+# Socket path for IPC between listener and main app
+SOCKET_PATH = Path(f"/run/user/{os.getuid()}/voicetype-hotkey.sock")
+
 
 def get_project_root() -> Path:
     """
@@ -23,8 +33,55 @@ def get_project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def get_privileged_service_file_content(hotkey: str = "<pause>") -> str:
+    """Generates the content for the privileged service systemd service file.
+
+    This service runs as root to:
+    - Access /dev/input for keyboard capture (via evdev)
+    - Type text reliably on all display servers including Wayland (via pynput)
+    """
+    python_executable = sys.executable
+    project_root = get_project_root()
+    socket_path = str(SOCKET_PATH)
+
+    exec_start = (
+        f"{shlex.quote(python_executable)} -m voicetype.hotkey_listener.privileged_service "
+        f"--socket {shlex.quote(socket_path)} --hotkey {shlex.quote(hotkey)}"
+    )
+    working_directory = shlex.quote(str(project_root))
+
+    # Get the user who will connect to this socket
+    user_id = os.getuid()
+
+    return f"""[Unit]
+Description=VoiceType Privileged Keyboard Service
+# Start after user session is available
+After=user@{user_id}.service
+Wants=user@{user_id}.service
+
+[Service]
+Type=simple
+ExecStart={exec_start}
+WorkingDirectory={working_directory}
+Restart=always
+RestartSec=5
+# Run as root to access /dev/input and for reliable keyboard typing
+User=root
+# Pass through environment variables for socket permissions
+Environment="PYTHONUNBUFFERED=1"
+Environment="SUDO_UID={user_id}"
+Environment="SUDO_GID={os.getgid()}"
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
 def get_service_file_content() -> str:
-    """Generates the content for the systemd service file."""
+    """Generates the content for the main VoiceType systemd user service file.
+
+    This service runs as the regular user for tray icon and D-Bus access.
+    """
     python_executable = sys.executable
     project_root = get_project_root()
 
@@ -40,6 +97,9 @@ def get_service_file_content() -> str:
     return f"""[Unit]
 Description=VoiceType Application
 # Start after the graphical session is available
+# Note: The privileged listener (voicetype-listener.service) is a system service,
+# so we cannot use After=/Requires= for it from a user service. The main app
+# handles connection to the listener via socket with retry logic.
 After=graphical-session.target
 # If the graphical session is stopped, this service will be stopped too
 PartOf=graphical-session.target
@@ -62,10 +122,21 @@ WantedBy=default.target
 """
 
 
-def run_systemctl_command(command: list[str], ignore_errors: bool = False):
-    """Runs a systemctl command."""
+def run_systemctl_command(
+    command: list[str], ignore_errors: bool = False, system: bool = False
+):
+    """Runs a systemctl command.
+
+    Args:
+        command: The systemctl subcommand and arguments
+        ignore_errors: If True, don't exit on errors
+        system: If True, run as system service (requires sudo); otherwise user service
+    """
     try:
-        full_command = ["systemctl", "--user"] + command
+        if system:
+            full_command = ["sudo", "systemctl"] + command
+        else:
+            full_command = ["systemctl", "--user"] + command
         print(f"Running: {' '.join(full_command)}")
         # For commands like stop/disable during uninstall, we might not want to exit on error
         if ignore_errors:
@@ -93,8 +164,17 @@ def run_systemctl_command(command: list[str], ignore_errors: bool = False):
 
 
 def install_service():
-    """Installs and starts the systemd user service."""
-    print(f"Installing VoiceType systemd user service ('{SERVICE_NAME}')...")
+    """Installs and starts both VoiceType systemd services.
+
+    On Linux, VoiceType requires two services:
+    1. A privileged system service (voicetype-service.service) that runs as root
+       for keyboard capture and typing (works on Wayland)
+    2. A user service (voicetype.service) that runs the main app with tray icon
+    """
+    print("Installing VoiceType systemd services...")
+    print("  - Privileged service (system service, runs as root for keyboard I/O)")
+    print("  - Main application (user service, runs as your user)")
+    print()
 
     if sys.platform != "linux":
         print(
@@ -121,6 +201,12 @@ def install_service():
             sys.exit(1)
         env_vars["OPENAI_API_KEY"] = api_key
 
+    # --- Hotkey Configuration ---
+    hotkey = input("Enter hotkey to use (default: <pause>): ").strip()
+    if not hotkey:
+        hotkey = "<pause>"
+    print(f"Using hotkey: {hotkey}")
+
     # Create app config directory and .env file
     APP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     try:
@@ -136,7 +222,45 @@ def install_service():
         )
         sys.exit(1)
 
-    # Create systemd service file
+    # --- Install privileged service (system service) ---
+    print(f"\nInstalling privileged service ({PRIVILEGED_SERVICE_NAME})...")
+    print("This requires sudo access to create system service files.")
+
+    privileged_service_content = get_privileged_service_file_content(hotkey)
+    privileged_service_path = str(PRIVILEGED_SERVICE_FILE_PATH)
+
+    try:
+        # Write to temp file first, then use sudo to move it
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".service", delete=False
+        ) as f:
+            f.write(privileged_service_content)
+            temp_path = f.name
+
+        # Use sudo to copy the file to /etc/systemd/system/
+        subprocess.run(["sudo", "cp", temp_path, privileged_service_path], check=True)
+        os.unlink(temp_path)
+        print(f"Privileged service file created at {privileged_service_path}")
+    except subprocess.CalledProcessError as e:
+        print(
+            f"Error writing privileged service file (sudo required): {e}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    except IOError as e:
+        print(f"Error writing privileged service file: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # Enable and start the privileged service
+    run_systemctl_command(["daemon-reload"], system=True)
+    run_systemctl_command(["enable", PRIVILEGED_SERVICE_NAME], system=True)
+    run_systemctl_command(["start", PRIVILEGED_SERVICE_NAME], system=True)
+
+    # --- Install user service (main app) ---
+    print(f"\nInstalling user service ({SERVICE_NAME})...")
+
     service_content = get_service_file_content()
     SYSTEMD_USER_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -158,25 +282,35 @@ def install_service():
     run_systemctl_command(["enable", SERVICE_NAME])
     run_systemctl_command(["start", SERVICE_NAME])
 
-    print(f"\nVoiceType service '{SERVICE_NAME}' installed and started.")
+    print(f"\n{'='*60}")
+    print("VoiceType services installed and started!")
+    print(f"{'='*60}")
+    print(f"\nServices running:")
+    print(f"  - {PRIVILEGED_SERVICE_NAME} (system, as root)")
+    print(f"  - {SERVICE_NAME} (user, as {os.environ.get('USER', 'you')})")
+
     if "OPENAI_API_KEY" in env_vars:
-        print(f"The OPENAI_API_KEY has been stored in {ENV_FILE_PATH}.")
+        print(f"\nThe OPENAI_API_KEY has been stored in {ENV_FILE_PATH}.")
         print("If you need to change the API key, you can edit this file and then run:")
     else:
-        print(f"The provider has been set to 'local' in {ENV_FILE_PATH}.")
+        print(f"\nThe provider has been set to 'local' in {ENV_FILE_PATH}.")
         print(
             "If you need to change the provider, you can edit this file and then run:"
         )
     print(f"  systemctl --user restart {SERVICE_NAME}")
-    print("\nYou can check the service status with:")
+
+    print("\nCheck service status:")
     print(f"  systemctl --user status {SERVICE_NAME}")
-    print("And view logs with:")
+    print(f"  sudo systemctl status {PRIVILEGED_SERVICE_NAME}")
+
+    print("\nView logs:")
     print(f"  journalctl --user -u {SERVICE_NAME} -f")
+    print(f"  sudo journalctl -u {PRIVILEGED_SERVICE_NAME} -f")
 
 
 def uninstall_service():
-    """Stops, disables, and removes the systemd user service."""
-    print(f"Uninstalling VoiceType systemd user service ('{SERVICE_NAME}')...")
+    """Stops, disables, and removes both VoiceType systemd services."""
+    print("Uninstalling VoiceType systemd services...")
 
     if sys.platform != "linux":
         print(
@@ -185,6 +319,9 @@ def uninstall_service():
         )
         # Allow to proceed if systemctl is not found, as the file might still exist.
         # run_systemctl_command will handle FileNotFoundError for systemctl itself.
+
+    # --- Uninstall user service ---
+    print(f"\nUninstalling user service ({SERVICE_NAME})...")
 
     # Try to stop and disable, ignoring errors if service is not found/loaded
     run_systemctl_command(["stop", SERVICE_NAME], ignore_errors=True)
@@ -203,6 +340,32 @@ def uninstall_service():
         print(f"Service file {SERVICE_FILE_PATH} not found.")
 
     run_systemctl_command(["daemon-reload"])  # Reload even if files were not present
+
+    # --- Uninstall privileged service ---
+    print(f"\nUninstalling privileged service ({PRIVILEGED_SERVICE_NAME})...")
+    print("This requires sudo access.")
+
+    run_systemctl_command(
+        ["stop", PRIVILEGED_SERVICE_NAME], ignore_errors=True, system=True
+    )
+    run_systemctl_command(
+        ["disable", PRIVILEGED_SERVICE_NAME], ignore_errors=True, system=True
+    )
+
+    privileged_service_path = str(PRIVILEGED_SERVICE_FILE_PATH)
+    try:
+        subprocess.run(
+            ["sudo", "rm", "-f", privileged_service_path],
+            check=False,  # Don't fail if file doesn't exist
+        )
+        print(f"Privileged service file removed: {privileged_service_path}")
+    except Exception as e:
+        print(f"Error removing privileged service file: {e}", file=sys.stderr)
+
+    run_systemctl_command(["daemon-reload"], system=True)
+
+    # --- Clean up configuration files ---
+    print("\nCleaning up configuration files...")
 
     # Remove the .env file
     if ENV_FILE_PATH.exists():
@@ -234,16 +397,29 @@ def uninstall_service():
             )
             print(f"You may need to remove it manually: rmdir {APP_CONFIG_DIR}")
 
-    print(f"VoiceType service '{SERVICE_NAME}' uninstalled.")
+    print(f"\n{'='*60}")
+    print("VoiceType services uninstalled.")
+    print(f"{'='*60}")
 
 
 def service_status():
-    """Checks the status of the systemd user service."""
+    """Checks the status of both VoiceType systemd services."""
     if sys.platform != "linux":
         print(
             "This status check is for Linux systems with systemd only.", file=sys.stderr
         )
         sys.exit(1)
+
+    print(f"{'='*60}")
+    print(f"Privileged Service ({PRIVILEGED_SERVICE_NAME}):")
+    print(f"{'='*60}")
+    run_systemctl_command(
+        ["status", PRIVILEGED_SERVICE_NAME], ignore_errors=True, system=True
+    )
+
+    print(f"\n{'='*60}")
+    print(f"Main Application Service ({SERVICE_NAME}):")
+    print(f"{'='*60}")
     run_systemctl_command(["status", SERVICE_NAME], ignore_errors=True)
 
 

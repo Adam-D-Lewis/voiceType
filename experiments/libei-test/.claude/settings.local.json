@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(LIBEI_DEBUG=0 python:*)",
+      "Bash(LIBEI_DEBUG=0 timeout 15 python:*)",
+      "Bash(EI_DEBUG=0 LIBEI_LOG_PRIORITY=0 timeout 15 python:*)",
+      "Bash(python:*)"
+    ]
+  }
+}
