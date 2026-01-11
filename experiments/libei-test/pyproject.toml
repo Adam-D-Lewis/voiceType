@@ -1,0 +1,22 @@
+[project]
+name = "libei-test"
+version = "0.1.0"
+description = "Sample program to type a sentence using libei on Wayland"
+requires-python = ">=3.11"
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.dependencies]
+python = ">=3.11"
+dbus-python = ">=1.3"
+pygobject = ">=3.40"
+
+[tool.pixi.pypi-dependencies]
+# snegg provides Python bindings to libei, libeis, and liboeffis
+snegg = { git = "https://gitlab.freedesktop.org/libinput/snegg.git" }
+
+[tool.pixi.tasks]
+run = "python type_sentence.py"
+run-dbus = "python type_sentence_dbus.py"
