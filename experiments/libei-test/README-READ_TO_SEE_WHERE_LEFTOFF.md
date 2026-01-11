@@ -35,6 +35,7 @@ A dialog will appear asking you to approve input device access. After approval, 
 | `type_sentence_ctypes.py` | **Fast typer using ctypes**. Uses `libei_ctypes.py` instead of snegg, plus direct D-Bus for the portal. Has optimized `type_sentence_fast()` with short delays (5ms), non-blocking polling, and rollback on device removal. Reports typing speed in chars/sec. |
 | `type_sentence_fast.py` | **Fast typer using snegg**. Applies the optimization techniques from `type_sentence_ctypes.py` but keeps using snegg. Provides `--slow` flag to compare with original approach. Reports typing speed. |
 | `type_sentence_xkb.py` | **Dynamic keyboard layout detection**. Uses libxkbcommon via ctypes to auto-detect your keyboard layout (Dvorak, QWERTY, etc.) and build the character→keycode mapping at runtime. No hardcoded layout dictionaries needed. |
+| `type_sentence_persistent.py` | **Persistent permissions**. Uses `restore_token` and `persist_mode` to remember user approval. First run shows dialog and saves token to `~/.cache/voicetype/restore_token`. Subsequent runs skip the dialog entirely. |
 
 ### Comparison Chart
 
@@ -46,6 +47,7 @@ A dialog will appear asking you to approve input device access. After approval, 
 | `type_sentence_ctypes.py` | dbus-python | ctypes | hardcoded Dvorak | fast |
 | `type_sentence_fast.py` | oeffis (snegg) | snegg | hardcoded Dvorak | fast |
 | `type_sentence_xkb.py` | oeffis (snegg) | snegg | **auto-detect (XKB)** | fast |
+| `type_sentence_persistent.py` | dbus-python | snegg | hardcoded QWERTY | medium |
 
 ## Usage Examples
 
@@ -68,6 +70,11 @@ python type_sentence_ctypes.py --slow
 python type_sentence_xkb.py
 python type_sentence_xkb.py --show-mapping  # debug: show char→keycode map
 python type_sentence_xkb.py --layout us --variant dvp  # override layout
+
+# Persistent permissions (no dialog after first run!)
+python type_sentence_persistent.py           # first run: shows dialog, saves token
+python type_sentence_persistent.py           # second run: no dialog!
+python type_sentence_persistent.py --reset   # clear saved token, force new dialog
 ```
 
 ## Key Concepts

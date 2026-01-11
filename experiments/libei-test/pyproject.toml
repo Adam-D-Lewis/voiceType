@@ -20,3 +20,5 @@ snegg = { git = "https://gitlab.freedesktop.org/libinput/snegg.git" }
 [tool.pixi.tasks]
 run = "python type_sentence.py"
 run-dbus = "python type_sentence_dbus.py"
+run-persistent = "python type_sentence_persistent.py"
+reset-token = "python type_sentence_persistent.py --reset"
