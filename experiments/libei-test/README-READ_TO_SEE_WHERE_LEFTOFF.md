@@ -36,6 +36,7 @@ A dialog will appear asking you to approve input device access. After approval, 
 | `type_sentence_fast.py` | **Fast typer using snegg**. Applies the optimization techniques from `type_sentence_ctypes.py` but keeps using snegg. Provides `--slow` flag to compare with original approach. Reports typing speed. |
 | `type_sentence_xkb.py` | **Dynamic keyboard layout detection**. Uses libxkbcommon via ctypes to auto-detect your keyboard layout (Dvorak, QWERTY, etc.) and build the character→keycode mapping at runtime. No hardcoded layout dictionaries needed. |
 | `type_sentence_persistent.py` | **Persistent permissions**. Uses `restore_token` and `persist_mode` to remember user approval. First run shows dialog and saves token to `~/.cache/voicetype/restore_token`. Subsequent runs skip the dialog entirely. |
+| `type_sentence_production.py` | **Production-ready combination** of all the above. Persistent permissions, fast typing with rollback, XKB auto-detection, and local config file for keyboard layout. Self-contained ctypes bindings (no snegg dependency for libei). Best starting point for integration. |
 
 ### Comparison Chart
 
@@ -48,6 +49,7 @@ A dialog will appear asking you to approve input device access. After approval, 
 | `type_sentence_fast.py` | oeffis (snegg) | snegg | hardcoded Dvorak | fast |
 | `type_sentence_xkb.py` | oeffis (snegg) | snegg | **auto-detect (XKB)** | fast |
 | `type_sentence_persistent.py` | dbus-python | snegg | hardcoded QWERTY | medium |
+| `type_sentence_production.py` | dbus-python | ctypes | **auto-detect (XKB)** | fast |
 
 ## Usage Examples
 
@@ -75,6 +77,12 @@ python type_sentence_xkb.py --layout us --variant dvp  # override layout
 python type_sentence_persistent.py           # first run: shows dialog, saves token
 python type_sentence_persistent.py           # second run: no dialog!
 python type_sentence_persistent.py --reset   # clear saved token, force new dialog
+
+# Production script (recommended for integration)
+python type_sentence_production.py --layout us --variant dvp --save-layout  # save Dvorak Programmer
+python type_sentence_production.py --text "Hello world!"  # uses saved layout
+python type_sentence_production.py --show-layout          # debug: show char→keycode map
+python type_sentence_production.py --reset                # clear saved permissions
 ```
 
 ## Key Concepts

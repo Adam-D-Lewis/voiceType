@@ -354,16 +354,29 @@ def wait_for_device(ctx: ei.Sender, poll: select.poll, kept_refs: list) -> ei.De
     while True:
         poll.poll(500)
         ctx.dispatch()
-        for event in ctx.events:
+        try:
+            events = list(ctx.events)
+        except ValueError as e:
+            # snegg may raise ValueError for unknown event types
+            print(f"Warning: {e}, continuing...")
+            continue
+
+        for event in events:
             kept_refs.append(event)
 
-            if event.event_type == ei.EventType.SEAT_ADDED:
+            try:
+                event_type = event.event_type
+            except ValueError:
+                # Unknown event type, skip it
+                continue
+
+            if event_type == ei.EventType.SEAT_ADDED:
                 seat = event.seat
                 if seat:
                     seat.bind((ei.DeviceCapability.KEYBOARD,))
                     kept_refs.append(seat)
 
-            elif event.event_type == ei.EventType.DEVICE_RESUMED:
+            elif event_type == ei.EventType.DEVICE_RESUMED:
                 dev = event.device
                 if dev and ei.DeviceCapability.KEYBOARD in dev.capabilities:
                     print(f"Keyboard device ready: {dev.name}")
