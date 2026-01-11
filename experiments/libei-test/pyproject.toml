@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Sample program to type a sentence using libei on Wayland"
 requires-python = ">=3.11"
 
-[tool.pixi.project]
+[tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["linux-64"]
 
