@@ -5,10 +5,11 @@ global keyboard shortcuts. It automatically selects the appropriate
 implementation based on the current platform and environment.
 """
 
-import os
 from typing import Callable, Optional
 
 from loguru import logger
+
+from voicetype.platform_detection import is_wayland
 
 from .hotkey_listener import HotkeyListener
 from .pynput_hotkey_listener import PynputHotkeyListener
@@ -57,16 +58,14 @@ def create_hotkey_listener(
         )
 
     # Check if we're on Wayland
-    wayland_display = os.environ.get("WAYLAND_DISPLAY")
-    xdg_session_type = os.environ.get("XDG_SESSION_TYPE")
-    is_wayland = wayland_display or xdg_session_type == "wayland"
+    wayland_session = is_wayland()
 
     # Try portal if on Wayland (or forced)
-    if is_wayland or method == "portal":
-        if is_wayland:
+    if wayland_session or method == "portal":
+        if wayland_session:
             logger.info("Wayland session detected")
 
-        if method == "portal" and not is_wayland:
+        if method == "portal" and not wayland_session:
             logger.warning(
                 "Portal method requested but not on Wayland. Trying anyway..."
             )

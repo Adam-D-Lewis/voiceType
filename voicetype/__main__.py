@@ -1,5 +1,4 @@
 import argparse
-import os
 import platform
 import sys
 from pathlib import Path
@@ -14,6 +13,7 @@ from voicetype.pipeline import (
     PipelineManager,
     ResourceManager,
 )
+from voicetype.platform_detection import get_compositor_name, get_display_server
 from voicetype.settings import load_settings
 from voicetype.state import AppState, State
 from voicetype.telemetry import (
@@ -96,8 +96,11 @@ def get_platform_listener(
     logger.info(f"Detected platform: {system}")
 
     if system == "Linux":
-        session_type = os.environ.get("XDG_SESSION_TYPE", "unknown").lower()
-        logger.info(f"Linux session type: {session_type}")
+        display_server = get_display_server()
+        compositor = get_compositor_name()
+        logger.info(
+            f"Linux display server: {display_server}, compositor: {compositor or 'unknown'}"
+        )
 
     try:
         return create_hotkey_listener(
