@@ -4,6 +4,7 @@ import sys
 import threading
 from typing import Optional, Tuple
 
+from loguru import logger
 from PIL import Image, ImageDraw
 
 # Valid pystray backends: 'gtk', 'appindicator', 'xorg', 'dummy'
@@ -155,9 +156,22 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
             # Cancel all active pipelines when disabling
             if ctx.pipeline_manager:
                 ctx.pipeline_manager.executor.cancel_all_pipelines()
+            # Stop hotkey listener to release the shortcut binding
+            # This allows other instances/apps to receive the hotkey
+            if ctx.hotkey_listener:
+                try:
+                    ctx.hotkey_listener.stop_listening()
+                except Exception as e:
+                    logger.warning(f"Failed to stop hotkey listener: {e}")
         else:
             ctx.state.state = State.ENABLED
             _apply_enabled_icon(icon)
+            # Restart hotkey listener to reclaim the shortcut binding
+            if ctx.hotkey_listener:
+                try:
+                    ctx.hotkey_listener.start_listening()
+                except Exception as e:
+                    logger.error(f"Failed to start hotkey listener: {e}")
         _icon.menu = _build_menu(ctx, icon)
         _icon.update_menu()
 
