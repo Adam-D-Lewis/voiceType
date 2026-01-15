@@ -138,8 +138,12 @@ faster-whisper = "*"
 pyobjc-framework-ApplicationServices = ">=8.0"
 pyobjc-framework-Quartz = ">=8.0"
 
+[tool.pixi.target.linux-64.dependencies]
+libxkbcommon = "*"  # Required for eitype build
+
 [tool.pixi.target.linux-64.pypi-dependencies]
 dbus-next = ">=0.2.3"  # Wayland GlobalShortcuts portal support
+eitype = { git = "https://github.com/Adam-D-Lewis/eitype.git" }  # Wayland EI keyboard input
 # the following dependencies come from vendoring in pynput
 evdev = ">=1.3"
 python-xlib = ">=0.17"

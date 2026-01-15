@@ -123,7 +123,17 @@ class TestPortalHotkeyListener:
         release_callback = MagicMock()
         listener = PortalHotkeyListener(on_hotkey_release=release_callback)
 
+        # Must first simulate activation (press) before deactivation (release)
+        # due to debounce logic that requires _press_callback_fired to be True
+        listener._on_shortcut_activated(
+            session_handle="/test/session",
+            shortcut_id="voicetype-record",
+            timestamp=12345,
+            options={},
+        )
+
         # Simulate shortcut deactivation
+        # With no event loop, it should execute release immediately (fallback path)
         listener._on_shortcut_deactivated(
             session_handle="/test/session",
             shortcut_id="voicetype-record",
