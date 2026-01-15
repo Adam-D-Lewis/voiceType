@@ -422,6 +422,41 @@ class PortalHotkeyListener(HotkeyListener):
             elif response_code == 1:
                 logger.warning("User cancelled shortcut binding")
                 response_future.set_result(False)
+            elif response_code == 2:
+                # Response code 2 means "interaction ended in some other way"
+                # GNOME may return code 2 but still bind the shortcut successfully
+                shortcuts = results.get("shortcuts", [])
+                if shortcuts:
+                    logger.info(f"Shortcuts bound with response code 2: {shortcuts}")
+                    # Extract trigger info same as code 0
+                    try:
+                        if hasattr(shortcuts, "value"):
+                            shortcuts_list = shortcuts.value
+                        else:
+                            shortcuts_list = shortcuts
+
+                        if shortcuts_list:
+                            for shortcut in shortcuts_list:
+                                shortcut_id = shortcut[0]
+                                shortcut_props = shortcut[1]
+                                trigger = shortcut_props.get("trigger_description")
+                                if trigger:
+                                    trigger_value = (
+                                        trigger.value
+                                        if hasattr(trigger, "value")
+                                        else trigger
+                                    )
+                                    self._actual_bound_trigger = trigger_value
+                                    logger.warning(
+                                        f"Portal bound shortcut '{shortcut_id}' to trigger: {trigger_value}"
+                                    )
+                    except Exception as e:
+                        logger.debug(f"Could not parse trigger description: {e}")
+
+                    response_future.set_result(True)
+                else:
+                    logger.warning("BindShortcuts returned code 2 with no shortcuts")
+                    response_future.set_result(False)
             else:
                 response_future.set_exception(
                     Exception(f"BindShortcuts failed: {response_code}")
