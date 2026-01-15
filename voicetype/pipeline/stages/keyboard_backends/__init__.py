@@ -14,6 +14,9 @@ from voicetype.pipeline.stages.keyboard_backends.eitype_backend import (
     EitypeKeyboard,
     EitypeNotFoundError,
 )
+from voicetype.pipeline.stages.keyboard_backends.eitype_backend import (
+    clear_cached_connection as clear_eitype_connection,
+)
 from voicetype.pipeline.stages.keyboard_backends.pynput_backend import PynputKeyboard
 from voicetype.pipeline.stages.keyboard_backends.wtype_backend import (
     WtypeKeyboard,
@@ -27,6 +30,7 @@ __all__ = [
     "EitypeKeyboard",
     "WtypeNotFoundError",
     "EitypeNotFoundError",
+    "clear_eitype_connection",
     "create_keyboard_backend",
 ]
 

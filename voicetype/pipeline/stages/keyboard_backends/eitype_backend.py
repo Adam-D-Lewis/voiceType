@@ -11,11 +11,28 @@ from loguru import logger
 
 from voicetype.utils import get_app_data_dir
 
+# Module-level cache for the eitype connection
+# The RemoteDesktop portal connection is expensive and may not support
+# multiple simultaneous connections, so we reuse a single typer instance.
+_cached_typer = None
+
 
 class EitypeNotFoundError(RuntimeError):
     """Raised when eitype library is not available."""
 
     pass
+
+
+def clear_cached_connection() -> None:
+    """Clear the cached eitype connection.
+
+    Call this to force a new connection on the next type_text() call.
+    Useful if the connection becomes stale or needs to be reset.
+    """
+    global _cached_typer
+    if _cached_typer is not None:
+        logger.debug("EitypeKeyboard: clearing cached portal connection")
+        _cached_typer = None
 
 
 def _get_token_path() -> Path:
@@ -79,15 +96,27 @@ class EitypeKeyboard:
         logger.debug("EitypeKeyboard: eitype library loaded")
 
     def _get_typer(self):
-        """Lazily connect to the EI portal, using saved token if available."""
-        if self._typer is None:
-            saved_token = _load_token()
-            logger.debug("EitypeKeyboard: connecting to RemoteDesktop portal")
-            self._typer, new_token = self._EiType.connect_portal_with_token(saved_token)
-            if new_token and new_token != saved_token:
-                _save_token(new_token)
-            logger.debug("EitypeKeyboard: connected to portal")
-        return self._typer
+        """Lazily connect to the EI portal, using saved token if available.
+
+        Uses a module-level cached connection to avoid hanging on subsequent calls.
+        The RemoteDesktop portal may not support multiple simultaneous connections.
+        """
+        global _cached_typer
+
+        if _cached_typer is not None:
+            logger.debug("EitypeKeyboard: reusing cached portal connection")
+            return _cached_typer
+
+        saved_token = _load_token()
+        logger.debug("EitypeKeyboard: connecting to RemoteDesktop portal")
+        typer, new_token = self._EiType.connect_portal_with_token(saved_token)
+        if new_token and new_token != saved_token:
+            _save_token(new_token)
+        logger.debug("EitypeKeyboard: connected to portal")
+
+        # Cache for subsequent calls
+        _cached_typer = typer
+        return typer
 
     def type_text(self, text: str) -> None:
         """Type the given text using eitype.
@@ -96,7 +125,7 @@ class EitypeKeyboard:
             text: The text to type
 
         Raises:
-            RuntimeError: If eitype fails to type
+            RuntimeError: If eitype fails to type after retry
         """
         logger.debug(f"EitypeKeyboard: typing {len(text)} characters")
 
@@ -106,4 +135,17 @@ class EitypeKeyboard:
             logger.debug("EitypeKeyboard: typing complete")
 
         except Exception as e:
-            raise RuntimeError(f"eitype failed to type text: {e}") from e
+            # Connection may be stale - clear cache and retry once
+            logger.warning(
+                f"EitypeKeyboard: typing failed, retrying with fresh connection: {e}"
+            )
+            clear_cached_connection()
+
+            try:
+                typer = self._get_typer()
+                typer.type_text(text)
+                logger.debug("EitypeKeyboard: typing complete (after retry)")
+            except Exception as retry_e:
+                raise RuntimeError(
+                    f"eitype failed to type text: {retry_e}"
+                ) from retry_e
