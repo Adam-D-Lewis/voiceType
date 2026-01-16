@@ -8,10 +8,16 @@ from loguru import logger
 from PIL import Image, ImageDraw
 
 # Valid pystray backends: 'gtk', 'appindicator', 'xorg', 'dummy'
-# On Linux, use GTK backend with GDK_BACKEND=x11 (set in systemd service) for Wayland support.
-# This uses XWayland for the tray icon, which works reliably on both X11 and Wayland sessions.
+# Set GI_TYPELIB_PATH to include common system paths for typelib discovery for appindicator backend.
 if sys.platform == "linux":
-    os.environ.setdefault("PYSTRAY_BACKEND", "gtk")
+    _existing_path = os.environ.get("GI_TYPELIB_PATH", "")
+    _system_paths = [
+        "/usr/lib/x86_64-linux-gnu/girepository-1.0",  # Debian/Ubuntu
+        "/usr/lib64/girepository-1.0",  # Fedora/RHEL
+        "/usr/lib/girepository-1.0",  # Arch
+    ]
+    _paths = [_existing_path] + _system_paths if _existing_path else _system_paths
+    os.environ["GI_TYPELIB_PATH"] = ":".join(_paths)
 
 import pystray
 from pystray import Menu
