@@ -5,6 +5,7 @@ that support the Extended Input (EI) protocol via the RemoteDesktop portal.
 This includes GNOME 46+ and KDE Plasma 6+.
 """
 
+import time
 from pathlib import Path
 
 from loguru import logger
@@ -28,10 +29,20 @@ def clear_cached_connection() -> None:
 
     Call this to force a new connection on the next type_text() call.
     Useful if the connection becomes stale or needs to be reset.
+
+    Important: This explicitly closes the stale connection before clearing
+    the cache. Without calling close(), the EI/DBus session remains open
+    in a bad state and reconnection will hang or fail.
     """
     global _cached_typer
     if _cached_typer is not None:
-        logger.debug("EitypeKeyboard: clearing cached portal connection")
+        logger.debug("EitypeKeyboard: closing stale portal connection")
+        try:
+            _cached_typer.close()
+        except Exception as e:
+            logger.debug(
+                f"EitypeKeyboard: error closing stale connection (ignored): {e}"
+            )
         _cached_typer = None
 
 
@@ -135,11 +146,16 @@ class EitypeKeyboard:
             logger.debug("EitypeKeyboard: typing complete")
 
         except Exception as e:
-            # Connection may be stale - clear cache and retry once
+            # Connection may be stale - close it properly and retry once
             logger.warning(
                 f"EitypeKeyboard: typing failed, retrying with fresh connection: {e}"
             )
             clear_cached_connection()
+
+            # Give the portal time to clean up the session before reconnecting.
+            # Without this delay, the new connection may fail because the old
+            # EI session state hasn't been fully released by the compositor.
+            time.sleep(0.1)
 
             try:
                 typer = self._get_typer()
