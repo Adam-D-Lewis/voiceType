@@ -68,6 +68,16 @@ class Settings(BaseSettings):
     # Path to log file (uses platform defaults if not specified)
     log_file: Optional[Path] = None
 
+    # Hotkey listener method: "auto", "portal", or "pynput"
+    # "auto" (default): Try portal on Wayland, fall back to pynput
+    # "portal": Force XDG Portal GlobalShortcuts (Wayland only)
+    # "pynput": Force pynput listener (works on X11, may need XWayland on Wayland)
+    hotkey_listener: str = "auto"
+
+    # Whether to log key repeat debug messages (portal listener only)
+    # Set to true for debugging key repeat issues, false to reduce log noise
+    log_key_repeat_debug: bool = False
+
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     """Deep merge two dictionaries, with override taking precedence."""
