@@ -84,6 +84,7 @@ ignore = [
 
 [tool.typos]
 default.extend-ignore-re = ["(?Rm)^.*(#|//)\\s*typos: ignore$"]
+default.extend-words = { gir = "gir" }
 
 [tool.pixi.workspace]
 channels = ["conda-forge", "nvidia"]

@@ -20,7 +20,7 @@ jobs:
           submodules: true
 
       - name: Install Dependencies via apt
-        run: sudo apt install libportaudio2 xvfb git1.2-ayatanaappindicator3-0.1 -y
+        run: sudo apt install libportaudio2 xvfb gir1.2-ayatanaappindicator3-0.1 -y
 
       - name: Setup Pixi
         uses: prefix-dev/setup-pixi@v0.8.1
