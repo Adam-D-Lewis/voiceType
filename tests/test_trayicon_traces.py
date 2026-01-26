@@ -30,7 +30,9 @@ def test_traces_menu_item_appears_when_telemetry_enabled():
     # Verify that "Open Traces" is in the menu
     assert "Open Traces" in menu_labels
     # Verify menu structure
-    assert len(menu_labels) == 5  # Enable/Disable, Open Logs, Open Traces, Quit
+    assert (
+        len(menu_labels) == 6
+    )  # Enable/Disable, Open Settings, Open Logs, Open Traces, Restart, Quit
 
 
 def test_traces_menu_item_absent_when_telemetry_disabled():
@@ -55,7 +57,9 @@ def test_traces_menu_item_absent_when_telemetry_disabled():
     # Verify that "Open Traces" is NOT in the menu
     assert "Open Traces" not in menu_labels
     # Verify menu structure
-    assert len(menu_labels) == 4  # Enable/Disable, Open Logs, Quit
+    assert (
+        len(menu_labels) == 5
+    )  # Enable/Disable, Open Settings, Open Logs, Restart, Quit
 
 
 def test_traces_menu_item_absent_when_no_telemetry_field():
@@ -78,4 +82,6 @@ def test_traces_menu_item_absent_when_no_telemetry_field():
     # Verify that "Open Traces" is NOT in the menu
     assert "Open Traces" not in menu_labels
     # Verify menu structure
-    assert len(menu_labels) == 4  # Enable/Disable, Open Logs, Quit
+    assert (
+        len(menu_labels) == 5
+    )  # Enable/Disable, Open Settings, Open Logs, Restart, Quit

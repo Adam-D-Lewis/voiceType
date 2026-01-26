@@ -215,6 +215,21 @@ pytest = "*"
 libcublas = "=12"  # faster_whisper doesn't seem to support cuda 13 yet
 cudnn = "*"
 
+# Dev tasks for trace analysis
+[tool.pixi.feature.dev.tasks]
+analyze-traces = { cmd = "python scripts/analyze_traces.py", description = "Analyze voicetype traces and show performance stats" }
+traces-to-csv = { cmd = "python scripts/analyze_traces.py --export", description = "Export traces to CSV for spreadsheet analysis" }
+jaeger-stop = { cmd = "docker stop jaeger && docker rm jaeger", description = "Stop and remove Jaeger container" }
+jaeger = { cmd = """
+python scripts/analyze_traces.py --jaeger && \
+(docker ps -q -f name=jaeger | grep -q . || docker run -d --name jaeger -p 16686:16686 -p 4317:4317 jaegertracing/all-in-one:latest) && \
+sleep 2 && \
+echo '' && \
+echo '==> Jaeger is running at http://localhost:16686' && \
+echo '==> Upload voicetype_traces_jaeger.json via: Search -> JSON File tab' && \
+(xdg-open http://localhost:16686 2>/dev/null || open http://localhost:16686 2>/dev/null || echo '    (open the URL manually)')
+""", description = "Convert traces, start Jaeger, and open browser" }
+
 # Map environments to feature sets
 [tool.pixi.environments]
 default = ["local"]
