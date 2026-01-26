@@ -55,6 +55,7 @@ run-voicetype = "voicetype.__main__:main"
 dev = [
     "pytest",
     "pre-commit",
+    "nvidia-ml-py"
 ]
 wayland = [
     "dbus-next>=0.2.3",
@@ -236,7 +237,7 @@ default = ["local"]
 local = ["local"]
 local-cpu = ["local-cpu"]  # For non-GPU machines
 build = ["build"]
-dev = ["dev"]
+dev = ["local", "dev"]  # Include local for CUDA support + dev tools
 windows-build = ["windows-build"]  # For building Windows installers
 
 # Pixi tasks for building
