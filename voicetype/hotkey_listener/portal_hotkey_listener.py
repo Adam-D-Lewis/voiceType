@@ -60,24 +60,15 @@ class PortalHotkeyListener(HotkeyListener):
             False  # Track if we've shown the hint about debug logging
         )
         # Track key state to handle key repeat
-        # Portal sends Activated/Deactivated pairs for each key repeat event.
-        # The pattern is:
+        # Portal behavior (tested on GNOME 48):
         #   - Initial press: Activated
-        #   - After ~100ms: Deactivated (system's internal timing)
-        #   - After ~500ms from initial: Activated (key repeat starts)
-        #   - Then Deactivated/Activated pairs every ~30ms
+        #   - After keyboard repeat delay (~500ms): Activated signals every ~30ms
+        #   - Release: Single Deactivated
         #
-        # Our approach: Track "logical" key state separately from portal events.
-        # Only trigger release callback when we're confident it's a real release,
-        # not a key repeat artifact.
-        self._key_is_pressed = False  # Logical state: is the physical key held?
+        # Key insight: Deactivated ONLY fires on actual key release, not during
+        # key repeat. So we can fire the release callback immediately without
+        # any debounce delay.
         self._press_callback_fired = False  # Have we called on_hotkey_press?
-        self._pending_release_task: Optional[asyncio.TimerHandle] = None
-        self._last_deactivated_time: float = 0.0
-        # Debounce threshold in seconds - if no Activated signal arrives within
-        # this time after a Deactivated, we consider it a real release.
-        # Must be longer than the keyboard's initial repeat delay (~500ms typical)
-        self._debounce_threshold_sec = 0.6
 
     def set_hotkey(self, hotkey: str) -> None:
         """Set the preferred hotkey trigger.
@@ -657,26 +648,15 @@ class PortalHotkeyListener(HotkeyListener):
     ):
         """Called when the shortcut is pressed.
 
-        Note: The XDG Portal GlobalShortcuts API sends Activated/Deactivated pairs
-        for each key repeat event (not just the initial press). We handle this by:
-        1. Cancelling any pending release when we receive an Activated signal
-        2. Only triggering press callback once per physical key press
+        The portal sends repeated Activated signals during key repeat (every ~30ms
+        after the initial keyboard repeat delay of ~500ms). We only fire the press
+        callback once per physical key press.
         """
         if self._log_key_repeat_debug:
             logger.debug(
                 f"Portal signal received - Activated: session={session_handle}, shortcut={shortcut_id}, timestamp={timestamp}"
             )
         if shortcut_id == self._shortcut_id:
-            # Cancel any pending release - this Activated means the key is still held
-            if self._pending_release_task is not None:
-                self._pending_release_task.cancel()
-                self._pending_release_task = None
-                if self._log_key_repeat_debug:
-                    logger.debug("Cancelled pending release (key repeat detected)")
-
-            # Mark key as logically pressed
-            self._key_is_pressed = True
-
             if self._press_callback_fired:
                 # We already fired the press callback for this key press session
                 # This is a key repeat - ignore
@@ -707,10 +687,8 @@ class PortalHotkeyListener(HotkeyListener):
     ):
         """Called when the shortcut is released.
 
-        Note: The XDG Portal sends Deactivated for both real releases AND key repeats.
-        We use a delayed release approach: schedule the release callback after a short
-        delay. If an Activated signal arrives before the delay expires (indicating key
-        repeat), we cancel the pending release.
+        The portal only sends Deactivated on actual key release, not during key repeat.
+        This means we can fire the release callback immediately without any debounce.
         """
         if self._log_key_repeat_debug:
             logger.debug(
@@ -725,44 +703,15 @@ class PortalHotkeyListener(HotkeyListener):
                     )
                 return
 
-            # Mark key as not physically pressed (but keep _press_callback_fired until
-            # we confirm it's a real release via debounce timeout)
-            self._key_is_pressed = False
-
-            # Cancel any existing pending release and schedule a new one
-            if self._pending_release_task is not None:
-                self._pending_release_task.cancel()
-                self._pending_release_task = None
-
-            # Schedule a delayed release - will be cancelled if Activated arrives
-            if self._log_key_repeat_debug:
-                logger.debug(
-                    f"Scheduling delayed release in {self._debounce_threshold_sec}s"
-                )
-            if self._loop:
-                self._pending_release_task = self._loop.call_later(
-                    self._debounce_threshold_sec,
-                    self._execute_release,
-                    shortcut_id,
-                    timestamp,
-                )
-            else:
-                # Fallback: if no loop, execute immediately (shouldn't happen)
-                logger.warning("No event loop available, executing release immediately")
-                self._execute_release(shortcut_id, timestamp)
+            # Reset state and fire the release callback immediately
+            self._press_callback_fired = False
+            logger.info(f"Shortcut deactivated: {shortcut_id} at {timestamp}")
+            if self.on_hotkey_release:
+                self.on_hotkey_release()
         else:
             logger.warning(
                 f"Received deactivation for unknown shortcut: {shortcut_id} (expected: {self._shortcut_id})"
             )
-
-    def _execute_release(self, shortcut_id: str, timestamp: int):
-        """Execute the actual release callback after debounce delay."""
-        self._pending_release_task = None
-        self._key_is_pressed = False
-        self._press_callback_fired = False  # Reset for next key press
-        logger.info(f"Shortcut deactivated: {shortcut_id} at {timestamp}")
-        if self.on_hotkey_release:
-            self.on_hotkey_release()
 
     def start_listening(self) -> None:
         """Start the portal hotkey listener.
@@ -824,11 +773,6 @@ class PortalHotkeyListener(HotkeyListener):
 
         self._running = False
         logger.info("Stopping portal hotkey listener...")
-
-        # Cancel any pending release task
-        if self._pending_release_task is not None:
-            self._pending_release_task.cancel()
-            self._pending_release_task = None
 
         if self._loop:
             # Schedule loop stop from the loop's thread
