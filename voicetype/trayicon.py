@@ -153,6 +153,33 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
         except Exception:
             pass
 
+    def _open_settings(_icon: pystray._base.Icon, _item: Item):
+        """Open the settings file in the default application."""
+        # Settings file location (user config directory)
+        settings_path = get_app_data_dir() / "settings.toml"
+
+        # Create settings file with example content if it doesn't exist
+        if not settings_path.exists():
+            try:
+                settings_path.parent.mkdir(parents=True, exist_ok=True)
+                # Create a minimal settings file with a helpful comment
+                settings_path.write_text(
+                    "# VoiceType Settings\n"
+                    "# See settings.example.toml for available options\n\n"
+                )
+            except Exception:
+                return
+
+        try:
+            if sys.platform.startswith("linux"):
+                subprocess.Popen(["xdg-open", str(settings_path)])
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(settings_path)])
+            elif sys.platform == "win32":
+                os.startfile(str(settings_path))  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
     def _toggle_enabled(_icon: pystray._base.Icon, _item: Item):
         # Thread-safe toggling via State
         is_enabled = ctx.state.state == State.ENABLED
@@ -187,6 +214,7 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
     # Build menu items list
     menu_items = [
         Item(enable_label, _toggle_enabled, default=True),
+        Item("Open Settings", _open_settings),
         Item("Open Logs", _open_logs),
     ]
 
