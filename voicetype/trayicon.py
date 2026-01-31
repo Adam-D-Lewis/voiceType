@@ -239,7 +239,9 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
                 stage_class = metadata.stage_class
                 if hasattr(stage_class, "get_menu_items"):
                     for label, callback in stage_class.get_menu_items():
-                        menu_items.append(Item(label, lambda _, cb=callback: cb()))
+                        menu_items.append(
+                            Item(label, lambda _icon, _item, cb=callback: cb())
+                        )
             except Exception as e:
                 logger.warning(f"Failed to get menu items from stage {stage_name}: {e}")
 
