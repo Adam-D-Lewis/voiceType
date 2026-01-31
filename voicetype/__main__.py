@@ -217,31 +217,22 @@ def main():
                 f"Found {len(enabled_pipelines)} enabled pipeline(s): {', '.join(enabled_pipelines)}"
             )
 
-            # Get the first enabled pipeline's hotkey for the listener
-            # NOTE: Current HotkeyListener only supports single hotkey
-            # For multi-hotkey support, we'd need to extend the listener
-            first_pipeline = pipeline_manager.pipelines[enabled_pipelines[0]]
-            hotkey_string = first_pipeline.hotkey
-
             # Create hotkey callbacks that delegate to HotkeyDispatcher
-            def on_hotkey_press():
+            def on_hotkey_press(hotkey_str: str):
                 """Hotkey press handler - delegates to pipeline manager."""
                 if ctx.state.state == State.ENABLED:
-                    logger.debug("Hotkey pressed")
+                    logger.debug(f"Hotkey pressed: {hotkey_str}")
                     play_sound(START_RECORD_SOUND)
-                    # Trigger pipeline via hotkey dispatcher
-                    hotkey_dispatcher._on_press(hotkey_string)
+                    hotkey_dispatcher._on_press(hotkey_str)
                 else:
                     logger.debug(
                         f"Hotkey pressed but app is disabled (state: {ctx.state.state})"
                     )
 
-            def on_hotkey_release():
+            def on_hotkey_release(hotkey_str: str):
                 """Hotkey release handler - delegates to pipeline manager."""
-                # Always process release events to cancel active pipelines
-                logger.debug("Hotkey released")
-                # Signal release to hotkey dispatcher
-                hotkey_dispatcher._on_release(hotkey_string)
+                logger.debug(f"Hotkey released: {hotkey_str}")
+                hotkey_dispatcher._on_release(hotkey_str)
 
             # Create platform-specific listener
             hotkey_listener = get_platform_listener(
@@ -250,7 +241,18 @@ def main():
                 method=settings.hotkey_listener,
                 log_key_repeat_debug=settings.log_key_repeat_debug,
             )
-            hotkey_listener.set_hotkey(hotkey_string)
+
+            # Register hotkeys for ALL enabled pipelines
+            registered_hotkeys = set()
+            for pipeline_name in enabled_pipelines:
+                pipeline = pipeline_manager.pipelines[pipeline_name]
+                hotkey_string = pipeline.hotkey
+                if hotkey_string not in registered_hotkeys:
+                    hotkey_listener.add_hotkey(hotkey_string)
+                    registered_hotkeys.add(hotkey_string)
+                    logger.info(
+                        f"Registered hotkey '{hotkey_string}' for pipeline '{pipeline_name}'"
+                    )
 
             # Set the listener in hotkey dispatcher (for compatibility)
             hotkey_dispatcher.set_hotkey_listener(hotkey_listener)
@@ -264,7 +266,7 @@ def main():
             # Start listening
             hotkey_listener.start_listening()
 
-            logger.info(f"Listening for hotkey: {hotkey_string}")
+            logger.info(f"Listening for hotkeys: {registered_hotkeys}")
             logger.info("Press Ctrl+C to exit.")
 
         # Start the system tray icon (blocks until closed)
