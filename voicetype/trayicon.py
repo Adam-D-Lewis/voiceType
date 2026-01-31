@@ -222,6 +222,37 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
     if hasattr(ctx, "telemetry_enabled") and ctx.telemetry_enabled:
         menu_items.append(Item("Open Traces", _open_traces))
 
+    # Discover menu items contributed by pipeline stages
+    if ctx.pipeline_manager:
+        from voicetype.pipeline.stage_registry import STAGE_REGISTRY
+
+        seen_stages = set()
+        for pipeline_cfg in ctx.pipeline_manager.pipelines.values():
+            if not pipeline_cfg.enabled:
+                continue
+            for stage_config in pipeline_cfg.stages:
+                seen_stages.add(stage_config["stage"])
+
+        for stage_name in sorted(seen_stages):
+            try:
+                metadata = STAGE_REGISTRY.get(stage_name)
+                stage_class = metadata.stage_class
+                if hasattr(stage_class, "get_menu_items"):
+                    for label, callback in stage_class.get_menu_items():
+
+                        def _make_handler(cb):
+                            def handler(icon_arg, item_arg):
+                                cb()
+
+                            return handler
+
+                        menu_items.append(Item(label, _make_handler(callback)))
+            except Exception:
+                logger.warning(
+                    f"Failed to get menu items from stage {stage_name}",
+                    exc_info=True,
+                )
+
     # Add Restart and Quit at the end
     menu_items.append(Item("Restart", _restart))
     menu_items.append(Item("Quit", _quit))
