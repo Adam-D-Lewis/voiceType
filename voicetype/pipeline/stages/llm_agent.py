@@ -242,10 +242,7 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
     @classmethod
     def get_menu_items(cls) -> List[Tuple[str, callable]]:
         """Return menu items contributed by this stage for the system tray."""
-        with cls._interaction_lock:
-            if cls._last_interaction is not None:
-                return [("Capture Wrong LLM Output", cls._capture_wrong_output)]
-        return []
+        return [("Capture Wrong LLM Output", cls._capture_wrong_output)]
 
     @classmethod
     def _capture_wrong_output(cls) -> None:
