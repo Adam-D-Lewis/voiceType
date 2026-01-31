@@ -99,7 +99,7 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
     - model: Model string (e.g., "gpt-4", "claude-3-5-sonnet-20241022", "ollama/llama3.2")
     - system_prompt: Optional instructions for the LLM (default: Jarvis assistant prompt)
     - trigger_keywords: List of keywords that must be present to invoke LLM (case-insensitive).
-                       If not configured or empty, LLM will NOT be invoked and original text is returned.
+                       If empty, LLM is always invoked.
     - temperature: Optional float controlling randomness (0.0-2.0, default: provider default)
     - max_tokens: Optional int limiting response length
     - timeout: Optional int for request timeout in seconds (default: 30)
@@ -171,6 +171,8 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
             logger.debug(
                 "Trigger keyword found in input, proceeding with LLM processing"
             )
+        else:
+            logger.debug("No trigger_keywords configured, always invoking LLM")
 
         # Update icon to processing state
         context.icon_controller.set_icon("processing")
