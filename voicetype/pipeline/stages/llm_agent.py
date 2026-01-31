@@ -4,7 +4,11 @@ This stage processes text through an LLM agent using LiteLLM.
 Supports both local (Ollama) and remote (OpenAI, Anthropic, etc.) providers.
 """
 
-from typing import List, Optional
+import json
+import threading
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import List, Optional, Tuple
 
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -108,6 +112,10 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
 
     required_resources = set()  # No exclusive resources needed
 
+    # Class-level state for capturing LLM interactions
+    _last_interaction: Optional[dict] = None
+    _interaction_lock = threading.Lock()
+
     def __init__(self, config: dict):
         """Initialize the LLM agent stage.
 
@@ -206,6 +214,14 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
 
             if output_text:
                 logger.info(f"LLM processing complete: {output_text[:100]}...")
+                with LLMAgent._interaction_lock:
+                    LLMAgent._last_interaction = {
+                        "input": input_data,
+                        "output": output_text,
+                        "model": self.model,
+                        "system_prompt": self.system_prompt,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
             else:
                 logger.warning("LLM returned empty response")
                 if self.fallback_on_error:
@@ -222,3 +238,32 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
             else:
                 logger.info("Returning None due to error (fallback disabled)")
                 return None
+
+    @classmethod
+    def get_menu_items(cls) -> List[Tuple[str, callable]]:
+        """Return menu items contributed by this stage for the system tray."""
+        with cls._interaction_lock:
+            if cls._last_interaction is not None:
+                return [("Capture Wrong LLM Output", cls._capture_wrong_output)]
+        return []
+
+    @classmethod
+    def _capture_wrong_output(cls) -> None:
+        """Save the last LLM interaction as an incorrect example."""
+        from voicetype.utils import get_app_data_dir
+
+        with cls._interaction_lock:
+            interaction = cls._last_interaction
+            if interaction is None:
+                logger.warning("No recent LLM interaction to capture")
+                return
+            cls._last_interaction = None
+
+        output_path = Path(get_app_data_dir()) / "wrong_llm_outputs.jsonl"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        entry = {"label": "incorrect", **interaction}
+        with open(output_path, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+
+        logger.info(f"Captured wrong LLM output to {output_path}")

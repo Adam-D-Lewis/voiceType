@@ -229,8 +229,11 @@ class TestLLMAgent:
                 # Should invoke LLM and return mocked response
                 assert result == "Processed text"
 
-    def test_no_trigger_keywords_skips_llm(self):
-        """Test that LLM is NOT invoked when trigger_keywords is empty."""
+    def test_no_trigger_keywords_always_invokes_llm(self):
+        """Test that LLM is always invoked when trigger_keywords is empty."""
+        import sys
+        from unittest.mock import MagicMock, patch
+
         config = {
             "model": "gpt-4o-mini",
             "system_prompt": "Test",
@@ -239,14 +242,23 @@ class TestLLMAgent:
         stage = LLMAgent(config)
         context = create_test_context()
 
-        # Should NOT invoke LLM when no trigger keywords configured
-        input_text = "Any text without keywords"
-        result = stage.execute(input_text, context)
-        # Should return original input unchanged
-        assert result == input_text
+        mock_litellm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Processed text"
+        mock_litellm.completion.return_value = mock_response
 
-    def test_empty_trigger_keywords_skips_llm(self):
-        """Test that LLM is NOT invoked when trigger_keywords is explicitly empty list."""
+        input_text = "Any text without keywords"
+        with patch.dict(sys.modules, {"litellm": mock_litellm}):
+            result = stage.execute(input_text, context)
+        assert result == "Processed text"
+        mock_litellm.completion.assert_called_once()
+
+    def test_empty_trigger_keywords_always_invokes_llm(self):
+        """Test that LLM is always invoked when trigger_keywords is explicitly empty list."""
+        import sys
+        from unittest.mock import MagicMock, patch
+
         config = {
             "model": "gpt-4o-mini",
             "system_prompt": "Test",
@@ -255,11 +267,17 @@ class TestLLMAgent:
         stage = LLMAgent(config)
         context = create_test_context()
 
-        # Should NOT invoke LLM when trigger keywords list is empty
+        mock_litellm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Processed text"
+        mock_litellm.completion.return_value = mock_response
+
         input_text = "Any text without keywords"
-        result = stage.execute(input_text, context)
-        # Should return original input unchanged
-        assert result == input_text
+        with patch.dict(sys.modules, {"litellm": mock_litellm}):
+            result = stage.execute(input_text, context)
+        assert result == "Processed text"
+        mock_litellm.completion.assert_called_once()
 
     @pytest.mark.skipif(
         True,  # Skip by default as it requires actual LLM API access
