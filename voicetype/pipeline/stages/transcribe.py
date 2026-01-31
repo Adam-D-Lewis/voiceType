@@ -253,8 +253,9 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         """
         # Use preloaded model if available and config matches the primary runtime
         whisper_model = None
-        if self._preloaded_model is not None and runtime is self.cfg.runtime:
-            self._model_ready.wait()
+        if self._preload_thread is not None and runtime is self.cfg.runtime:
+            if not self._model_ready.wait(timeout=5):
+                raise RuntimeError("Whisper model preload timed out after 5 seconds")
             if self._preload_error is None:
                 whisper_model = self._preloaded_model
                 logger.debug("Using preloaded Whisper model")
