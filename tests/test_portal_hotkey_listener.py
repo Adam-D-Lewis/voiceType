@@ -92,56 +92,104 @@ class TestPortalHotkeyListener:
         listener = PortalHotkeyListener()
         listener.set_hotkey("<pause>")
 
-        assert listener._hotkey == "<pause>"
-        assert listener._preferred_trigger == "Pause"
+        assert "voicetype-0-pause" in listener._shortcut_id_to_hotkey
+        assert listener._shortcut_id_to_hotkey["voicetype-0-pause"] == "<pause>"
+        assert listener._hotkey_triggers["<pause>"] == "Pause"
+
+    def test_add_multiple_hotkeys(self):
+        """Test adding multiple hotkeys."""
+        from voicetype.hotkey_listener.portal_hotkey_listener import (
+            PortalHotkeyListener,
+        )
+
+        listener = PortalHotkeyListener()
+        listener.add_hotkey("<pause>")
+        listener.add_hotkey("<f12>")
+
+        assert len(listener._shortcut_id_to_hotkey) == 2
+        assert listener._shortcut_id_to_hotkey["voicetype-0-pause"] == "<pause>"
+        assert listener._shortcut_id_to_hotkey["voicetype-1-f12"] == "<f12>"
+
+    def test_clear_hotkeys(self):
+        """Test clearing all hotkeys."""
+        from voicetype.hotkey_listener.portal_hotkey_listener import (
+            PortalHotkeyListener,
+        )
+
+        listener = PortalHotkeyListener()
+        listener.add_hotkey("<pause>")
+        listener.add_hotkey("<f12>")
+        listener.clear_hotkeys()
+
+        assert len(listener._shortcut_id_to_hotkey) == 0
+        assert len(listener._hotkey_triggers) == 0
 
     def test_shortcut_activated_callback(self):
-        """Test that shortcut activation triggers the press callback."""
+        """Test that shortcut activation triggers the press callback with hotkey string."""
         from voicetype.hotkey_listener.portal_hotkey_listener import (
             PortalHotkeyListener,
         )
 
         press_callback = MagicMock()
         listener = PortalHotkeyListener(on_hotkey_press=press_callback)
+        listener.add_hotkey("<pause>")
 
         # Simulate shortcut activation
         listener._on_shortcut_activated(
             session_handle="/test/session",
-            shortcut_id="voicetype-record",
+            shortcut_id="voicetype-0-pause",
             timestamp=12345,
             options={},
         )
 
-        press_callback.assert_called_once()
+        press_callback.assert_called_once_with("<pause>")
 
     def test_shortcut_deactivated_callback(self):
-        """Test that shortcut deactivation triggers the release callback."""
+        """Test that shortcut deactivation triggers the release callback with hotkey string."""
         from voicetype.hotkey_listener.portal_hotkey_listener import (
             PortalHotkeyListener,
         )
 
         release_callback = MagicMock()
         listener = PortalHotkeyListener(on_hotkey_release=release_callback)
+        listener.add_hotkey("<pause>")
 
-        # Must first simulate activation (press) before deactivation (release)
-        # due to debounce logic that requires _press_callback_fired to be True
+        # Must first simulate activation before deactivation
         listener._on_shortcut_activated(
             session_handle="/test/session",
-            shortcut_id="voicetype-record",
+            shortcut_id="voicetype-0-pause",
             timestamp=12345,
             options={},
         )
 
-        # Simulate shortcut deactivation
-        # With no event loop, it should execute release immediately (fallback path)
         listener._on_shortcut_deactivated(
             session_handle="/test/session",
-            shortcut_id="voicetype-record",
+            shortcut_id="voicetype-0-pause",
             timestamp=12346,
             options={},
         )
 
-        release_callback.assert_called_once()
+        release_callback.assert_called_once_with("<pause>")
+
+    def test_multiple_hotkeys_activate_independently(self):
+        """Test that multiple hotkeys fire independently."""
+        from voicetype.hotkey_listener.portal_hotkey_listener import (
+            PortalHotkeyListener,
+        )
+
+        press_callback = MagicMock()
+        listener = PortalHotkeyListener(on_hotkey_press=press_callback)
+        listener.add_hotkey("<pause>")
+        listener.add_hotkey("<f12>")
+
+        listener._on_shortcut_activated(
+            session_handle="/test/session",
+            shortcut_id="voicetype-1-f12",
+            timestamp=12345,
+            options={},
+        )
+
+        press_callback.assert_called_once_with("<f12>")
 
     def test_wrong_shortcut_id_ignored(self):
         """Test that callbacks for wrong shortcut IDs are ignored."""
@@ -155,6 +203,7 @@ class TestPortalHotkeyListener:
             on_hotkey_press=press_callback,
             on_hotkey_release=release_callback,
         )
+        listener.add_hotkey("<pause>")
 
         # Simulate shortcut with wrong ID
         listener._on_shortcut_activated(
@@ -191,7 +240,6 @@ class TestCreateHotkeyListener:
         """Test factory returns PynputHotkeyListener when portal is unavailable."""
         mock_portal_available.return_value = False
 
-        # Clear wayland env vars to force non-wayland path
         import os
 
         from voicetype.hotkey_listener import create_hotkey_listener
@@ -209,7 +257,6 @@ class TestCreateHotkeyListener:
             listener = create_hotkey_listener()
             assert isinstance(listener, PynputHotkeyListener)
         finally:
-            # Restore environment
             if original_wayland:
                 os.environ["WAYLAND_DISPLAY"] = original_wayland
             if original_session:

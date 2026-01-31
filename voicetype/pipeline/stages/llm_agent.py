@@ -130,12 +130,9 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
         self.timeout = self.cfg.timeout
         self.fallback_on_error = self.cfg.fallback_on_error
 
-        # Warn if trigger keywords are not configured
         if not self.trigger_keywords:
-            logger.warning(
-                "LLMAgent configured without trigger_keywords. "
-                "The LLM will not be invoked. Please configure trigger_keywords "
-                "to enable LLM processing (e.g., trigger_keywords = ['jarvis', 'hey assistant'])"
+            logger.info(
+                "LLMAgent configured without trigger_keywords — LLM will always be invoked."
             )
 
         logger.debug(
@@ -159,23 +156,21 @@ class LLMAgent(PipelineStage[Optional[str], Optional[str]]):
             logger.info("No text to process (input is None)")
             return None
 
-        # Check for trigger keywords - return unchanged if not configured or not found
-        if not self.trigger_keywords:
-            logger.debug("No trigger_keywords configured, skipping LLM processing")
-            return input_data
-
-        input_lower = input_data.lower()
-        keyword_found = any(
-            keyword.lower() in input_lower for keyword in self.trigger_keywords
-        )
-        if not keyword_found:
-            logger.debug(
-                f"No trigger keywords {self.trigger_keywords} found in input, "
-                "skipping LLM processing"
+        # Check for trigger keywords - if configured, only invoke LLM when a keyword is found
+        if self.trigger_keywords:
+            input_lower = input_data.lower()
+            keyword_found = any(
+                keyword.lower() in input_lower for keyword in self.trigger_keywords
             )
-            return input_data
-
-        logger.debug(f"Trigger keyword found in input, proceeding with LLM processing")
+            if not keyword_found:
+                logger.debug(
+                    f"No trigger keywords {self.trigger_keywords} found in input, "
+                    "skipping LLM processing"
+                )
+                return input_data
+            logger.debug(
+                "Trigger keyword found in input, proceeding with LLM processing"
+            )
 
         # Update icon to processing state
         context.icon_controller.set_icon("processing")

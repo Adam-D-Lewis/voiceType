@@ -22,8 +22,8 @@ __all__ = [
 
 
 def create_hotkey_listener(
-    on_hotkey_press: Optional[Callable[[], None]] = None,
-    on_hotkey_release: Optional[Callable[[], None]] = None,
+    on_hotkey_press: Optional[Callable[[str], None]] = None,
+    on_hotkey_release: Optional[Callable[[str], None]] = None,
     method: str = "auto",
     log_key_repeat_debug: bool = False,
 ) -> HotkeyListener:
