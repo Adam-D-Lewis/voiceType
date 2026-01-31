@@ -240,8 +240,8 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
                 if hasattr(stage_class, "get_menu_items"):
                     for label, callback in stage_class.get_menu_items():
                         menu_items.append(Item(label, lambda _, cb=callback: cb()))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to get menu items from stage {stage_name}: {e}")
 
     # Add Restart and Quit at the end
     menu_items.append(Item("Restart", _restart))
