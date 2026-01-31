@@ -7,6 +7,7 @@ This stage transcribes audio files to text using the configured STT provider
 import os
 import sys
 import tempfile
+import threading
 from pathlib import Path
 from typing import Annotated, Literal, Optional, Union
 
@@ -156,6 +157,10 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
     def __init__(self, config: dict):
         """Initialize the transcribe stage.
 
+        If the primary runtime is local, starts loading the WhisperModel in a
+        background thread so it can complete during earlier pipeline stages
+        (e.g. while the user is recording audio).
+
         Args:
             config: Stage-specific configuration dict
 
@@ -165,6 +170,56 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         self.cfg = TranscribeConfig(**config)
         # Keep audio_format accessible for compatibility
         self.audio_format = self.cfg.audio_format
+
+        # Background model preload for local runtime
+        self._preloaded_model = None
+        self._model_ready = threading.Event()
+        self._preload_error = None
+
+        if isinstance(self.cfg.runtime, LocalSTTRuntime):
+            self._preload_thread = threading.Thread(
+                target=self._preload_model,
+                name="whisper-preload",
+                daemon=True,
+            )
+            self._preload_thread.start()
+        else:
+            self._preload_thread = None
+            self._model_ready.set()
+
+    def _preload_model(self):
+        """Load the WhisperModel in a background thread."""
+        try:
+            from faster_whisper import WhisperModel
+
+            runtime = self.cfg.runtime
+            bundled_path = get_bundled_model_path(runtime.model)
+            model_path = str(bundled_path) if bundled_path else runtime.model
+            models_dir = self.cfg.download_root or str(get_app_data_dir() / "models")
+            compute_type = "float16" if runtime.device == "cuda" else "int8"
+
+            logger.info(
+                f"Preloading Whisper model '{runtime.model}' on {runtime.device}..."
+            )
+            self._preloaded_model = WhisperModel(
+                model_path,
+                device=runtime.device,
+                compute_type=compute_type,
+                download_root=models_dir,
+            )
+            logger.info("Whisper model preload complete")
+        except Exception as e:
+            logger.warning(f"Whisper model preload failed: {e}")
+            self._preload_error = e
+        finally:
+            self._model_ready.set()
+
+    def cleanup(self):
+        """Release the preloaded model to free GPU/CPU memory."""
+        if self._preloaded_model is not None:
+            logger.debug("Releasing preloaded Whisper model")
+            del self._preloaded_model
+            self._preloaded_model = None
 
     def _get_runtime_description(self, runtime: STTRuntime) -> str:
         """Get a human-readable description of a runtime configuration."""
@@ -196,36 +251,34 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         Raises:
             Exception: Any error during transcription (to allow fallback handling)
         """
-        from faster_whisper import WhisperModel
+        # Use preloaded model if available and config matches the primary runtime
+        whisper_model = None
+        if self._preloaded_model is not None and runtime is self.cfg.runtime:
+            self._model_ready.wait()
+            if self._preload_error is None:
+                whisper_model = self._preloaded_model
+                logger.debug("Using preloaded Whisper model")
+            else:
+                logger.warning("Preload failed, loading model inline")
 
-        model = runtime.model
-        device = runtime.device
+        if whisper_model is None:
+            from faster_whisper import WhisperModel
 
-        # Check for bundled model first (for PyInstaller builds)
-        bundled_path = get_bundled_model_path(model)
-        if bundled_path:
-            model_path = str(bundled_path)
-            logger.info(f"Using bundled Whisper model from {bundled_path}")
-        else:
-            model_path = model
-            logger.debug(
-                f"No bundled model found for '{model}', will download if needed"
+            model = runtime.model
+            device = runtime.device
+
+            bundled_path = get_bundled_model_path(model)
+            model_path = str(bundled_path) if bundled_path else model
+
+            models_dir = download_root or str(get_app_data_dir() / "models")
+            compute_type = "float16" if device == "cuda" else "int8"
+
+            whisper_model = WhisperModel(
+                model_path,
+                device=device,
+                compute_type=compute_type,
+                download_root=models_dir,
             )
-
-        # Build init options - default to app data dir for models so they get cleaned up on uninstall
-        models_dir = download_root or str(get_app_data_dir() / "models")
-        logger.debug(f"Using model download root: {models_dir}")
-
-        # Determine compute type based on device
-        compute_type = "float16" if device == "cuda" else "int8"
-
-        # Initialize the WhisperModel
-        whisper_model = WhisperModel(
-            model_path,
-            device=device,
-            compute_type=compute_type,
-            download_root=models_dir,
-        )
 
         # Transcribe the audio file
         segments, info = whisper_model.transcribe(

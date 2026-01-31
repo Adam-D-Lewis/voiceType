@@ -179,7 +179,29 @@ class PipelineExecutor:
         try:
             # Enter the pipeline span context
             with pipeline_span:
-                for stage_index, stage_config in enumerate(stages):
+                # Phase 1: Instantiate all stages up-front.
+                # This allows stages (e.g. Transcribe) to start background
+                # work in __init__ that runs concurrently with earlier stages.
+                stage_configs_parsed = []
+                for stage_config in stages:
+                    stage_name = stage_config["stage"]
+                    stage_metadata = STAGE_REGISTRY.get(stage_name)
+                    stage_class = stage_metadata.stage_class
+                    stage_specific_config = {
+                        k: v for k, v in stage_config.items() if k != "func"
+                    }
+                    stage_instance = stage_class(config=stage_specific_config)
+                    stage_instances.append(stage_instance)
+                    stage_configs_parsed.append(
+                        (stage_name, stage_specific_config, stage_instance)
+                    )
+
+                # Phase 2: Execute stages sequentially
+                for stage_index, (
+                    stage_name,
+                    stage_specific_config,
+                    stage_instance,
+                ) in enumerate(stage_configs_parsed):
                     # Check for cancellation
                     if context.cancel_requested.is_set():
                         logger.info(f"Pipeline '{pipeline_name}' cancelled")
@@ -188,35 +210,20 @@ class PipelineExecutor:
                         )
                         return
 
-                    stage_name = stage_config["stage"]
                     logger.debug(f"[{pipeline_name}] Starting stage: {stage_name}")
-
-                    # Get stage class from registry
-                    stage_metadata = STAGE_REGISTRY.get(stage_name)
-                    stage_class = stage_metadata.stage_class
-
-                    # Extract stage-specific config (remove 'func' key)
-                    stage_specific_config = {
-                        k: v for k, v in stage_config.items() if k != "func"
-                    }
 
                     # Create stage span with configuration as attributes
                     if tracer is not None:
-                        # Build attributes with stage config
                         stage_attributes = {
                             "pipeline.id": pipeline_id,
                             "pipeline.name": pipeline_name,
                             "stage.name": stage_name,
                             "stage.index": stage_index,
                         }
-
-                        # Add stage configuration as attributes with "stage.config." prefix
                         for config_key, config_value in stage_specific_config.items():
-                            # Convert value to string for OpenTelemetry attribute
                             stage_attributes[f"stage.config.{config_key}"] = str(
                                 config_value
                             )
-
                         stage_span = tracer.start_as_current_span(
                             f"stage.{stage_name}",
                             attributes=stage_attributes,
@@ -230,11 +237,6 @@ class PipelineExecutor:
                         stage_start_time = time.time()
 
                         try:
-
-                            # Instantiate stage with config
-                            stage_instance = stage_class(config=stage_specific_config)
-                            stage_instances.append(stage_instance)
-
                             # Update context with stage-specific config
                             context.config = stage_specific_config
 
