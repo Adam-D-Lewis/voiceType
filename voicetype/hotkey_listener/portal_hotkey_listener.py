@@ -56,11 +56,17 @@ class PortalHotkeyListener(HotkeyListener):
         self._hotkey_triggers: Dict[str, str] = {}
         # Track key repeat state per shortcut_id
         self._press_callback_fired: Dict[str, bool] = {}
+        # shortcut_id -> human-readable name
+        self._shortcut_id_to_name: Dict[str, str] = {}
 
-    def add_hotkey(self, hotkey: str) -> None:
+    def add_hotkey(self, hotkey: str, name: str = "") -> None:
         idx = len(self._shortcut_id_to_hotkey)
-        shortcut_id = f"voicetype-{idx}"
+        # Include hotkey and name in ID so GNOME portal cache invalidates when hotkey changes
+        key_slug = hotkey.strip("<>").replace("+", "-")
+        name_slug = name.replace(" ", "-") if name else str(idx)
+        shortcut_id = f"voicetype-{name_slug}-{key_slug}"
         self._shortcut_id_to_hotkey[shortcut_id] = hotkey
+        self._shortcut_id_to_name[shortcut_id] = name or f"shortcut {idx}"
         self._hotkey_triggers[hotkey] = self._convert_hotkey_format(hotkey)
         self._press_callback_fired[shortcut_id] = False
         logger.info(
@@ -69,6 +75,7 @@ class PortalHotkeyListener(HotkeyListener):
 
     def clear_hotkeys(self) -> None:
         self._shortcut_id_to_hotkey.clear()
+        self._shortcut_id_to_name.clear()
         self._hotkey_triggers.clear()
         self._press_callback_fired.clear()
 
@@ -195,7 +202,7 @@ class PortalHotkeyListener(HotkeyListener):
             self._shortcuts_iface = proxy.get_interface(self.SHORTCUTS_INTERFACE)
 
             sender = self._bus.unique_name.replace(":", "").replace(".", "_")
-            session_token = f"voicetype_session"
+            session_token = "voicetype_session"
 
             session_handle = await self._create_session(sender, session_token)
             if not session_handle:
@@ -399,13 +406,12 @@ class PortalHotkeyListener(HotkeyListener):
         shortcuts = []
         for shortcut_id, hotkey_str in self._shortcut_id_to_hotkey.items():
             trigger = self._hotkey_triggers[hotkey_str]
+            display_name = self._shortcut_id_to_name.get(shortcut_id, shortcut_id)
             shortcuts.append(
                 [
                     shortcut_id,
                     {
-                        "description": Variant(
-                            "s", f"VoiceType shortcut ({hotkey_str})"
-                        ),
+                        "description": Variant("s", f"VoiceType: {display_name}"),
                         "preferred_trigger": Variant("s", trigger),
                     },
                 ]

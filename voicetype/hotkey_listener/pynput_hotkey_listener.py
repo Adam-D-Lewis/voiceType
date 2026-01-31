@@ -32,7 +32,7 @@ class PynputHotkeyListener(HotkeyListener):
         self._hotkey_pressed: Dict[str, bool] = {}
         self._lock = threading.Lock()
 
-    def add_hotkey(self, hotkey: str) -> None:
+    def add_hotkey(self, hotkey: str, name: str = "") -> None:
         try:
             combo = set(keyboard.HotKey.parse(hotkey))
             self._hotkey_combos[hotkey] = combo

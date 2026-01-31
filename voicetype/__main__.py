@@ -248,7 +248,7 @@ def main():
                 pipeline = pipeline_manager.pipelines[pipeline_name]
                 hotkey_string = pipeline.hotkey
                 if hotkey_string not in registered_hotkeys:
-                    hotkey_listener.add_hotkey(hotkey_string)
+                    hotkey_listener.add_hotkey(hotkey_string, name=pipeline_name)
                     registered_hotkeys.add(hotkey_string)
                     logger.info(
                         f"Registered hotkey '{hotkey_string}' for pipeline '{pipeline_name}'"

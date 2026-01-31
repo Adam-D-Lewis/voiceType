@@ -92,8 +92,8 @@ class TestPortalHotkeyListener:
         listener = PortalHotkeyListener()
         listener.set_hotkey("<pause>")
 
-        assert "voicetype-0" in listener._shortcut_id_to_hotkey
-        assert listener._shortcut_id_to_hotkey["voicetype-0"] == "<pause>"
+        assert "voicetype-0-pause" in listener._shortcut_id_to_hotkey
+        assert listener._shortcut_id_to_hotkey["voicetype-0-pause"] == "<pause>"
         assert listener._hotkey_triggers["<pause>"] == "Pause"
 
     def test_add_multiple_hotkeys(self):
@@ -107,8 +107,8 @@ class TestPortalHotkeyListener:
         listener.add_hotkey("<f12>")
 
         assert len(listener._shortcut_id_to_hotkey) == 2
-        assert listener._shortcut_id_to_hotkey["voicetype-0"] == "<pause>"
-        assert listener._shortcut_id_to_hotkey["voicetype-1"] == "<f12>"
+        assert listener._shortcut_id_to_hotkey["voicetype-0-pause"] == "<pause>"
+        assert listener._shortcut_id_to_hotkey["voicetype-1-f12"] == "<f12>"
 
     def test_clear_hotkeys(self):
         """Test clearing all hotkeys."""
@@ -137,7 +137,7 @@ class TestPortalHotkeyListener:
         # Simulate shortcut activation
         listener._on_shortcut_activated(
             session_handle="/test/session",
-            shortcut_id="voicetype-0",
+            shortcut_id="voicetype-0-pause",
             timestamp=12345,
             options={},
         )
@@ -157,14 +157,14 @@ class TestPortalHotkeyListener:
         # Must first simulate activation before deactivation
         listener._on_shortcut_activated(
             session_handle="/test/session",
-            shortcut_id="voicetype-0",
+            shortcut_id="voicetype-0-pause",
             timestamp=12345,
             options={},
         )
 
         listener._on_shortcut_deactivated(
             session_handle="/test/session",
-            shortcut_id="voicetype-0",
+            shortcut_id="voicetype-0-pause",
             timestamp=12346,
             options={},
         )
@@ -184,7 +184,7 @@ class TestPortalHotkeyListener:
 
         listener._on_shortcut_activated(
             session_handle="/test/session",
-            shortcut_id="voicetype-1",
+            shortcut_id="voicetype-1-f12",
             timestamp=12345,
             options={},
         )

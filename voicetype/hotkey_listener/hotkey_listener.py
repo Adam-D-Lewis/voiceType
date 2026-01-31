@@ -32,12 +32,13 @@ class HotkeyListener(abc.ABC):
         self.on_hotkey_release = on_hotkey_release
 
     @abc.abstractmethod
-    def add_hotkey(self, hotkey: str) -> None:
+    def add_hotkey(self, hotkey: str, name: str = "") -> None:
         """
         Register an additional hotkey to listen for.
 
         Args:
             hotkey: The hotkey string to add.
+            name: Optional human-readable name (e.g. pipeline name).
         """
         raise NotImplementedError
 
