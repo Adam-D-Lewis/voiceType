@@ -40,7 +40,7 @@ class RecordAudioConfig(BaseModel):
     """Configuration for RecordAudio stage."""
 
     max_duration: float = Field(
-        default=60.0,
+        default=120.0,
         gt=0,
         description="Maximum recording duration in seconds",
     )
@@ -80,7 +80,7 @@ class RecordAudio(PipelineStage[None, Optional[str]]):
     - Output: Optional[str] (filepath to audio file or None if too short)
 
     Config parameters:
-    - max_duration: Maximum recording duration in seconds (default: 60)
+    - max_duration: Maximum recording duration in seconds (default: 120)
     - minimum_duration: Minimum duration to process in seconds (default: 0.25)
     - device_name: Optional audio device name (default: system default)
     - audio_format: Audio format for recordings (default: "wav")
