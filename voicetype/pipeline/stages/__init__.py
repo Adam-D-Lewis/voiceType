@@ -11,6 +11,7 @@ This module contains the core stages for the voice typing pipeline:
 from .correct_typos import CorrectTypos
 from .llm_agent import LLMAgent
 from .record_audio import RecordAudio
+from .run_command import RunCommand
 from .transcribe import Transcribe
 from .type_text import TypeText
 
@@ -19,5 +20,6 @@ __all__ = [
     "Transcribe",
     "CorrectTypos",
     "LLMAgent",
+    "RunCommand",
     "TypeText",
 ]
