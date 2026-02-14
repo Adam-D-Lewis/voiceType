@@ -175,6 +175,7 @@ def main():
             log_file_path=log_file_path,
             telemetry_enabled=settings.telemetry.enabled,
             trace_file_path=trace_file_path,
+            file_openers=settings.file_openers,
         )
         # Start with app enabled
         ctx.state.state = State.ENABLED

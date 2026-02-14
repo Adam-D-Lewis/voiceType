@@ -1,7 +1,8 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
+from voicetype.settings import FileOpenersConfig
 from voicetype.state import AppState
 
 if TYPE_CHECKING:
@@ -21,6 +22,7 @@ class AppContext:
     log_file_path: Optional[Path] = None
     telemetry_enabled: bool = False
     trace_file_path: Optional[Path] = None
+    file_openers: FileOpenersConfig = field(default_factory=FileOpenersConfig)
 
     @property
     def has_active_pipelines(self) -> bool:
