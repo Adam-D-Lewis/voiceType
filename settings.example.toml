@@ -41,6 +41,51 @@ rotation_enabled = true  # Enable automatic file rotation (default: true)
 rotation_max_size_mb = 10  # Rotate when file reaches this size in MB (default: 10)
 
 # =============================================================================
+# FILE OPENER CONFIGURATION
+# =============================================================================
+# Customize how logs, traces, and settings files are opened from the tray menu.
+# If a section is omitted or command is not specified, uses system default
+# (xdg-open on Linux, open on macOS, default handler on Windows).
+
+# Example: Open logs in VS Code, jumping to end of file
+# [file_openers.logs]
+# command = "code"
+# args = ["--goto", "{path}:999999"]
+
+# Example: Open settings in VS Code
+# [file_openers.settings]
+# command = "code"
+
+# Example: Open traces with system default (explicit, same as omitting)
+# [file_openers.traces]
+# No config needed - system default is used when section is omitted
+
+# -----------------------------------------------------------------------------
+# TAIL MODE EXAMPLES (show last N lines in terminal)
+# -----------------------------------------------------------------------------
+# These are platform-specific. Uncomment the one matching your system.
+
+# Linux (GNOME Terminal):
+# [file_openers.logs]
+# command = "gnome-terminal"
+# args = ["--", "tail", "-n", "100", "-f", "{path}"]
+
+# Linux (Konsole):
+# [file_openers.logs]
+# command = "konsole"
+# args = ["-e", "tail", "-n", "100", "-f", "{path}"]
+
+# Linux (Alacritty):
+# [file_openers.logs]
+# command = "alacritty"
+# args = ["-e", "tail", "-n", "100", "-f", "{path}"]
+
+# macOS (Terminal.app with script):
+# [file_openers.logs]
+# command = "open"
+# args = ["-a", "Terminal", "{path}"]
+
+# =============================================================================
 # STAGE DEFINITIONS
 # =============================================================================
 # Define named stage instances with their configurations.
