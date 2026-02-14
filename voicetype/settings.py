@@ -9,6 +9,21 @@ from pydantic_settings import BaseSettings
 from voicetype.utils import get_app_data_dir
 
 
+class FileOpenerConfig(BaseModel):
+    """Configuration for opening a specific file type."""
+
+    command: Optional[str] = None  # None = system default
+    args: List[str] = []  # Args with {path} placeholder
+
+
+class FileOpenersConfig(BaseModel):
+    """Configuration for all file openers."""
+
+    logs: FileOpenerConfig = FileOpenerConfig()
+    traces: FileOpenerConfig = FileOpenerConfig()
+    settings: FileOpenerConfig = FileOpenerConfig()
+
+
 class TelemetryConfig(BaseModel):
     """Telemetry configuration for OpenTelemetry tracing."""
 
@@ -64,6 +79,9 @@ class Settings(BaseSettings):
 
     # Telemetry configuration (enabled by default with file export)
     telemetry: TelemetryConfig = TelemetryConfig()
+
+    # File opener configuration
+    file_openers: FileOpenersConfig = FileOpenersConfig()
 
     # Path to log file (uses platform defaults if not specified)
     log_file: Optional[Path] = None

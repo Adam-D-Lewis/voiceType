@@ -21,7 +21,7 @@ from voicetype.telemetry import (
     initialize_telemetry,
     shutdown_telemetry,
 )
-from voicetype.trayicon import TrayIconController, create_tray
+from voicetype.trayicon import TrayIconController, _build_menu, create_tray
 from voicetype.utils import get_app_data_dir, play_sound, type_text
 
 HERE = Path(__file__).resolve().parent
@@ -175,6 +175,7 @@ def main():
             log_file_path=log_file_path,
             telemetry_enabled=settings.telemetry.enabled,
             trace_file_path=trace_file_path,
+            file_openers=settings.file_openers,
         )
         # Start with app enabled
         ctx.state.state = State.ENABLED
@@ -204,6 +205,9 @@ def main():
             )
         else:
             logger.warning("No pipelines configured")
+
+        # Rebuild tray menu now that pipeline_manager and pipelines are loaded
+        tray.menu = _build_menu(ctx, tray)
 
         # Initialize hotkey dispatcher
         hotkey_dispatcher = HotkeyDispatcher(pipeline_manager)

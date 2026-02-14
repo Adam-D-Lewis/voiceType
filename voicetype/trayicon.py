@@ -25,8 +25,37 @@ from pystray import MenuItem as Item
 
 from voicetype.app_context import AppContext
 from voicetype.assets.imgs import YELLOW_BG_MIC
+from voicetype.settings import FileOpenerConfig
 from voicetype.state import State
 from voicetype.utils import get_app_data_dir
+
+
+def _open_file(path, config: FileOpenerConfig) -> None:
+    """Open a file using the configured opener.
+
+    Args:
+        path: Path to the file to open.
+        config: FileOpenerConfig specifying how to open the file.
+    """
+    try:
+        if config.command:
+            # Custom command with args
+            # Substitute {path} in args
+            args = [arg.replace("{path}", str(path)) for arg in config.args]
+            # Only append path if {path} was not in any args
+            if "{path}" not in " ".join(config.args):
+                args.append(str(path))
+            subprocess.Popen([config.command, *args])
+        else:
+            # System default
+            if sys.platform.startswith("linux"):
+                subprocess.Popen(["xdg-open", str(path)])
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(path)])
+            elif sys.platform == "win32":
+                os.startfile(str(path))  # type: ignore[attr-defined]
+    except Exception:
+        pass
 
 
 def _load_tray_image() -> Image.Image:
@@ -96,9 +125,7 @@ def _restart(icon: pystray._base.Icon, item: Item):
 
 def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
     def _open_logs(_icon: pystray._base.Icon, _item: Item):
-        """Open the log file in the default application."""
-        from pathlib import Path
-
+        """Open the log file in the configured application."""
         # Use log file path from context if available
         if ctx.log_file_path:
             log_path = ctx.log_file_path
@@ -114,20 +141,14 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
             except Exception:
                 return
 
-        try:
-            if sys.platform.startswith("linux"):
-                subprocess.Popen(["xdg-open", str(log_path)])
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", str(log_path)])
-            elif sys.platform == "win32":
-                os.startfile(str(log_path))  # type: ignore[attr-defined]
-        except Exception:
-            pass
+        # Get opener config
+        opener_config = (
+            ctx.file_openers.logs if ctx.file_openers else FileOpenerConfig()
+        )
+        _open_file(log_path, opener_config)
 
     def _open_traces(_icon: pystray._base.Icon, _item: Item):
-        """Open the trace file in the default application."""
-        from pathlib import Path
-
+        """Open the trace file in the configured application."""
         # Get trace file path using the same logic as telemetry.py
         if hasattr(ctx, "trace_file_path") and ctx.trace_file_path:
             trace_path = ctx.trace_file_path
@@ -143,18 +164,14 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
             except Exception:
                 return
 
-        try:
-            if sys.platform.startswith("linux"):
-                subprocess.Popen(["xdg-open", str(trace_path)])
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", str(trace_path)])
-            elif sys.platform == "win32":
-                os.startfile(str(trace_path))  # type: ignore[attr-defined]
-        except Exception:
-            pass
+        # Get opener config
+        opener_config = (
+            ctx.file_openers.traces if ctx.file_openers else FileOpenerConfig()
+        )
+        _open_file(trace_path, opener_config)
 
     def _open_settings(_icon: pystray._base.Icon, _item: Item):
-        """Open the settings file in the default application."""
+        """Open the settings file in the configured application."""
         # Settings file location (user config directory)
         settings_path = get_app_data_dir() / "settings.toml"
 
@@ -170,15 +187,11 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
             except Exception:
                 return
 
-        try:
-            if sys.platform.startswith("linux"):
-                subprocess.Popen(["xdg-open", str(settings_path)])
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", str(settings_path)])
-            elif sys.platform == "win32":
-                os.startfile(str(settings_path))  # type: ignore[attr-defined]
-        except Exception:
-            pass
+        # Get opener config
+        opener_config = (
+            ctx.file_openers.settings if ctx.file_openers else FileOpenerConfig()
+        )
+        _open_file(settings_path, opener_config)
 
     def _toggle_enabled(_icon: pystray._base.Icon, _item: Item):
         # Thread-safe toggling via State
@@ -221,6 +234,37 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
     # Add "Open Traces" menu item if telemetry is enabled
     if hasattr(ctx, "telemetry_enabled") and ctx.telemetry_enabled:
         menu_items.append(Item("Open Traces", _open_traces))
+
+    # Discover menu items contributed by pipeline stages
+    if ctx.pipeline_manager:
+        from voicetype.pipeline.stage_registry import STAGE_REGISTRY
+
+        seen_stages = set()
+        for pipeline_cfg in ctx.pipeline_manager.pipelines.values():
+            if not pipeline_cfg.enabled:
+                continue
+            for stage_config in pipeline_cfg.stages:
+                seen_stages.add(stage_config["stage"])
+
+        for stage_name in sorted(seen_stages):
+            try:
+                metadata = STAGE_REGISTRY.get(stage_name)
+                stage_class = metadata.stage_class
+                if hasattr(stage_class, "get_menu_items"):
+                    for label, callback in stage_class.get_menu_items():
+
+                        def _make_handler(cb):
+                            def handler(icon_arg, item_arg):
+                                cb()
+
+                            return handler
+
+                        menu_items.append(Item(label, _make_handler(callback)))
+            except Exception:
+                logger.warning(
+                    f"Failed to get menu items from stage {stage_name}",
+                    exc_info=True,
+                )
 
     # Add Restart and Quit at the end
     menu_items.append(Item("Restart", _restart))
