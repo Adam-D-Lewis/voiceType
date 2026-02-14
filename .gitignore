@@ -171,3 +171,6 @@ settings.toml
 
 # Downloaded Whisper models (bundled during build)
 voicetype/models/
+
+# Git worktrees
+.worktrees/
