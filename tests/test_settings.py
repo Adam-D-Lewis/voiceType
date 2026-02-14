@@ -12,6 +12,84 @@ from loguru import logger
 from voicetype.settings import Settings, _validate_stage_configs, load_settings
 
 
+class TestFileOpenerConfig:
+    """Tests for FileOpenerConfig model."""
+
+    def test_file_opener_config_defaults(self):
+        """Test default values for FileOpenerConfig."""
+        from voicetype.settings import FileOpenerConfig
+
+        config = FileOpenerConfig()
+        assert config.command is None
+        assert config.args == []
+
+    def test_file_opener_config_with_command(self):
+        """Test FileOpenerConfig with custom command."""
+        from voicetype.settings import FileOpenerConfig
+
+        config = FileOpenerConfig(command="code", args=["--goto", "{path}:999999"])
+        assert config.command == "code"
+        assert config.args == ["--goto", "{path}:999999"]
+
+
+class TestFileOpenersConfig:
+    """Tests for FileOpenersConfig model."""
+
+    def test_file_openers_config_defaults(self):
+        """Test default values for FileOpenersConfig."""
+        from voicetype.settings import FileOpenersConfig
+
+        config = FileOpenersConfig()
+        assert config.logs.command is None
+        assert config.traces.command is None
+        assert config.settings.command is None
+
+    def test_file_openers_config_with_custom_logs(self):
+        """Test FileOpenersConfig with custom logs opener."""
+        from voicetype.settings import FileOpenerConfig, FileOpenersConfig
+
+        config = FileOpenersConfig(
+            logs=FileOpenerConfig(command="code", args=["--goto", "{path}:999999"])
+        )
+        assert config.logs.command == "code"
+        assert config.logs.args == ["--goto", "{path}:999999"]
+        assert config.traces.command is None  # Still default
+
+
+class TestSettingsFileOpeners:
+    """Tests for file_openers in Settings."""
+
+    def test_settings_has_file_openers_default(self):
+        """Test that Settings has file_openers with defaults."""
+        settings = Settings()
+        assert settings.file_openers is not None
+        assert settings.file_openers.logs.command is None
+
+    def test_settings_loads_file_openers_from_toml(self):
+        """Test that file_openers are loaded from TOML."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            toml.dump(
+                {
+                    "file_openers": {
+                        "logs": {
+                            "command": "code",
+                            "args": ["--goto", "{path}:999999"],
+                        }
+                    }
+                },
+                f,
+            )
+            temp_file = Path(f.name)
+
+        try:
+            settings = load_settings(temp_file)
+            assert settings.file_openers.logs.command == "code"
+            assert settings.file_openers.logs.args == ["--goto", "{path}:999999"]
+            assert settings.file_openers.traces.command is None  # Still default
+        finally:
+            temp_file.unlink()
+
+
 @pytest.fixture
 def captured_logs():
     """Fixture to capture loguru logs."""
