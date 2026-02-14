@@ -46,19 +46,18 @@ class CorrectTypos(PipelineStage[Optional[str], Optional[str]]):
     - case_sensitive: Default case sensitivity for matching (default: false)
     - whole_word_only: Default whole-word matching (default: true)
     - corrections: List of correction rules. Each rule is a list with:
-      [typo, correction] or [typo, correction, "overrides"]
-      where overrides can be "case_sensitive=true" or "whole_word_only=false"
-      or both separated by comma: "case_sensitive=true,whole_word_only=false"
+      [typo, correction] or [typo, correction, override1, override2, ...]
+      where each override is a separate "key=value" string.
 
     Example config:
         [correct_typos_stage]
-        case_sensitive = false
         whole_word_only = true
         corrections = [
             ["machinelearning", "machine learning"],
             ["air quotes", "error codes"],
             ["Python", "python", "case_sensitive=true"],
-            ["machine", "machine", "whole_word_only=false"],
+            ["kubectl", "kubectl", "whole_word_only=false"],
+            ["Pixie", "Pixi", "case_sensitive=true", "whole_word_only=false"],
         ]
     """
 
@@ -83,11 +82,16 @@ class CorrectTypos(PipelineStage[Optional[str], Optional[str]]):
         # Parse and compile correction patterns
         self._patterns = self._parse_and_compile_corrections()
 
+    # Valid override keys for validation
+    VALID_OVERRIDE_KEYS = {"case_sensitive", "whole_word_only"}
+
     def _parse_correction_entry(self, entry: list) -> tuple:
         """Parse a correction entry from config.
 
         Args:
-            entry: List with [typo, correction] or [typo, correction, overrides]
+            entry: List with [typo, correction] or [typo, correction, override1, override2, ...]
+                   Each override is a separate "key=value" string.
+                   Example: ["typo", "fix", "case_sensitive=true", "whole_word_only=false"]
 
         Returns:
             Tuple of (typo, correction, case_sensitive, whole_word_only)
@@ -99,30 +103,35 @@ class CorrectTypos(PipelineStage[Optional[str], Optional[str]]):
         case_sensitive = self.case_sensitive
         whole_word_only = self.whole_word_only
 
-        # Parse overrides if present
-        if len(entry) > 2:
-            overrides_str = entry[2]
-            for pair in overrides_str.split(","):
-                pair = pair.strip()
-                if "=" not in pair:
-                    logger.warning(
-                        f"Invalid override format '{pair}' for typo '{typo}'. "
-                        f"Expected 'key=value'. Skipping."
-                    )
-                    continue
+        # Parse overrides if present - each is a separate argument
+        for override_arg in entry[2:]:
+            override_arg = override_arg.strip()
+            if not override_arg:
+                continue
 
-                key, value = pair.split("=", 1)
-                key = key.strip()
-                value = value.strip().lower()
+            if "=" not in override_arg:
+                logger.error(
+                    f"Invalid override format '{override_arg}' for typo '{typo}'. "
+                    f"Expected 'key=value'."
+                )
+                continue
 
-                if key == "case_sensitive":
-                    case_sensitive = value == "true"
-                elif key == "whole_word_only":
-                    whole_word_only = value == "true"
-                else:
-                    logger.warning(
-                        f"Unknown override option '{key}' for typo '{typo}'. Skipping."
-                    )
+            key, value = override_arg.split("=", 1)
+            key = key.strip()
+            value = value.strip().lower()
+
+            # Validate the key
+            if key not in self.VALID_OVERRIDE_KEYS:
+                logger.error(
+                    f"Unknown override option '{key}' for typo '{typo}'. "
+                    f"Valid options are: {', '.join(sorted(self.VALID_OVERRIDE_KEYS))}."
+                )
+                continue
+
+            if key == "case_sensitive":
+                case_sensitive = value == "true"
+            elif key == "whole_word_only":
+                whole_word_only = value == "true"
 
         return typo, correction, case_sensitive, whole_word_only
 
