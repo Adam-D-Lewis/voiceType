@@ -359,7 +359,7 @@ class PortalHotkeyListener(HotkeyListener):
                                     if hasattr(trigger, "value")
                                     else trigger
                                 )
-                                logger.warning(
+                                logger.info(
                                     f"Portal bound shortcut '{shortcut_id}' to trigger: {trigger_value}"
                                 )
                 except Exception as e:
