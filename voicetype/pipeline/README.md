@@ -538,21 +538,20 @@ class CorrectTypos(PipelineStage[Optional[str], Optional[str]]):
     - case_sensitive: Default case sensitivity for matching (default: false)
     - whole_word_only: Default whole-word matching (default: true)
     - corrections: List of correction rules. Each rule is a list with:
-      [typo, correction] or [typo, correction, "overrides"]
-      where overrides can be "case_sensitive=true" or "whole_word_only=false"
-      or both: "case_sensitive=true,whole_word_only=false"
+      [typo, correction] or [typo, correction, override1, override2, ...]
+      where each override is a separate "key=value" string.
 
     Example configuration in settings.toml:
     ```toml
     [[pipelines.stages]]
     stage = "CorrectTypos"
-    case_sensitive = false
     whole_word_only = true
     corrections = [
         ["machinelearning", "machine learning"],
         ["air quotes", "error codes"],
         ["Python", "python", "case_sensitive=true"],
-        ["machine", "machine", "whole_word_only=false"],
+        ["kubectl", "kubectl", "whole_word_only=false"],
+        ["Pixie", "Pixi", "case_sensitive=true", "whole_word_only=false"],
     ]
     ```
     """

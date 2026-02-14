@@ -123,12 +123,12 @@ class TestCorrectTypos:
         assert result == "This is a exam and examing"  # typos: ignore
 
     def test_multiple_overrides(self):
-        """Test multiple overrides in one correction."""
+        """Test multiple overrides as separate arguments."""
         config = {
             "case_sensitive": False,
             "whole_word_only": True,
             "corrections": [
-                ["Test", "exam", "case_sensitive=true,whole_word_only=false"],
+                ["Test", "exam", "case_sensitive=true", "whole_word_only=false"],
             ],
         }
         stage = CorrectTypos(config)
@@ -219,3 +219,18 @@ class TestCorrectTypos:
 
         result = stage.execute("valid invalid another", context)
         assert result == "correction invalid valid"
+
+    def test_unknown_override_key_ignored(self):
+        """Test that unknown override keys are ignored and defaults are used."""
+        config = {
+            "corrections": [
+                ["test", "exam", "whole_work_only=false"],  # Typo in key name
+            ],
+        }
+        stage = CorrectTypos(config)
+        context = create_test_context()
+
+        # The correction should still work with defaults (whole_word_only=True)
+        # The typo "whole_work_only" is ignored, so whole_word_only stays True
+        result = stage.execute("test testing", context)
+        assert result == "exam testing"  # Only whole word matched, not "testing"
