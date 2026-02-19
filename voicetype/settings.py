@@ -72,13 +72,9 @@ class Settings(BaseSettings):
         {
             "name": "default",
             "enabled": True,
-            "hotkey": "<pause>",
+            "hotkey": "<mouse20>",
             "stages": [
-                "RecordAudio",
-                "Transcribe",
-                "CorrectTypos",
-                # "LLMAgent",  # TODO: Get this working with a local model by default so it's faster
-                "TypeText",
+                "StreamingSTT",
             ],
         }
     ]

@@ -49,6 +49,16 @@ class StreamingSTTConfig(BaseModel):
         gt=0,
         description="Maximum streaming duration in seconds",
     )
+    drain_timeout: float = Field(
+        default=2.0,
+        gt=0,
+        description="Seconds to wait for final words from server after PTT release",
+    )
+    silence_flush_duration: float = Field(
+        default=1.5,
+        gt=0,
+        description="Seconds of silence to send after PTT release to flush server pipeline",
+    )
     keyboard_backend: str = Field(
         default="auto",
         description="Keyboard backend to use: auto, pynput, wtype, or eitype",
@@ -137,26 +147,56 @@ class StreamingSTT(PipelineStage[None, None]):
             logger.warning("StreamingSTT: WebSocket closed while sending")
         except asyncio.CancelledError:
             pass
+        logger.debug("StreamingSTT: send loop ended")
 
-    async def _receive_and_type(self, websocket, stop: asyncio.Event):
-        """Receive transcription messages and type words as they arrive."""
+    async def _send_silence(self, websocket):
+        """Send silence chunks to flush the server's internal pipeline.
+
+        Streaming models need continued audio input to process and emit the
+        final word(s). After the mic stops, we send silence so the model has
+        enough context to finalize.
+        """
+        silence = [0.0] * self.cfg.block_size
+        num_chunks = int(
+            self.cfg.silence_flush_duration * self.cfg.sample_rate / self.cfg.block_size
+        )
+        chunk_interval = self.cfg.block_size / self.cfg.sample_rate
+
+        logger.debug(f"StreamingSTT: sending {num_chunks} silence chunks to flush server")
+        try:
+            for _ in range(num_chunks):
+                msg = msgpack.packb(
+                    {"type": "Audio", "pcm": silence},
+                    use_bin_type=True,
+                    use_single_float=True,
+                )
+                await websocket.send(msg)
+                await asyncio.sleep(chunk_interval)
+        except websockets.ConnectionClosed:
+            logger.debug("StreamingSTT: WebSocket closed during silence flush")
+        logger.debug("StreamingSTT: silence flush done")
+
+    async def _receive_and_type(self, websocket):
+        """Receive transcription messages and type words as they arrive.
+
+        Runs until the websocket is closed or the task is cancelled.
+        """
         try:
             logger.debug("StreamingSTT: receive loop started")
             async for message in websocket:
-                if stop.is_set():
-                    break
                 data = msgpack.unpackb(message, raw=False)
                 if data["type"] == "Word":
                     word = data["text"]
                     logger.debug(f"StreamingSTT: received word: {word}")
                     self.backend.type_text(word + " ")
         except websockets.ConnectionClosed:
-            logger.warning("StreamingSTT: WebSocket closed while receiving")
+            logger.debug("StreamingSTT: WebSocket closed, receive loop done")
         except asyncio.CancelledError:
             pass
+        logger.debug("StreamingSTT: receive loop ended")
 
-    async def _watch_for_release(self, context: PipelineContext, stop: asyncio.Event):
-        """Watch for PTT release or cancellation and signal stop."""
+    async def _wait_for_release(self, context: PipelineContext):
+        """Block until PTT release or cancellation. Returns when button is released."""
         loop = asyncio.get_event_loop()
 
         def _wait():
@@ -166,14 +206,24 @@ class StreamingSTT(PipelineStage[None, None]):
                 context.cancel_requested.wait(timeout=self.cfg.max_duration)
 
         await loop.run_in_executor(None, _wait)
-        stop.set()
-        logger.debug("StreamingSTT: stop signal set (PTT released or timeout)")
 
     async def _run_streaming(self, context: PipelineContext):
-        """Main async entry point that orchestrates audio streaming and typing."""
-        stop = asyncio.Event()
+        """Main async entry point that orchestrates audio streaming and typing.
+
+        Lifecycle:
+        1. Open mic + websocket, start send/receive tasks
+        2. Wait for PTT release
+        3. Stop mic and send task immediately (no more audio)
+        4. Keep receive task alive for drain_timeout to collect final words
+        5. Close websocket cleanly
+        """
+        stop_sending = asyncio.Event()
         audio_queue: asyncio.Queue = asyncio.Queue()
         loop = asyncio.get_event_loop()
+
+        # We manage the audio stream explicitly so we can stop it on PTT release
+        # while keeping the websocket open for draining.
+        audio_stream = None
 
         def audio_callback(indata, frames, time_info, status):
             if status:
@@ -185,31 +235,59 @@ class StreamingSTT(PipelineStage[None, None]):
         url = f"{self.cfg.server_url}/api/asr-streaming"
         headers = {"kyutai-api-key": self.cfg.api_key}
 
-        with sd.InputStream(
-            samplerate=self.cfg.sample_rate,
-            channels=1,
-            dtype="float32",
-            callback=audio_callback,
-            blocksize=self.cfg.block_size,
-            device=self.device_id,
-        ):
-            async with websockets.connect(url, additional_headers=headers) as ws:
-                logger.info("StreamingSTT: connected to server, streaming started")
-                context.icon_controller.set_icon("recording")
+        async with websockets.connect(url, additional_headers=headers) as ws:
+            logger.info("StreamingSTT: connected to server, streaming started")
+            context.icon_controller.set_icon("recording")
 
-                send_task = asyncio.create_task(self._send_audio(ws, audio_queue, stop))
-                recv_task = asyncio.create_task(self._receive_and_type(ws, stop))
-                watch_task = asyncio.create_task(self._watch_for_release(context, stop))
+            # Start the audio stream
+            audio_stream = sd.InputStream(
+                samplerate=self.cfg.sample_rate,
+                channels=1,
+                dtype="float32",
+                callback=audio_callback,
+                blocksize=self.cfg.block_size,
+                device=self.device_id,
+            )
+            audio_stream.start()
 
-                # Wait for the release watcher to finish (PTT released or timeout)
-                await watch_task
+            send_task = asyncio.create_task(self._send_audio(ws, audio_queue, stop_sending))
+            recv_task = asyncio.create_task(self._receive_and_type(ws))
 
-                # Cancel the send/receive tasks
-                send_task.cancel()
-                recv_task.cancel()
+            try:
+                # Phase 1: stream audio while PTT is held
+                await self._wait_for_release(context)
+                logger.debug("StreamingSTT: PTT released, stopping mic and send")
 
-                # Wait for them to finish cancellation
-                await asyncio.gather(send_task, recv_task, return_exceptions=True)
+                # Phase 2: cut mic, then send silence to flush server pipeline
+                audio_stream.stop()
+                audio_stream.close()
+                audio_stream = None
+                stop_sending.set()
+                await send_task
+                await self._send_silence(ws)
+
+                # Phase 3: drain remaining words from server
+                logger.debug(
+                    f"StreamingSTT: draining final words (timeout={self.cfg.drain_timeout}s)"
+                )
+                context.icon_controller.set_icon("processing")
+                try:
+                    await asyncio.wait_for(recv_task, timeout=self.cfg.drain_timeout)
+                except asyncio.TimeoutError:
+                    logger.debug("StreamingSTT: drain timeout reached")
+                    recv_task.cancel()
+                    await asyncio.gather(recv_task, return_exceptions=True)
+            finally:
+                # Ensure cleanup if something went wrong
+                if audio_stream is not None:
+                    audio_stream.stop()
+                    audio_stream.close()
+                if not send_task.done():
+                    send_task.cancel()
+                    await asyncio.gather(send_task, return_exceptions=True)
+                if not recv_task.done():
+                    recv_task.cancel()
+                    await asyncio.gather(recv_task, return_exceptions=True)
 
         logger.info("StreamingSTT: streaming stopped")
 
