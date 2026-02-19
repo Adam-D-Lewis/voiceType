@@ -60,6 +60,12 @@ class Settings(BaseSettings):
         },
         "LLMAgent": {"provider": "openai:gpt-5-mini", "trigger_keywords": ["Jarvis"]},
         "TypeText": {},
+        "StreamingSTT": {
+            "server_url": "ws://127.0.0.1:8080",
+            "api_key": "public_token",
+            "keyboard_backend": "auto",
+            "char_delay": 0.001,
+        },
     }
 
     pipelines: Optional[List[Dict[str, Any]]] = [

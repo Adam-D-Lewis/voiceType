@@ -110,6 +110,8 @@ audioop-lts = "*"  # for pydub compatibility with Python 3.13+ # necessary until
 playsound3 = "*" # for sound
 soundfile = "*"  # for sound recording
 sounddevice = "*"  # for detecting input devices and recording sound
+msgpack = "*"  # for Kyutai DSM streaming STT protocol
+websockets = "*"  # for Kyutai DSM streaming STT connection
 pydantic-settings = "*"
 toml = "*"
 
