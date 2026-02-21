@@ -56,6 +56,22 @@ class TranscriptionError(Exception):
     """Exception raised for transcription errors."""
 
 
+def _cuda_synchronize():
+    """Call cudaDeviceSynchronize to release leaked CUDA memory.
+
+    CTranslate2 uses async CUDA operations during model loading. When the
+    constructor fails (e.g. OOM), pending async ops hold partially-allocated
+    memory. Synchronizing forces them to complete and clean up.
+    """
+    try:
+        import ctypes
+
+        libcudart = ctypes.CDLL("libcudart.so")
+        libcudart.cudaDeviceSynchronize()
+    except Exception:
+        pass
+
+
 # =============================================================================
 # Runtime Models - Unified STT runtime configurations
 # =============================================================================
@@ -193,6 +209,7 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             from faster_whisper import WhisperModel
 
             runtime = self.cfg.runtime
+
             bundled_path = get_bundled_model_path(runtime.model)
             model_path = str(bundled_path) if bundled_path else runtime.model
             models_dir = self.cfg.download_root or str(get_app_data_dir() / "models")
@@ -211,6 +228,11 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
         except Exception as e:
             logger.warning(f"Whisper model preload failed: {e}")
             self._preload_error = e
+            if (
+                isinstance(self.cfg.runtime, LocalSTTRuntime)
+                and self.cfg.runtime.device == "cuda"
+            ):
+                _cuda_synchronize()
         finally:
             self._model_ready.set()
 
@@ -220,6 +242,12 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             logger.debug("Releasing preloaded Whisper model")
             del self._preloaded_model
             self._preloaded_model = None
+
+            # Force garbage collection so CTranslate2's C++ destructor runs
+            # immediately, releasing CUDA memory back to the GPU.
+            import gc
+
+            gc.collect()
 
     def _get_runtime_description(self, runtime: STTRuntime) -> str:
         """Get a human-readable description of a runtime configuration."""
@@ -274,12 +302,17 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             models_dir = download_root or str(get_app_data_dir() / "models")
             compute_type = "float16" if device == "cuda" else "int8"
 
-            whisper_model = WhisperModel(
-                model_path,
-                device=device,
-                compute_type=compute_type,
-                download_root=models_dir,
-            )
+            try:
+                whisper_model = WhisperModel(
+                    model_path,
+                    device=device,
+                    compute_type=compute_type,
+                    download_root=models_dir,
+                )
+            except Exception:
+                if device == "cuda":
+                    _cuda_synchronize()
+                raise
 
         # Transcribe the audio file
         segments, info = whisper_model.transcribe(
