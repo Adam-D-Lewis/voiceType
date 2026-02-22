@@ -214,7 +214,26 @@ stages = [
 #     "TypeText_default",
 # ]
 
-# Example 4: Pipeline with multiple instances of same stage
+# Example 4: Streaming STT pipeline (Kyutai DSM server)
+# Types words in real-time as you speak while PTT is held.
+# Requires the Kyutai delayed-streams-modeling Rust server running.
+# [[pipelines]]
+# name = "streaming"
+# enabled = false
+# hotkey = "<pause>"
+# stages = ["StreamingSTT_default"]
+
+# [stage_configs.StreamingSTT_default]
+# stage_class = "StreamingSTT"
+# server_url = "ws://127.0.0.1:8080"  # Kyutai DSM Rust server URL
+# api_key = "public_token"
+# # sample_rate = 24000  # Must match server expectation
+# # block_size = 1920  # 80ms audio blocks at 24kHz
+# # max_duration = 120  # Max streaming duration in seconds
+# # keyboard_backend = "auto"
+# # char_delay = 0.001
+
+# Example 5: Pipeline with multiple instances of same stage
 # To use a stage twice with different configs, create separate named instances
 # [stage_configs.CorrectTypos_slang]
 # stage_class = "CorrectTypos"
@@ -246,6 +265,7 @@ stages = [
 #   - Transcribe: Converts audio to text using speech recognition
 #   - CorrectTypos: Corrects configured typos and common speech-to-text errors
 #   - LLMAgent: Processes text through an LLM agent (local or remote)
+#   - StreamingSTT: Streams audio to Kyutai DSM server, types words in real-time
 #   - TypeText: Types the transcribed text at the current cursor position
 #
 # Hotkey Format:
