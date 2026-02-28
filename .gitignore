@@ -174,3 +174,6 @@ voicetype/models/
 
 # Git worktrees
 .worktrees/
+
+# Pi-mono source (installed globally via npm, kept locally for reference)
+pi-mono/
