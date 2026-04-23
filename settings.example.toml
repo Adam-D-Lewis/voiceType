@@ -147,6 +147,13 @@ corrections = [
     ["Python", "python", "case_sensitive=true"],
 ]
 
+# Optional: remove a trailing ellipsis (e.g., "...") that some speech-to-text
+# models leave on the end of transcribed text when the speaker trails off.
+# This stage takes no configuration. To enable it, add
+# "StripTrailingEllipsis_default" to a pipeline's stages below.
+[stage_configs.StripTrailingEllipsis_default]
+stage_class = "StripTrailingEllipsis"
+
 [stage_configs.TypeText_default]
 stage_class = "TypeText"
 
@@ -245,6 +252,7 @@ stages = [
 #   - RecordAudio: Records audio while hotkey is held down
 #   - Transcribe: Converts audio to text using speech recognition
 #   - CorrectTypos: Corrects configured typos and common speech-to-text errors
+#   - StripTrailingEllipsis: Removes a trailing ellipsis ("...") from transcribed text
 #   - LLMAgent: Processes text through an LLM agent (local or remote)
 #   - TypeText: Types the transcribed text at the current cursor position
 #
