@@ -371,3 +371,11 @@ Notes
   - pixi install
 ## License
 This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+
+## 💰 Bounty Contribution
+
+- **Task:** Check out alternatives for inspiration
+- **Reward:** $100
+- **Source:** GitHub-Paid
+- **Date:** 2026-04-27
+
