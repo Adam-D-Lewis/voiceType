@@ -218,6 +218,7 @@ cudnn = "*"
 
 # Dev tasks for trace analysis
 [tool.pixi.feature.dev.tasks]
+test = { cmd = "pytest", description = "Run the pytest test suite" }
 analyze-traces = { cmd = "python scripts/analyze_traces.py", description = "Analyze voicetype traces and show performance stats" }
 traces-to-csv = { cmd = "python scripts/analyze_traces.py --export", description = "Export traces to CSV for spreadsheet analysis" }
 jaeger-stop = { cmd = "docker stop jaeger && docker rm jaeger", description = "Stop and remove Jaeger container" }
