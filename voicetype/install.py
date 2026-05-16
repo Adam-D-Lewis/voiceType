@@ -1,6 +1,7 @@
 import argparse
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -19,7 +20,6 @@ ENV_FILE_PATH = APP_CONFIG_DIR / ".env"
 
 # Desktop file paths
 DESKTOP_FILE_NAME = f"{APP_ID}.desktop"
-DESKTOP_SOURCE_PATH = Path(__file__).parent / "assets" / DESKTOP_FILE_NAME
 DESKTOP_INSTALL_DIR = Path.home() / ".local" / "share" / "applications"
 DESKTOP_INSTALL_PATH = DESKTOP_INSTALL_DIR / DESKTOP_FILE_NAME
 
@@ -71,6 +71,48 @@ EnvironmentFile={environment_file_path}
 [Install]
 # Enable this service for the default user target (starts on login)
 WantedBy=default.target
+"""
+
+
+def _resolve_voicetype_binary() -> str:
+    """Find the absolute path to the installed `voicetype` script.
+
+    The .desktop file's Exec= must be absolute: xdg-desktop-portal validates
+    it via g_find_program_in_path() against the portal daemon's PATH (the
+    systemd user PATH), which does not include pixi/venv bin directories.
+    A non-absolute Exec= causes validation to fail and GlobalShortcuts
+    CreateSession to return "An app id is required" on portal >= 1.21.
+    """
+    found = shutil.which("voicetype")
+    if found:
+        return found
+    candidate = Path(sys.executable).parent / "voicetype"
+    if candidate.exists():
+        return str(candidate)
+    print(
+        "Error: could not locate the 'voicetype' executable on PATH "
+        f"or at {candidate}. Aborting install.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+def get_desktop_file_content() -> str:
+    """Generate the .desktop file content with an absolute Exec/TryExec path."""
+    voicetype_path = _resolve_voicetype_binary()
+    return f"""[Desktop Entry]
+Type=Application
+Name=VoiceType
+GenericName=Voice Typing
+Comment=Type with your voice using speech-to-text
+Exec={voicetype_path}
+TryExec={voicetype_path}
+Icon=audio-input-microphone
+Terminal=false
+Categories=Utility;Accessibility;
+Keywords=voice;typing;speech;transcription;dictation;
+StartupNotify=false
+NoDisplay=true
 """
 
 
@@ -152,17 +194,9 @@ def install_service():
     # The portal uses the .desktop file to validate the application identity
     DESKTOP_INSTALL_DIR.mkdir(parents=True, exist_ok=True)
     try:
-        import shutil
-
-        if DESKTOP_SOURCE_PATH.exists():
-            shutil.copy(DESKTOP_SOURCE_PATH, DESKTOP_INSTALL_PATH)
-            print(f"Desktop file installed at {DESKTOP_INSTALL_PATH}")
-        else:
-            print(
-                f"Warning: Desktop file not found at {DESKTOP_SOURCE_PATH}. "
-                "Global shortcuts may not work on Wayland/GNOME.",
-                file=sys.stderr,
-            )
+        with open(DESKTOP_INSTALL_PATH, "w") as f:
+            f.write(get_desktop_file_content())
+        print(f"Desktop file installed at {DESKTOP_INSTALL_PATH}")
     except IOError as e:
         print(
             f"Warning: Could not install desktop file: {e}. "
