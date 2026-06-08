@@ -108,6 +108,11 @@ language = "en"  # Language code: "en", "es", "fr", "de", etc.
 provider = "local"
 model = "large-v3-turbo"  # Whisper model: "tiny", "base", "small", "medium", "large-v3", "large-v3-turbo"
 device = "cuda"  # Device for inference: "cuda" (GPU) or "cpu"
+# keep_loaded: keep the model resident in VRAM/RAM between transcriptions instead
+# of reloading it on every hotkey press. Skips all per-press load overhead. Holds
+# the model's memory (~1-2 GB VRAM for large models) for the process lifetime.
+# Can also be toggled at runtime from the tray menu.
+keep_loaded = false
 
 # Cloud transcription via LiteLLM/OpenAI (requires OPENAI_API_KEY)
 [stage_configs.Transcribe_cloud]
@@ -260,6 +265,9 @@ stages = [
 #   - "local": Uses faster-whisper for local transcription (faster, offline)
 #     - model: Whisper model size (tiny, base, small, medium, large-v3, large-v3-turbo)
 #     - device: "cuda" for GPU or "cpu" for CPU inference
+#     - keep_loaded: keep the model resident between transcriptions instead of
+#       reloading it each time (default false). Skips per-press load overhead;
+#       trades ~1-2 GB of held VRAM for large models. Toggleable from the tray.
 #   - "litellm": Uses cloud-based transcription (requires OPENAI_API_KEY)
 #     - model: LiteLLM model identifier (e.g., whisper-1, azure/whisper)
 #
