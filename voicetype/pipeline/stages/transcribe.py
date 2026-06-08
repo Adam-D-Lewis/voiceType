@@ -126,6 +126,56 @@ def _get_or_create_whisper_model(
         return model
 
 
+def clear_resident_models() -> None:
+    """Evict all resident models from the cache and free their memory."""
+    with _MODEL_CACHE_LOCK:
+        had_models = bool(_MODEL_CACHE)
+        _MODEL_CACHE.clear()
+    if had_models:
+        logger.info("Evicted resident Whisper model(s) from cache")
+        import gc
+
+        gc.collect()
+
+
+# Runtime override for keep_loaded, controllable without a restart (e.g. from the
+# tray menu). ``None`` means "follow each runtime's configured value"; once set to
+# a bool it overrides the config for all local runtimes.
+_keep_loaded_override: Optional[bool] = None
+_keep_loaded_override_lock = threading.Lock()
+
+
+def init_keep_loaded(enabled: bool) -> None:
+    """Initialize the runtime keep_loaded state from config (no-op if already set)."""
+    global _keep_loaded_override
+    with _keep_loaded_override_lock:
+        if _keep_loaded_override is None:
+            _keep_loaded_override = enabled
+
+
+def set_keep_loaded(enabled: bool) -> None:
+    """Override keep_loaded at runtime. Disabling evicts any resident models."""
+    global _keep_loaded_override
+    with _keep_loaded_override_lock:
+        _keep_loaded_override = enabled
+    if not enabled:
+        clear_resident_models()
+
+
+def is_keep_loaded() -> bool:
+    """Return the current effective keep_loaded state (False if uninitialized)."""
+    with _keep_loaded_override_lock:
+        return bool(_keep_loaded_override)
+
+
+def _resolve_keep_loaded(config_value: bool) -> bool:
+    """Resolve effective keep_loaded: the runtime override if set, else config."""
+    with _keep_loaded_override_lock:
+        if _keep_loaded_override is None:
+            return config_value
+        return _keep_loaded_override
+
+
 # =============================================================================
 # Runtime Models - Unified STT runtime configurations
 # =============================================================================
@@ -276,8 +326,9 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             model_path = str(bundled_path) if bundled_path else runtime.model
             models_dir = self.cfg.download_root or str(get_app_data_dir() / "models")
             compute_type = "float16" if runtime.device == "cuda" else "int8"
+            keep_loaded = _resolve_keep_loaded(runtime.keep_loaded)
 
-            if runtime.keep_loaded:
+            if keep_loaded:
                 logger.info(
                     f"Loading resident Whisper model '{runtime.model}' on "
                     f"{runtime.device} (kept loaded between requests)..."
@@ -291,7 +342,7 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
                 runtime.device,
                 compute_type,
                 models_dir,
-                runtime.keep_loaded,
+                keep_loaded,
             )
             logger.info("Whisper model preload complete")
         except Exception as e:
@@ -316,7 +367,9 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             return
 
         runtime = self.cfg.runtime
-        if isinstance(runtime, LocalSTTRuntime) and runtime.keep_loaded:
+        if isinstance(runtime, LocalSTTRuntime) and _resolve_keep_loaded(
+            runtime.keep_loaded
+        ):
             # Model stays resident in _MODEL_CACHE; just drop our reference.
             self._preloaded_model = None
             return
@@ -388,7 +441,7 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
                     device,
                     compute_type,
                     models_dir,
-                    runtime.keep_loaded,
+                    _resolve_keep_loaded(runtime.keep_loaded),
                 )
             except Exception:
                 if device == "cuda":

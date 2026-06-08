@@ -18,10 +18,12 @@ from voicetype.pipeline.stages.transcribe import (
 
 @pytest.fixture
 def clear_model_cache():
-    """Ensure the module-level resident-model cache is empty around each test."""
+    """Reset the module-level cache and runtime override around each test."""
     transcribe_mod._MODEL_CACHE.clear()
+    transcribe_mod._keep_loaded_override = None
     yield
     transcribe_mod._MODEL_CACHE.clear()
+    transcribe_mod._keep_loaded_override = None
 
 
 class TestKeepLoadedConfig:
@@ -136,3 +138,64 @@ class TestResidentModelCache:
 
         assert stage._preloaded_model is None
         assert transcribe_mod._MODEL_CACHE == {}
+
+
+class TestRuntimeKeepLoadedToggle:
+    """The keep_loaded state can be flipped at runtime (e.g. from the tray menu)."""
+
+    def test_resolve_follows_config_when_no_override(self, clear_model_cache):
+        assert transcribe_mod.is_keep_loaded() is False
+        assert transcribe_mod._resolve_keep_loaded(True) is True
+        assert transcribe_mod._resolve_keep_loaded(False) is False
+
+    def test_init_seeds_once(self, clear_model_cache):
+        transcribe_mod.init_keep_loaded(True)
+        assert transcribe_mod.is_keep_loaded() is True
+        # A second init does not override an already-set value.
+        transcribe_mod.init_keep_loaded(False)
+        assert transcribe_mod.is_keep_loaded() is True
+
+    def test_override_wins_over_config(self, clear_model_cache):
+        transcribe_mod.set_keep_loaded(True)
+        assert transcribe_mod.is_keep_loaded() is True
+        assert transcribe_mod._resolve_keep_loaded(False) is True  # config says off
+
+        transcribe_mod.set_keep_loaded(False)
+        assert transcribe_mod.is_keep_loaded() is False
+        assert transcribe_mod._resolve_keep_loaded(True) is False  # config says on
+
+    def test_disabling_evicts_resident_models(self, clear_model_cache):
+        transcribe_mod._MODEL_CACHE[("tiny", "cuda", "float16")] = object()
+        transcribe_mod.set_keep_loaded(False)
+        assert transcribe_mod._MODEL_CACHE == {}
+
+    def test_clear_resident_models(self, clear_model_cache):
+        transcribe_mod._MODEL_CACHE[("tiny", "cpu", "int8")] = object()
+        transcribe_mod.clear_resident_models()
+        assert transcribe_mod._MODEL_CACHE == {}
+
+    def test_runtime_override_controls_caching(self, clear_model_cache):
+        """A stage whose config says keep_loaded=False still caches when the
+        runtime override is on (mirrors toggling the tray item on)."""
+        transcribe_mod.set_keep_loaded(True)
+        created = []
+        with patch.object(
+            transcribe_mod,
+            "_create_whisper_model",
+            side_effect=lambda *a: created.append(object()) or created[-1],
+        ):
+            cfg = {
+                "runtime": {
+                    "provider": "local",
+                    "model": "tiny",
+                    "device": "cpu",
+                    "keep_loaded": False,
+                }
+            }
+            s1 = Transcribe(config=cfg)
+            assert s1._model_ready.wait(timeout=10)
+            s2 = Transcribe(config=cfg)
+            assert s2._model_ready.wait(timeout=10)
+
+        assert len(created) == 1
+        assert s1._preloaded_model is s2._preloaded_model

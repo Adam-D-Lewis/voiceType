@@ -235,6 +235,45 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
     if hasattr(ctx, "telemetry_enabled") and ctx.telemetry_enabled:
         menu_items.append(Item("Open Traces", _open_traces))
 
+    # Add "Keep model loaded" toggle if a local transcription runtime is in use.
+    # Lets the user keep the Whisper model resident in VRAM (no reload per press)
+    # or free it, at runtime, without editing settings.toml and restarting.
+    local_keep_loaded_cfg = None
+    if ctx.pipeline_manager:
+        for pipeline_cfg in ctx.pipeline_manager.pipelines.values():
+            if not pipeline_cfg.enabled:
+                continue
+            for stage_cfg in pipeline_cfg.stages:
+                if stage_cfg.get("stage") != "Transcribe":
+                    continue
+                runtime_cfg = stage_cfg.get("runtime") or {}
+                if runtime_cfg.get("provider", "local") == "local":
+                    local_keep_loaded_cfg = bool(runtime_cfg.get("keep_loaded", False))
+                    break
+            if local_keep_loaded_cfg is not None:
+                break
+
+    if local_keep_loaded_cfg is not None:
+        from voicetype.pipeline.stages import transcribe as _transcribe
+
+        # Seed runtime state from config the first time the menu is built.
+        _transcribe.init_keep_loaded(local_keep_loaded_cfg)
+
+        def _toggle_keep_loaded(_icon: pystray._base.Icon, _item: Item):
+            new_value = not _transcribe.is_keep_loaded()
+            _transcribe.set_keep_loaded(new_value)
+            logger.info(f"'Keep model loaded' toggled to {new_value} via tray menu")
+            _icon.menu = _build_menu(ctx, icon)
+            _icon.update_menu()
+
+        menu_items.append(
+            Item(
+                "Keep model loaded",
+                _toggle_keep_loaded,
+                checked=lambda _item: _transcribe.is_keep_loaded(),
+            )
+        )
+
     # Discover menu items contributed by pipeline stages
     if ctx.pipeline_manager:
         from voicetype.pipeline.stage_registry import STAGE_REGISTRY
