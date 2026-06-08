@@ -199,3 +199,61 @@ class TestRuntimeKeepLoadedToggle:
 
         assert len(created) == 1
         assert s1._preloaded_model is s2._preloaded_model
+
+
+class TestLocalFilesOnly:
+    """The loader avoids the HuggingFace Hub when the model is already cached."""
+
+    def test_uses_local_cache_without_network(self, monkeypatch):
+        import faster_whisper
+
+        calls = []
+
+        class FakeModel:
+            def __init__(self, path, **kw):
+                calls.append(kw.get("local_files_only"))
+
+        monkeypatch.setattr(faster_whisper, "WhisperModel", FakeModel)
+        transcribe_mod._create_whisper_model("tiny", "cpu", "int8", "/tmp/models")
+        # Loaded straight from cache; no second (networked) attempt.
+        assert calls == [True]
+
+    def test_falls_back_to_download_when_not_cached(self, monkeypatch):
+        import faster_whisper
+
+        try:
+            from huggingface_hub.errors import LocalEntryNotFoundError
+        except ImportError:
+            from huggingface_hub.utils import LocalEntryNotFoundError
+
+        calls = []
+
+        class FakeModel:
+            def __init__(self, path, **kw):
+                lfo = kw.get("local_files_only")
+                calls.append(lfo)
+                if lfo:
+                    raise LocalEntryNotFoundError("not cached")
+
+        monkeypatch.setattr(faster_whisper, "WhisperModel", FakeModel)
+        transcribe_mod._create_whisper_model("tiny", "cpu", "int8", "/tmp/models")
+        # First tried offline, then allowed the network download.
+        assert calls == [True, False]
+
+    def test_non_cache_error_does_not_trigger_network_retry(self, monkeypatch):
+        import faster_whisper
+
+        calls = []
+
+        class FakeModel:
+            def __init__(self, path, **kw):
+                calls.append(kw.get("local_files_only"))
+                raise RuntimeError("CUDA out of memory")
+
+        monkeypatch.setattr(faster_whisper, "WhisperModel", FakeModel)
+        with pytest.raises(RuntimeError, match="CUDA out of memory"):
+            transcribe_mod._create_whisper_model(
+                "tiny", "cuda", "float16", "/tmp/models"
+            )
+        # A CUDA error must propagate from the first attempt, not retry online.
+        assert calls == [True]

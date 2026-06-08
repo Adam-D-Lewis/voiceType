@@ -89,15 +89,38 @@ _MODEL_CACHE_LOCK = threading.Lock()
 def _create_whisper_model(
     model_path: str, device: str, compute_type: str, models_dir: str
 ):
-    """Construct a faster-whisper WhisperModel (no caching)."""
+    """Construct a faster-whisper WhisperModel, preferring the local cache.
+
+    faster-whisper resolves a model given by name (e.g. "large-v3-turbo")
+    through the HuggingFace Hub, which makes a network request on *every* load
+    to validate the cached copy. If the Hub is slow or unreachable, that request
+    blocks until it times out (~10s) before falling back to the local cache,
+    adding a large, seemingly random delay to transcription. To avoid it we load
+    with ``local_files_only=True`` first (no network when the model is already
+    downloaded) and only reach the Hub if the model isn't present locally.
+    """
     from faster_whisper import WhisperModel
 
-    return WhisperModel(
-        model_path,
+    try:
+        from huggingface_hub.errors import LocalEntryNotFoundError
+    except ImportError:  # pragma: no cover - older huggingface_hub layout
+        from huggingface_hub.utils import LocalEntryNotFoundError
+
+    kwargs = dict(
         device=device,
         compute_type=compute_type,
         download_root=models_dir,
     )
+    try:
+        # Already downloaded: load straight from cache, no Hub round-trip.
+        return WhisperModel(model_path, local_files_only=True, **kwargs)
+    except LocalEntryNotFoundError:
+        # Not cached locally (e.g. first run) -- allow the network download.
+        logger.info(
+            f"Model '{model_path}' not in local cache; "
+            f"downloading from the HuggingFace Hub..."
+        )
+        return WhisperModel(model_path, local_files_only=False, **kwargs)
 
 
 def _get_or_create_whisper_model(
