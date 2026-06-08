@@ -73,6 +73,60 @@ def _cuda_synchronize():
 
 
 # =============================================================================
+# Resident model cache
+# =============================================================================
+#
+# When a runtime is configured with ``keep_loaded=True`` the constructed
+# WhisperModel is stored here, keyed by (model_path, device, compute_type), and
+# reused across pipeline runs instead of being reloaded (and freed) on every
+# hotkey press. This avoids the multi-second reload that occurs when the GPU has
+# idled into a low-power state. Access is guarded by a lock because the model is
+# loaded from a background preload thread.
+_MODEL_CACHE: dict[tuple[str, str, str], object] = {}
+_MODEL_CACHE_LOCK = threading.Lock()
+
+
+def _create_whisper_model(
+    model_path: str, device: str, compute_type: str, models_dir: str
+):
+    """Construct a faster-whisper WhisperModel (no caching)."""
+    from faster_whisper import WhisperModel
+
+    return WhisperModel(
+        model_path,
+        device=device,
+        compute_type=compute_type,
+        download_root=models_dir,
+    )
+
+
+def _get_or_create_whisper_model(
+    model_path: str,
+    device: str,
+    compute_type: str,
+    models_dir: str,
+    keep_loaded: bool,
+):
+    """Return a WhisperModel, reusing a cached resident instance if enabled.
+
+    When ``keep_loaded`` is False the model is constructed fresh on every call
+    (the historical behavior). When True, the model is loaded once per
+    (model_path, device, compute_type) and reused for the lifetime of the
+    process.
+    """
+    if not keep_loaded:
+        return _create_whisper_model(model_path, device, compute_type, models_dir)
+
+    key = (model_path, device, compute_type)
+    with _MODEL_CACHE_LOCK:
+        model = _MODEL_CACHE.get(key)
+        if model is None:
+            model = _create_whisper_model(model_path, device, compute_type, models_dir)
+            _MODEL_CACHE[key] = model
+        return model
+
+
+# =============================================================================
 # Runtime Models - Unified STT runtime configurations
 # =============================================================================
 
@@ -91,6 +145,16 @@ class LocalSTTRuntime(BaseModel):
     )
     device: Literal["cuda", "cpu"] = Field(
         default="cpu", description="Device for inference"
+    )
+    keep_loaded: bool = Field(
+        default=False,
+        description=(
+            "Keep the model resident in memory/VRAM between transcriptions instead "
+            "of reloading it on every request. Eliminates per-request model load "
+            "latency (which can be many seconds on a GPU that has idled into a "
+            "low-power state) at the cost of holding the model's memory for the "
+            "lifetime of the process."
+        ),
     )
 
 
@@ -206,8 +270,6 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
     def _preload_model(self):
         """Load the WhisperModel in a background thread."""
         try:
-            from faster_whisper import WhisperModel
-
             runtime = self.cfg.runtime
 
             bundled_path = get_bundled_model_path(runtime.model)
@@ -215,14 +277,21 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             models_dir = self.cfg.download_root or str(get_app_data_dir() / "models")
             compute_type = "float16" if runtime.device == "cuda" else "int8"
 
-            logger.info(
-                f"Preloading Whisper model '{runtime.model}' on {runtime.device}..."
-            )
-            self._preloaded_model = WhisperModel(
+            if runtime.keep_loaded:
+                logger.info(
+                    f"Loading resident Whisper model '{runtime.model}' on "
+                    f"{runtime.device} (kept loaded between requests)..."
+                )
+            else:
+                logger.info(
+                    f"Preloading Whisper model '{runtime.model}' on {runtime.device}..."
+                )
+            self._preloaded_model = _get_or_create_whisper_model(
                 model_path,
-                device=runtime.device,
-                compute_type=compute_type,
-                download_root=models_dir,
+                runtime.device,
+                compute_type,
+                models_dir,
+                runtime.keep_loaded,
             )
             logger.info("Whisper model preload complete")
         except Exception as e:
@@ -237,17 +306,30 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             self._model_ready.set()
 
     def cleanup(self):
-        """Release the preloaded model to free GPU/CPU memory."""
-        if self._preloaded_model is not None:
-            logger.debug("Releasing preloaded Whisper model")
-            del self._preloaded_model
+        """Release the preloaded model to free GPU/CPU memory.
+
+        When the runtime is configured with ``keep_loaded=True`` the model is
+        retained in the module-level cache for reuse on subsequent runs, so we
+        only drop this stage's reference without freeing the underlying memory.
+        """
+        if self._preloaded_model is None:
+            return
+
+        runtime = self.cfg.runtime
+        if isinstance(runtime, LocalSTTRuntime) and runtime.keep_loaded:
+            # Model stays resident in _MODEL_CACHE; just drop our reference.
             self._preloaded_model = None
+            return
 
-            # Force garbage collection so CTranslate2's C++ destructor runs
-            # immediately, releasing CUDA memory back to the GPU.
-            import gc
+        logger.debug("Releasing preloaded Whisper model")
+        del self._preloaded_model
+        self._preloaded_model = None
 
-            gc.collect()
+        # Force garbage collection so CTranslate2's C++ destructor runs
+        # immediately, releasing CUDA memory back to the GPU.
+        import gc
+
+        gc.collect()
 
     def _get_runtime_description(self, runtime: STTRuntime) -> str:
         """Get a human-readable description of a runtime configuration."""
@@ -291,8 +373,6 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
                 logger.warning("Preload failed, loading model inline")
 
         if whisper_model is None:
-            from faster_whisper import WhisperModel
-
             model = runtime.model
             device = runtime.device
 
@@ -303,11 +383,12 @@ class Transcribe(PipelineStage[Optional[str], Optional[str]]):
             compute_type = "float16" if device == "cuda" else "int8"
 
             try:
-                whisper_model = WhisperModel(
+                whisper_model = _get_or_create_whisper_model(
                     model_path,
-                    device=device,
-                    compute_type=compute_type,
-                    download_root=models_dir,
+                    device,
+                    compute_type,
+                    models_dir,
+                    runtime.keep_loaded,
                 )
             except Exception:
                 if device == "cuda":
