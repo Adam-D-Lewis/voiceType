@@ -13,7 +13,7 @@
 
 ## Prerequisites
 
-- Python 3.8+
+- Python 3.11+
 - `pip` (Python package installer)
 - For Linux installation: `systemd` (common in most modern Linux distributions).
 - An OpenAI API Key (if using OpenAI for transcription).
