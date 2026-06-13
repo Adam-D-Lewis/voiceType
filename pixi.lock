@@ -225,7 +225,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zstd-1.5.7-hb78ec9c_6.conda
       - pypi: https://files.pythonhosted.org/packages/b8/3b/e8964210b5e216e5041593b7d33e97ee65967f17c282e8510d19c666dab4/audioop_lts-0.2.2-cp313-abi3-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/d2/fc/c0a3f4c4eaa5a22fbef91713474666e13d0ea2a69c84532579490a9f2cc8/dbus_next-0.2.3-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/59/96/a3480adccc998ff4a86a53711765af0874edc0ab27f61982000df7a71f1c/eitype-0.2.0-cp313-cp313-manylinux_2_28_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/87/36/dc4cf29be131882edfaf68d8d573c6249711d169b038f14196e659379503/eitype-0.2.2-cp313-cp313-manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/63/fe/a17c106a1f4061ce83f04d14bcedcfb2c38c7793ea56bfb906a6fadae8cb/evdev-1.9.2.tar.gz
       - pypi: https://files.pythonhosted.org/packages/c4/ab/09169d5a4612a5f92490806649ac8d41e3ec9129c636754575b3553f4ea4/googleapis_common_protos-1.72.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ba/87/d341e519956273b39d8d47969dd1eaa1af740615394fe67d06f1efa68773/numpy-2.4.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
@@ -837,7 +837,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/a7/06/3d6badcf13db419e25b07041d9c7b4a2c331d3f4e7134445ec5df57714cd/coloredlogs-15.0.1-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/93/b6/738a2aec047b404e86a2a5a8a7e8b756ff456752553885fe41d53fa2cb8e/ctranslate2-4.6.3-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/d2/fc/c0a3f4c4eaa5a22fbef91713474666e13d0ea2a69c84532579490a9f2cc8/dbus_next-0.2.3-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/59/96/a3480adccc998ff4a86a53711765af0874edc0ab27f61982000df7a71f1c/eitype-0.2.0-cp313-cp313-manylinux_2_28_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/87/36/dc4cf29be131882edfaf68d8d573c6249711d169b038f14196e659379503/eitype-0.2.2-cp313-cp313-manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/63/fe/a17c106a1f4061ce83f04d14bcedcfb2c38c7793ea56bfb906a6fadae8cb/evdev-1.9.2.tar.gz
       - pypi: https://files.pythonhosted.org/packages/05/99/49ee85903dee060d9f08297b4a342e5e0bcfca2f027a07b4ee0a38ab13f9/faster_whisper-1.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl
@@ -1433,7 +1433,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/a7/06/3d6badcf13db419e25b07041d9c7b4a2c331d3f4e7134445ec5df57714cd/coloredlogs-15.0.1-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/93/b6/738a2aec047b404e86a2a5a8a7e8b756ff456752553885fe41d53fa2cb8e/ctranslate2-4.6.3-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/d2/fc/c0a3f4c4eaa5a22fbef91713474666e13d0ea2a69c84532579490a9f2cc8/dbus_next-0.2.3-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/59/96/a3480adccc998ff4a86a53711765af0874edc0ab27f61982000df7a71f1c/eitype-0.2.0-cp313-cp313-manylinux_2_28_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/87/36/dc4cf29be131882edfaf68d8d573c6249711d169b038f14196e659379503/eitype-0.2.2-cp313-cp313-manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/63/fe/a17c106a1f4061ce83f04d14bcedcfb2c38c7793ea56bfb906a6fadae8cb/evdev-1.9.2.tar.gz
       - pypi: https://files.pythonhosted.org/packages/05/99/49ee85903dee060d9f08297b4a342e5e0bcfca2f027a07b4ee0a38ab13f9/faster_whisper-1.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl
@@ -2043,7 +2043,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/a7/06/3d6badcf13db419e25b07041d9c7b4a2c331d3f4e7134445ec5df57714cd/coloredlogs-15.0.1-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/93/b6/738a2aec047b404e86a2a5a8a7e8b756ff456752553885fe41d53fa2cb8e/ctranslate2-4.6.3-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/d2/fc/c0a3f4c4eaa5a22fbef91713474666e13d0ea2a69c84532579490a9f2cc8/dbus_next-0.2.3-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/59/96/a3480adccc998ff4a86a53711765af0874edc0ab27f61982000df7a71f1c/eitype-0.2.0-cp313-cp313-manylinux_2_28_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/87/36/dc4cf29be131882edfaf68d8d573c6249711d169b038f14196e659379503/eitype-0.2.2-cp313-cp313-manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/63/fe/a17c106a1f4061ce83f04d14bcedcfb2c38c7793ea56bfb906a6fadae8cb/evdev-1.9.2.tar.gz
       - pypi: https://files.pythonhosted.org/packages/05/99/49ee85903dee060d9f08297b4a342e5e0bcfca2f027a07b4ee0a38ab13f9/faster_whisper-1.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl
@@ -2619,7 +2619,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/a7/06/3d6badcf13db419e25b07041d9c7b4a2c331d3f4e7134445ec5df57714cd/coloredlogs-15.0.1-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/93/b6/738a2aec047b404e86a2a5a8a7e8b756ff456752553885fe41d53fa2cb8e/ctranslate2-4.6.3-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/d2/fc/c0a3f4c4eaa5a22fbef91713474666e13d0ea2a69c84532579490a9f2cc8/dbus_next-0.2.3-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/59/96/a3480adccc998ff4a86a53711765af0874edc0ab27f61982000df7a71f1c/eitype-0.2.0-cp313-cp313-manylinux_2_28_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/87/36/dc4cf29be131882edfaf68d8d573c6249711d169b038f14196e659379503/eitype-0.2.2-cp313-cp313-manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/63/fe/a17c106a1f4061ce83f04d14bcedcfb2c38c7793ea56bfb906a6fadae8cb/evdev-1.9.2.tar.gz
       - pypi: https://files.pythonhosted.org/packages/05/99/49ee85903dee060d9f08297b4a342e5e0bcfca2f027a07b4ee0a38ab13f9/faster_whisper-1.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl
@@ -3190,7 +3190,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/a7/06/3d6badcf13db419e25b07041d9c7b4a2c331d3f4e7134445ec5df57714cd/coloredlogs-15.0.1-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/93/b6/738a2aec047b404e86a2a5a8a7e8b756ff456752553885fe41d53fa2cb8e/ctranslate2-4.6.3-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/d2/fc/c0a3f4c4eaa5a22fbef91713474666e13d0ea2a69c84532579490a9f2cc8/dbus_next-0.2.3-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/59/96/a3480adccc998ff4a86a53711765af0874edc0ab27f61982000df7a71f1c/eitype-0.2.0-cp313-cp313-manylinux_2_28_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/87/36/dc4cf29be131882edfaf68d8d573c6249711d169b038f14196e659379503/eitype-0.2.2-cp313-cp313-manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/63/fe/a17c106a1f4061ce83f04d14bcedcfb2c38c7793ea56bfb906a6fadae8cb/evdev-1.9.2.tar.gz
       - pypi: https://files.pythonhosted.org/packages/05/99/49ee85903dee060d9f08297b4a342e5e0bcfca2f027a07b4ee0a38ab13f9/faster_whisper-1.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl
@@ -4435,10 +4435,10 @@ packages:
   - pkg:pypi/editables?source=hash-mapping
   size: 10828
   timestamp: 1733208220327
-- pypi: https://files.pythonhosted.org/packages/59/96/a3480adccc998ff4a86a53711765af0874edc0ab27f61982000df7a71f1c/eitype-0.2.0-cp313-cp313-manylinux_2_28_x86_64.whl
+- pypi: https://files.pythonhosted.org/packages/87/36/dc4cf29be131882edfaf68d8d573c6249711d169b038f14196e659379503/eitype-0.2.2-cp313-cp313-manylinux_2_28_x86_64.whl
   name: eitype
-  version: 0.2.0
-  sha256: 03af01e8d50f5ba958ed282d1e2deb6aa57df717313776807409d3da5ed73362
+  version: 0.2.2
+  sha256: 0eff70098e3da4beaa838524831bd8732dc71eb3845b3188ad33ff902d3d4fa9
   requires_python: '>=3.10'
 - conda: https://conda.anaconda.org/conda-forge/linux-64/epoxy-1.5.10-hb03c661_2.conda
   sha256: a5b51e491fec22bcc1765f5b2c8fff8a97428e9a5a7ee6730095fb9d091b0747
@@ -9301,8 +9301,8 @@ packages:
   timestamp: 1768069793682
 - pypi: ./
   name: voicetype2
-  version: 0.4.2.dev3+gdf664a842.d20260516
-  sha256: e85a81e8dc6011e96e62d0099ba2b5a9e3dbaeb6fe4a18b5ed01113266370fc0
+  version: 0.4.2.dev8+ga207afb24.d20260613
+  sha256: b2dabe4895eff1abe2ab6b022c49db3cf9278a63cccc41da544d1e350bde419f
   requires_dist:
   - nvidia-ml-py ; extra == 'dev'
   - pre-commit ; extra == 'dev'
