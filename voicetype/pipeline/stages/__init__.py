@@ -12,6 +12,7 @@ from .correct_typos import CorrectTypos
 from .llm_agent import LLMAgent
 from .record_audio import RecordAudio
 from .run_command import RunCommand
+from .streaming_stt import StreamingSTT
 from .transcribe import Transcribe
 from .type_text import TypeText
 
@@ -21,5 +22,6 @@ __all__ = [
     "CorrectTypos",
     "LLMAgent",
     "RunCommand",
+    "StreamingSTT",
     "TypeText",
 ]
