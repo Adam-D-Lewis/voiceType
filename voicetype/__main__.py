@@ -7,7 +7,12 @@ from loguru import logger
 
 from voicetype.app_context import AppContext
 from voicetype.assets.sounds import EMPTY_SOUND, ERROR_SOUND, START_RECORD_SOUND
-from voicetype.hotkey_listener import HotkeyListener, create_hotkey_listener
+from voicetype.hotkey_listener import (
+    HotkeyListener,
+    RemoteHotkeyListener,
+    create_hotkey_listener,
+    is_remote_hotkey,
+)
 from voicetype.pipeline import (
     HotkeyDispatcher,
     PipelineManager,
@@ -159,6 +164,7 @@ def main():
     pipeline_manager = None
     hotkey_dispatcher = None
     hotkey_listener = None
+    remote_listener = None
     tray = None
     icon_controller = None
 
@@ -222,55 +228,99 @@ def main():
             )
 
             # Create hotkey callbacks that delegate to HotkeyDispatcher
-            def on_hotkey_press(hotkey_str: str):
-                """Hotkey press handler - delegates to pipeline manager."""
+            def on_hotkey_press(hotkey_str: str) -> bool:
+                """Hotkey press handler - delegates to pipeline manager.
+
+                Returns True if a pipeline started.
+                """
                 if ctx.state.state == State.ENABLED:
                     logger.debug(f"Hotkey pressed: {hotkey_str}")
                     play_sound(START_RECORD_SOUND)
-                    hotkey_dispatcher._on_press(hotkey_str)
-                else:
-                    logger.debug(
-                        f"Hotkey pressed but app is disabled (state: {ctx.state.state})"
-                    )
+                    return hotkey_dispatcher._on_press(hotkey_str)
+                logger.debug(
+                    f"Hotkey pressed but app is disabled (state: {ctx.state.state})"
+                )
+                return False
 
             def on_hotkey_release(hotkey_str: str):
                 """Hotkey release handler - delegates to pipeline manager."""
                 logger.debug(f"Hotkey released: {hotkey_str}")
                 hotkey_dispatcher._on_release(hotkey_str)
 
-            # Create platform-specific listener
-            hotkey_listener = get_platform_listener(
-                on_press=on_hotkey_press,
-                on_release=on_hotkey_release,
-                method=settings.hotkey_listener,
-                log_key_repeat_debug=settings.log_key_repeat_debug,
-            )
+            def on_hotkey_cancel(hotkey_str: str):
+                """Hotkey cancel handler - the trigger went away mid-press.
 
-            # Register hotkeys for ALL enabled pipelines
-            registered_hotkeys = set()
+                Called when a remote device disconnects while holding its button;
+                the recording is discarded instead of transcribed.
+                """
+                logger.debug(f"Hotkey cancelled: {hotkey_str}")
+                if hotkey_dispatcher._on_cancel(hotkey_str):
+                    play_sound(ERROR_SOUND)
+
+            # Remote button hotkeys ("remote:<button>") go to the remote
+            # listener, everything else to the platform listener
+            local_hotkeys = {}  # hotkey -> pipeline name
+            remote_hotkeys = {}
             for pipeline_name in enabled_pipelines:
-                pipeline = pipeline_manager.pipelines[pipeline_name]
-                hotkey_string = pipeline.hotkey
-                if hotkey_string not in registered_hotkeys:
+                hotkey_string = pipeline_manager.pipelines[pipeline_name].hotkey
+                hotkeys = (
+                    remote_hotkeys if is_remote_hotkey(hotkey_string) else local_hotkeys
+                )
+                hotkeys.setdefault(hotkey_string, pipeline_name)
+
+            if local_hotkeys:
+                # Create platform-specific listener
+                hotkey_listener = get_platform_listener(
+                    on_press=on_hotkey_press,
+                    on_release=on_hotkey_release,
+                    method=settings.hotkey_listener,
+                    log_key_repeat_debug=settings.log_key_repeat_debug,
+                )
+
+                # Register hotkeys for all enabled local pipelines
+                for hotkey_string, pipeline_name in local_hotkeys.items():
                     hotkey_listener.add_hotkey(hotkey_string, name=pipeline_name)
-                    registered_hotkeys.add(hotkey_string)
                     logger.info(
                         f"Registered hotkey '{hotkey_string}' for pipeline '{pipeline_name}'"
                     )
 
-            # Set the listener in hotkey dispatcher (for compatibility)
-            hotkey_dispatcher.set_hotkey_listener(hotkey_listener)
+                # Set the listener in hotkey dispatcher (for compatibility)
+                hotkey_dispatcher.set_hotkey_listener(hotkey_listener)
 
-            # Update context with listener
-            ctx.hotkey_listener = hotkey_listener
+                # Update context with listener
+                ctx.hotkey_listener = hotkey_listener
+
+            if settings.remote.enabled:
+                remote_listener = RemoteHotkeyListener(
+                    settings.remote,
+                    on_hotkey_press=on_hotkey_press,
+                    on_hotkey_release=on_hotkey_release,
+                    on_hotkey_cancel=on_hotkey_cancel,
+                )
+                for hotkey_string, pipeline_name in remote_hotkeys.items():
+                    remote_listener.add_hotkey(hotkey_string, name=pipeline_name)
+                    logger.info(
+                        f"Registered hotkey '{hotkey_string}' for pipeline '{pipeline_name}'"
+                    )
+            elif remote_hotkeys:
+                logger.error(
+                    f"Hotkeys {sorted(remote_hotkeys)} need the remote listener; "
+                    "set enabled = true under [remote] in settings.toml"
+                )
 
             # Play empty sound to initialize audio system
             play_sound(EMPTY_SOUND)
 
             # Start listening
-            hotkey_listener.start_listening()
-
-            logger.info(f"Listening for hotkeys: {registered_hotkeys}")
+            if hotkey_listener:
+                hotkey_listener.start_listening()
+                logger.info(f"Listening for hotkeys: {set(local_hotkeys)}")
+            if remote_listener:
+                try:
+                    remote_listener.start_listening()
+                except Exception as e:
+                    logger.error(f"Remote listener failed to start: {e}")
+                    remote_listener = None
             logger.info("Press Ctrl+C to exit.")
 
         # Start the system tray icon (blocks until closed)
@@ -294,6 +344,13 @@ def main():
                 logger.info("Hotkey listener stopped.")
             except Exception as e:
                 logger.error(f"Error stopping listener: {e}", exc_info=True)
+
+        # Stop remote listener
+        if remote_listener:
+            try:
+                remote_listener.stop_listening()
+            except Exception as e:
+                logger.error(f"Error stopping remote listener: {e}", exc_info=True)
 
         # Shutdown pipeline manager
         if pipeline_manager:

@@ -34,6 +34,7 @@ class HotkeyDispatcher:
         self.active_events: Dict[str, HotkeyTriggerEvent] = (
             {}
         )  # hotkey -> trigger event
+        self.active_pipeline_ids: Dict[str, str] = {}  # hotkey -> pipeline id
         self.hotkey_listener = None  # Will be set by application
 
     def register_hotkey(
@@ -70,17 +71,20 @@ class HotkeyDispatcher:
         """
         self.hotkey_listener = listener
 
-    def _on_press(self, hotkey: str):
+    def _on_press(self, hotkey: str) -> bool:
         """Handle hotkey press - create trigger event and execute pipeline.
 
         Args:
             hotkey: Hotkey string that was pressed
+
+        Returns:
+            True if a pipeline was started
         """
         # Get pipeline for this hotkey
         pipeline = self.pipeline_manager.get_pipeline_by_hotkey(hotkey)
         if not pipeline:
             logger.warning(f"No pipeline found for hotkey: {hotkey}")
-            return
+            return False
 
         # Create trigger event
         trigger_event = HotkeyTriggerEvent()
@@ -99,6 +103,10 @@ class HotkeyDispatcher:
             logger.warning(
                 f"Pipeline '{pipeline.name}' could not start (resources busy)"
             )
+            return False
+
+        self.active_pipeline_ids[hotkey] = pipeline_id
+        return True
 
     def _on_release(self, hotkey: str):
         """Handle hotkey release - signal trigger event.
@@ -106,6 +114,7 @@ class HotkeyDispatcher:
         Args:
             hotkey: Hotkey string that was released
         """
+        self.active_pipeline_ids.pop(hotkey, None)
         if hotkey in self.active_events:
             trigger_event = self.active_events[hotkey]
             trigger_event.signal_release()
@@ -115,6 +124,32 @@ class HotkeyDispatcher:
             logger.debug(
                 f"Hotkey released but no active event: {hotkey} (may have been cancelled)"
             )
+
+    def _on_cancel(self, hotkey: str) -> bool:
+        """Handle a press whose release will never come - cancel its pipeline.
+
+        Used when the trigger source goes away mid-press (e.g. a remote device
+        disconnects while its button is held): the recording is discarded
+        instead of being transcribed.
+
+        Args:
+            hotkey: Hotkey string that was pressed
+
+        Returns:
+            True if a pipeline was cancelled
+        """
+        trigger_event = self.active_events.pop(hotkey, None)
+        pipeline_id = self.active_pipeline_ids.pop(hotkey, None)
+        if trigger_event is None:
+            logger.debug(f"Hotkey cancelled but no active event: {hotkey}")
+            return False
+
+        if pipeline_id is not None:
+            self.pipeline_manager.cancel_pipeline(pipeline_id)
+        # Wake stages waiting for the release; they see the cancellation and stop
+        trigger_event.signal_release()
+        logger.info(f"Cancelled pipeline for hotkey: {hotkey}")
+        return True
 
     def register_all_pipelines(self):
         """Register hotkeys for all enabled pipelines.

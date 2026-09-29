@@ -13,11 +13,14 @@ from voicetype.platform_detection import is_wayland
 
 from .hotkey_listener import HotkeyListener
 from .pynput_hotkey_listener import PynputHotkeyListener
+from .remote_hotkey_listener import RemoteHotkeyListener, is_remote_hotkey
 
 __all__ = [
     "HotkeyListener",
     "PynputHotkeyListener",
+    "RemoteHotkeyListener",
     "create_hotkey_listener",
+    "is_remote_hotkey",
 ]
 
 

@@ -251,6 +251,14 @@ class PipelineManager:
             trigger_event=trigger_event,
         )
 
+    def cancel_pipeline(self, pipeline_id: str):
+        """Request cancellation of a running pipeline execution.
+
+        Args:
+            pipeline_id: Execution ID returned by trigger_pipeline()
+        """
+        self.executor.cancel_pipeline(pipeline_id)
+
     def list_pipelines(self) -> List[str]:
         """Get list of all pipeline names.
 

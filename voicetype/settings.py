@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import toml
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
 from voicetype.utils import get_app_data_dir
@@ -36,6 +36,39 @@ class TelemetryConfig(BaseModel):
     # File rotation settings
     rotation_enabled: bool = True
     rotation_max_size_mb: int = 10  # Rotate when file reaches this size in MB
+
+
+def _remote_credentials_path(filename: str) -> Path:
+    return get_app_data_dir() / "remote" / filename
+
+
+class RemoteConfig(BaseModel):
+    """Remote trigger server, for devices like a Pico 2 W button.
+
+    When enabled, voiceType accepts TLS connections from a remote device that
+    sends button press/release events (bound to pipelines with hotkeys like
+    "remote:main") and types text sent back with keyboard_backend = "remote".
+    Create the certificate and token with `voicetype remote-setup`.
+    """
+
+    enabled: bool = False
+    host: str = "0.0.0.0"  # Interface to listen on ("0.0.0.0" = all IPv4 interfaces)
+    port: int = Field(default=8684, ge=0, le=65535)
+    cert_file: Path = Field(
+        default_factory=lambda: _remote_credentials_path("cert.pem")
+    )
+    key_file: Path = Field(default_factory=lambda: _remote_credentials_path("key.pem"))
+    token_file: Path = Field(default_factory=lambda: _remote_credentials_path("token"))
+    # A device holding a button that goes silent this long is treated as gone,
+    # and its recording is cancelled
+    press_timeout: float = Field(default=3.0, gt=0)
+    # Connections that send nothing (not even pings) for this long are closed
+    idle_timeout: float = Field(default=30.0, gt=0)
+
+    @field_validator("cert_file", "key_file", "token_file")
+    @classmethod
+    def _expand_user(cls, value: Path) -> Path:
+        return Path(value).expanduser()
 
 
 class Settings(BaseSettings):
@@ -82,6 +115,9 @@ class Settings(BaseSettings):
 
     # File opener configuration
     file_openers: FileOpenersConfig = FileOpenersConfig()
+
+    # Remote trigger server (e.g. a Pico 2 W button)
+    remote: RemoteConfig = RemoteConfig()
 
     # Path to log file (uses platform defaults if not specified)
     log_file: Optional[Path] = None

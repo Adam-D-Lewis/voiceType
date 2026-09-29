@@ -341,9 +341,86 @@ def service_status():
     run_systemctl_command(["status", SERVICE_NAME], ignore_errors=True)
 
 
+def _remote_pipeline_stages(settings) -> list[str]:
+    """Stages for a remote pipeline: the first local pipeline's, typing remotely."""
+    stage_configs = settings.stage_configs or {}
+    for pipeline in settings.pipelines or []:
+        if not pipeline.get("enabled", True) or pipeline.get("hotkey", "").startswith(
+            "remote:"
+        ):
+            continue
+        stages = []
+        for stage in pipeline.get("stages", []):
+            config = stage_configs.get(stage, {})
+            stage_class = config.get("stage_class", config.get("class", stage))
+            stages.append("TypeText_remote" if stage_class == "TypeText" else stage)
+        if "TypeText_remote" in stages:
+            return stages
+    return ["RecordAudio", "Transcribe", "CorrectTypos", "TypeText_remote"]
+
+
+def remote_setup(force: bool = False):
+    """Create the TLS certificate and token for a remote trigger device."""
+    import socket
+
+    from voicetype.hotkey_listener.remote_credentials import (
+        RemoteCredentialsError,
+        generate_credentials,
+        load_token,
+    )
+    from voicetype.settings import load_settings
+
+    settings = load_settings()
+    remote = settings.remote
+    try:
+        written = generate_credentials(
+            remote.cert_file, remote.key_file, remote.token_file, force=force
+        )
+        token = load_token(remote.token_file)
+    except RemoteCredentialsError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    for path in written:
+        print(f"Created {path}")
+    if not written:
+        print("Using the existing certificate and token (--force replaces them).")
+
+    stages = ", ".join(f'"{stage}"' for stage in _remote_pipeline_stages(settings))
+    print(
+        f"""
+1. Add to voiceType's settings.toml (skip anything already there):
+
+   [remote]
+   enabled = true
+
+   [stage_configs.TypeText_remote]
+   stage_class = "TypeText"
+   keyboard_backend = "remote"
+
+   [[pipelines]]
+   name = "remote"
+   hotkey = "remote:main"
+   stages = [{stages}]
+
+2. Copy {remote.cert_file}
+   to the Pico's CIRCUITPY drive as voicetype_cert.pem
+
+3. Put these in the Pico's settings.toml:
+
+   VOICETYPE_HOST = "{socket.gethostname()}"
+   VOICETYPE_PORT = {remote.port}
+   VOICETYPE_TOKEN = "{token}"
+
+4. Restart voiceType: systemctl --user restart {SERVICE_NAME}
+
+See firmware/pico2w/README.md for the rest of the Pico setup."""
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Manage VoiceType systemd service (Linux only)."
+        description="Manage the VoiceType service and remote trigger devices."
     )
     subparsers = parser.add_subparsers(
         dest="command", help="Available commands", required=True
@@ -366,8 +443,21 @@ def main():
     )
     status_parser.set_defaults(func=service_status)
 
+    remote_parser = subparsers.add_parser(
+        "remote-setup",
+        help="Create the TLS certificate and token for a remote trigger device "
+        "(e.g. a Pico 2 W button).",
+    )
+    remote_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Replace the existing certificate and token.",
+    )
+    remote_parser.set_defaults(func=remote_setup)
+
     args = parser.parse_args()
-    args.func()
+    options = {k: v for k, v in vars(args).items() if k not in ("command", "func")}
+    args.func(**options)
 
 
 if __name__ == "__main__":

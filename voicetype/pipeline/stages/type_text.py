@@ -24,9 +24,10 @@ class TypeTextConfig(BaseModel):
     )
     keyboard_backend: str = Field(
         default="auto",
-        description="Keyboard backend to use: auto, pynput, wtype, or eitype. "
+        description="Keyboard backend to use: auto, pynput, wtype, eitype, or remote. "
         "auto selects based on platform (pynput for X11/Windows/Mac, "
-        "eitype for Wayland GNOME/KDE, wtype for Wayland wlroots).",
+        "eitype for Wayland GNOME/KDE, wtype for Wayland wlroots). "
+        "remote types on the device connected to the remote listener.",
     )
 
 
@@ -49,6 +50,8 @@ class TypeText(PipelineStage[Optional[str], None]):
                        - pynput: X11, Windows, macOS
                        - wtype: Wayland wlroots compositors (Sway, Hyprland, etc.)
                        - eitype: Wayland GNOME/KDE with EI support
+                       - remote: The device connected to the remote listener
+                                 (e.g. a Pico 2 W acting as a USB keyboard)
     """
 
     required_resources = {Resource.KEYBOARD}

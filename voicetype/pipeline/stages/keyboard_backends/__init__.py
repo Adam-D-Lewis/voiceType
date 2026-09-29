@@ -18,6 +18,7 @@ from voicetype.pipeline.stages.keyboard_backends.eitype_backend import (
     clear_cached_connection as clear_eitype_connection,
 )
 from voicetype.pipeline.stages.keyboard_backends.pynput_backend import PynputKeyboard
+from voicetype.pipeline.stages.keyboard_backends.remote_backend import RemoteKeyboard
 from voicetype.pipeline.stages.keyboard_backends.wtype_backend import (
     WtypeKeyboard,
     WtypeNotFoundError,
@@ -28,6 +29,7 @@ __all__ = [
     "PynputKeyboard",
     "WtypeKeyboard",
     "EitypeKeyboard",
+    "RemoteKeyboard",
     "WtypeNotFoundError",
     "EitypeNotFoundError",
     "clear_eitype_connection",
@@ -38,7 +40,7 @@ __all__ = [
 def create_keyboard_backend(
     method: str = "auto",
     char_delay: float = 0.001,
-) -> Union[PynputKeyboard, WtypeKeyboard, EitypeKeyboard]:
+) -> Union[PynputKeyboard, WtypeKeyboard, EitypeKeyboard, RemoteKeyboard]:
     """Create the appropriate keyboard backend for the current platform.
 
     Args:
@@ -47,6 +49,7 @@ def create_keyboard_backend(
             - "pynput": Force pynput (X11, Windows, macOS)
             - "wtype": Force wtype (Wayland wlroots)
             - "eitype": Force eitype (Wayland GNOME/KDE)
+            - "remote": Type on the connected remote device (e.g. a Pico 2 W)
         char_delay: Delay between characters (only used by pynput)
 
     Returns:
@@ -71,10 +74,14 @@ def create_keyboard_backend(
         logger.info("Using eitype keyboard backend (explicitly requested)")
         return EitypeKeyboard()
 
+    if method == "remote":
+        logger.info("Using remote keyboard backend (types on the remote device)")
+        return RemoteKeyboard()
+
     if method != "auto":
         raise ValueError(
             f"Invalid keyboard_backend method: '{method}'. "
-            "Valid options: auto, pynput, wtype, eitype"
+            "Valid options: auto, pynput, wtype, eitype, remote"
         )
 
     # Auto-detection logic

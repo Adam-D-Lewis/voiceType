@@ -86,6 +86,21 @@ rotation_max_size_mb = 10  # Rotate when file reaches this size in MB (default: 
 # args = ["-a", "Terminal", "{path}"]
 
 # =============================================================================
+# REMOTE TRIGGER (e.g. a Raspberry Pi Pico 2 W button)
+# =============================================================================
+# Lets a device on your network trigger pipelines (hotkey = "remote:<button>")
+# and type their text (keyboard_backend = "remote"). Create the TLS certificate
+# and token first with `voicetype remote-setup`. See firmware/pico2w/README.md.
+
+# [remote]
+# enabled = true
+# host = "0.0.0.0"      # Interface to listen on
+# port = 8684
+# press_timeout = 3.0   # Cancel a held button's recording if the device goes silent this long
+# idle_timeout = 30.0   # Drop connections that send nothing this long
+# cert_file, key_file, token_file default to ~/.config/voicetype/remote/
+
+# =============================================================================
 # STAGE DEFINITIONS
 # =============================================================================
 # Define named stage instances with their configurations.
@@ -155,6 +170,11 @@ corrections = [
 [stage_configs.TypeText_default]
 stage_class = "TypeText"
 
+# Types on the device connected to the remote trigger (see [remote] above)
+# [stage_configs.TypeText_remote]
+# stage_class = "TypeText"
+# keyboard_backend = "remote"
+
 [stage_configs.LLMAgent_jarvis]
 stage_class = "LLMAgent"
 model = "gpt-4o-mini"  # or "ollama/llama3.2", "claude-3-5-sonnet-20241022", etc.
@@ -219,7 +239,21 @@ stages = [
 #     "TypeText_default",
 # ]
 
-# Example 4: Pipeline with multiple instances of same stage
+# Example 4: Dictate with a remote button (a Pico 2 W plugged into another
+# computer as a USB keyboard); the text is typed on that computer.
+# Needs [remote] enabled and the TypeText_remote stage config above.
+# [[pipelines]]
+# name = "remote"
+# enabled = true
+# hotkey = "remote:main"  # Button "main" on the remote device
+# stages = [
+#     "RecordAudio_default",
+#     "Transcribe_local",
+#     "CorrectTypos_default",
+#     "TypeText_remote",
+# ]
+
+# Example 5: Pipeline with multiple instances of same stage
 # To use a stage twice with different configs, create separate named instances
 # [stage_configs.CorrectTypos_slang]
 # stage_class = "CorrectTypos"
@@ -252,11 +286,13 @@ stages = [
 #   - CorrectTypos: Corrects configured typos and common speech-to-text errors
 #   - LLMAgent: Processes text through an LLM agent (local or remote)
 #   - TypeText: Types the transcribed text at the current cursor position
+#     (keyboard_backend = "remote" types on the remote trigger device instead)
 #
 # Hotkey Format:
 #   - Special keys: <pause>, <f1>, <f12>, etc.
 #   - Modifiers: <ctrl>+<alt>+p, <shift>+<f1>, etc.
 #   - Regular keys: a, b, 1, 2, etc.
+#   - Remote device buttons: remote:main, remote:<button name> (see [remote])
 #
 # Transcription Configuration:
 #   The Transcribe stage uses a unified runtime configuration with fallback support.
