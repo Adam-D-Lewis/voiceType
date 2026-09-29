@@ -206,7 +206,7 @@ otlp_endpoint = "http://localhost:4317"
 
 ## Remote Button (Raspberry Pi Pico 2 W)
 
-A Pico 2 W plugged into another computer (e.g. a Chromebook) can act as a dictation button: hold its button to record on the voiceType machine, and the Pico types the transcription into the computer it's plugged into, as a USB keyboard. The Pico connects to voiceType over TLS with a shared token. Run `voicetype remote-setup` to create the certificate and token, then follow [firmware/pico2w/README.md](firmware/pico2w/README.md).
+A Pico 2 W plugged into another computer (e.g. a Chromebook) can act as a dictation button: hold its button to record on the voiceType machine, and the Pico types the transcription into the computer it's plugged into, as a USB keyboard. The Pico connects to voiceType over TLS with a shared token. Run `voicetype remote-setup` to create the certificate and token, then follow [contrib/pico2w/README.md](contrib/pico2w/README.md).
 
 ## Managing the Service (Linux with systemd)
 

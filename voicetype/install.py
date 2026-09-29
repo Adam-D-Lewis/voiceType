@@ -414,7 +414,7 @@ def remote_setup(force: bool = False):
 
 4. Restart voiceType: systemctl --user restart {SERVICE_NAME}
 
-See firmware/pico2w/README.md for the rest of the Pico setup."""
+See contrib/pico2w/README.md for the rest of the Pico setup."""
     )
 
 

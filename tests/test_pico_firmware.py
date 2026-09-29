@@ -1,4 +1,4 @@
-"""Run the Pico firmware (firmware/pico2w/code.py) against the real remote listener.
+"""Run the Pico firmware (contrib/pico2w/code.py) against the real remote listener.
 
 The firmware runs under CPython with small stand-ins for the CircuitPython
 modules it uses: sockets that behave like CircuitPython's (the handshake happens
@@ -26,7 +26,7 @@ from voicetype.hotkey_listener.remote_credentials import generate_credentials
 from voicetype.hotkey_listener.remote_hotkey_listener import RemoteHotkeyListener
 from voicetype.settings import RemoteConfig
 
-FIRMWARE = Path(__file__).parent.parent / "firmware" / "pico2w"
+FIRMWARE = Path(__file__).parent.parent / "contrib" / "pico2w"
 sys.path.insert(0, str(FIRMWARE))
 
 import hid_layouts  # noqa: E402

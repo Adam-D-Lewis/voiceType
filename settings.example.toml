@@ -90,7 +90,7 @@ rotation_max_size_mb = 10  # Rotate when file reaches this size in MB (default: 
 # =============================================================================
 # Lets a device on your network trigger pipelines (hotkey = "remote:<button>")
 # and type their text (keyboard_backend = "remote"). Create the TLS certificate
-# and token first with `voicetype remote-setup`. See firmware/pico2w/README.md.
+# and token first with `voicetype remote-setup`. See contrib/pico2w/README.md.
 
 # [remote]
 # enabled = true

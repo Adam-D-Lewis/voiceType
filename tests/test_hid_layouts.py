@@ -1,11 +1,11 @@
-"""Tests for the Pico firmware's keyboard layout tables (firmware/pico2w/hid_layouts.py)."""
+"""Tests for the Pico firmware's keyboard layout tables (contrib/pico2w/hid_layouts.py)."""
 
 import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "firmware" / "pico2w"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "contrib" / "pico2w"))
 
 import hid_layouts  # noqa: E402
 
