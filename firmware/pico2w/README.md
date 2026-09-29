@@ -17,16 +17,18 @@ The Pico keeps one TLS connection open to voiceType. It checks voiceType's
 certificate, and voiceType checks the Pico's token. The Pico never accepts
 incoming connections.
 
-> **Not yet tested on real hardware.** The firmware has run under CPython
-> against the real voiceType listener (with stand-ins for the CircuitPython
-> modules), compiles with CircuitPython 9 and 10, and its keyboard layouts
-> match xkeyboard-config. See the [hardware checklist](#hardware-checklist).
+> **Tested on real hardware:** a Pico 2 W typing into a Chromebook set to
+> Programmer Dvorak, triggered from a desktop hotkey. The LED patterns and the
+> faster typing have only run in the simulation tests so far (the firmware under
+> CPython against the real listener). See the
+> [hardware checklist](#hardware-checklist).
 
 ## What you need
 
 - A Pico 2 W with CircuitPython 9 or newer
-- The `adafruit_hid` library
-- A push button (or a foot pedal) wired between **GP15** and any **GND** pin
+- Optionally, a push button (or a foot pedal) wired between **GP15** and any
+  **GND** pin. Without one, trigger dictation with a desktop hotkey whose
+  pipeline uses `keyboard_backend = "remote"`.
 - voiceType on the desktop, with this feature
 
 ## 1. Set up voiceType (desktop)
@@ -83,16 +85,13 @@ firewall, TLS and token before the Pico is involved.
    (Holding BOOTSEL starts the chip's bootloader instead: that drive is called
    `RP2350` and only has `INDEX.HTM` and `INFO_UF2.TXT`. Your files are still
    there; replug normally.)
-2. Install `adafruit_hid` with `circup install adafruit_hid`, or copy the
-   `adafruit_hid` folder from the
-   [library bundle](https://circuitpython.org/libraries) matching your
-   CircuitPython version into `CIRCUITPY/lib/`.
-3. Copy `code.py`, `boot.py` and `hid_layouts.py` from this folder to `CIRCUITPY`.
-4. Copy `~/.config/voicetype/remote/cert.pem` to `CIRCUITPY` as `voicetype_cert.pem`.
-5. Copy `settings.toml.example` to `CIRCUITPY/settings.toml` (or merge it into
+2. Copy `code.py`, `boot.py` and `hid_layouts.py` from this folder to `CIRCUITPY`.
+   No libraries are needed.
+3. Copy `~/.config/voicetype/remote/cert.pem` to `CIRCUITPY` as `voicetype_cert.pem`.
+4. Copy `settings.toml.example` to `CIRCUITPY/settings.toml` (or merge it into
    yours) and fill it in. Set `VOICETYPE_LAYOUT` to the Chromebook's keyboard
    layout (see [Keyboard layouts](#keyboard-layouts)).
-6. Eject `CIRCUITPY` before unplugging, so the computer finishes writing.
+5. Eject `CIRCUITPY` before unplugging, so the computer finishes writing.
 
 To watch what the Pico is doing, open the serial console: on a Chromebook,
 open https://code.circuitpython.org in Chrome and connect over USB. On Linux,
@@ -105,14 +104,14 @@ The desktop plays voiceType's start sound when recording begins. If the Pico
 disconnects mid-recording, voiceType discards that recording and plays its
 error sound.
 
-| Pico LED            | Meaning                                                   |
-| ------------------- | --------------------------------------------------------- |
-| Slow blink          | Connecting to WiFi / voiceType                            |
-| Off                 | Connected and ready                                       |
-| On                  | Recording (button held)                                   |
-| Fast blink          | Transcribing; stops when the text is typed                |
-| Flicker, then off   | voiceType didn't start recording (see serial console)     |
-| Constant flicker    | Setup problem; the serial console says what to fix        |
+| Pico LED                        | Meaning                                                    |
+| ------------------------------- | ---------------------------------------------------------- |
+| Slow blink (once a second)      | Connecting to WiFi / voiceType                             |
+| Short blip every 10 s           | Connected and ready (heartbeat; `VOICETYPE_HEARTBEAT_MS`)  |
+| On                              | Typing, or the Pico's button is held (recording)           |
+| Fast blink                      | Transcribing, after you release the Pico's button          |
+| Three quick flashes             | Typing failed, or voiceType didn't start recording         |
+| Constant fast flicker           | Setup problem; the serial console says what to fix         |
 
 ## Keyboard layouts
 
@@ -145,22 +144,29 @@ with `hotkey = "remote:jarvis"`.
 
 ## Hardware checklist
 
-Things to confirm on real hardware:
+Things to confirm on real hardware (checked items are confirmed):
 
-- [ ] `voicetype remote-setup` works, and voiceType logs `Remote listener on 0.0.0.0:8684 (TLS)`.
+- [x] `voicetype remote-setup` works, and voiceType logs `Remote listener on 0.0.0.0:8684 (TLS)`.
 - [ ] `scripts/fake_pico.py --host nirvana --hold 3` from another machine prints
       what you said. This covers the network path, firewall, TLS and token.
-- [ ] The Pico's serial console shows `WiFi connected`, then
+- [x] The Pico connects: voiceType logs `Remote device connected: pico2w`.
+      On the Pico's serial console that's `WiFi connected`, then
       `Connecting to nirvana at 192.168.1.109`, then `Connected to voiceType`.
       If `nirvana` doesn't resolve, try `nirvana.attlocal.net`, then the IP
       address. (`nirvana.local` is untested; CircuitPython may not look up
       `.local` names.)
-- [ ] The Pico completes the TLS handshake. If it reports a certificate or
+- [x] The Pico completes the TLS handshake. If it reports a certificate or
       handshake error, recopy `cert.pem` as `voicetype_cert.pem`.
+- [x] A dictation triggered from a desktop hotkey types correctly on the
+      Chromebook (Programmer Dvorak).
 - [ ] Dictating "Testing 1, 2, 3. Does punctuation work? Yes, it does!" into a
       text editor on the Chromebook types exactly that, with no dropped or
       wrong characters (the digits exercise Shift on Programmer Dvorak).
 - [ ] Long dictation (30+ seconds) types completely.
+- [ ] Repeated letters and capitals type correctly with one report per
+      keystroke, e.g. "Mississippi, AAA, aA".
+- [ ] The LED blips every 10 seconds while connected, stays on while typing,
+      and blinks slowly while disconnected.
 - [ ] Hold the button and unplug the Pico: within ~3 seconds voiceType logs
       that the device went away and plays the error sound.
 - [ ] Restart voiceType while the Pico is plugged in: the LED blinks slowly,

@@ -17,7 +17,6 @@ import keypad
 import socketpool
 import usb_hid
 import wifi
-from adafruit_hid.keyboard import Keyboard
 
 try:
     import errno
@@ -43,12 +42,15 @@ DEVICE_NAME = setting("VOICETYPE_DEVICE_NAME", "pico2w")
 CERT_FILE = setting("VOICETYPE_CERT_FILE", "/voicetype_cert.pem")
 # Name checked against the certificate; `voicetype remote-setup` always adds it
 TLS_NAME = setting("VOICETYPE_TLS_NAME", "voicetype")
+# How often the LED blips while connected and idle; 0 turns the heartbeat off
+HEARTBEAT_MS = int(setting("VOICETYPE_HEARTBEAT_MS", 10000))
 
 # voiceType cancels a held button's recording after ~3 s without hearing from us
 PING_INTERVAL_MS = 1000
 SERVER_TIMEOUT_MS = 5000  # Reconnect if voiceType goes quiet this long
 CONNECT_TIMEOUT_S = 15  # The TLS handshake takes a moment on a microcontroller
 WAIT_FOR_TEXT_MS = 20000  # How long the LED shows "transcribing" after release
+MIN_TYPING_LIGHT_MS = 300  # Keep the LED on this long even for short texts
 MAX_RETRY_DELAY_S = 10
 MAX_MESSAGE_BYTES = 64 * 1024
 TYPE_CHUNK = 16  # Characters typed between pings
@@ -74,13 +76,24 @@ class SetupProblem(Exception):
 
 
 class Led:
-    """The onboard LED.
+    """The onboard LED. It sits on the WiFi chip, so it's only on or off.
 
-    on: recording | fast blink: transcribing | slow blink: connecting
-    flicker: voiceType refused the press, or a setup problem | off: ready
+    Lasting states:  connecting: slow blink
+                     idle: a short blip every HEARTBEAT_MS (10 s)
+                     error: constant flicker (a setup problem)
+    Brief states:    on: typing, or the Pico's button is held
+                     waiting: fast blink until the transcription arrives
+                     refused: three quick flashes
     """
 
-    HALF_PERIOD_MS = {"waiting": 150, "connecting": 500, "error": 50}
+    # mode: (period, time on per period), in ms
+    PATTERNS = {
+        "connecting": (1000, 500),
+        "idle": (HEARTBEAT_MS, 80) if HEARTBEAT_MS > 0 else (1, 0),
+        "waiting": (300, 150),
+        "refused": (200, 100),
+        "error": (100, 50),
+    }
 
     def __init__(self):
         try:
@@ -88,66 +101,94 @@ class Led:
             self._pin.direction = digitalio.Direction.OUTPUT
         except (AttributeError, ValueError, RuntimeError):
             self._pin = None
-        self._mode = "off"
-        self._until = None
+        self._base, self._base_start = "connecting", now_ms()
+        self._brief = None
+        self._brief_start = self._brief_until = 0
 
-    def set(self, mode, duration_ms=None):
-        """Show a mode, optionally only for a while before going off."""
-        self._mode = mode
-        self._until = now_ms() + duration_ms if duration_ms else None
+    def base(self, mode):
+        """Show a lasting state, replacing any brief one."""
+        self._base, self._base_start = mode, now_ms()
+        self._brief = None
+        self.update()
+
+    def show(self, mode, duration_ms=None):
+        """Show a brief state, until clear() or for duration_ms."""
+        self._brief, self._brief_start = mode, now_ms()
+        self._brief_until = self._brief_start + duration_ms if duration_ms else None
+        self.update()
+
+    def clear(self):
+        self._brief = None
         self.update()
 
     def update(self):
         if self._pin is None:
             return
         t = now_ms()
-        if self._until is not None and t >= self._until:
-            self._mode, self._until = "off", None
-        half_period = self.HALF_PERIOD_MS.get(self._mode)
-        if half_period:
-            self._pin.value = (t // half_period) % 2 == 0
+        if self._brief is not None and self._brief_until and t >= self._brief_until:
+            self._brief = None
+        if self._brief is not None:
+            mode, start = self._brief, self._brief_start
         else:
-            self._pin.value = self._mode == "on"
+            mode, start = self._base, self._base_start
+        if mode == "on":
+            self._pin.value = True
+            return
+        period, on_time = self.PATTERNS.get(mode, (1, 0))
+        self._pin.value = (t - start) % period < on_time
 
 
 class Typer:
-    """Types text into the computer the Pico is plugged into."""
+    """Types text into the computer the Pico is plugged into, as a USB keyboard.
+
+    The computer reads the keyboard at most every 8 ms, so every report costs up
+    to 8 ms. Rather than a press report and a release report per character, each
+    report presses the next key, which also releases the previous one. Only a
+    repeated key ("ll") needs a release report in between.
+    """
+
+    RELEASE = bytes(8)
+    SHIFT = 0x02  # Left Shift's bit in the report's modifier byte
 
     def __init__(self, layout):
         self._keymap = hid_layouts.keymap(layout)
         self._keyboard = None
-
-    def _open_keyboard(self):
-        # The computer may still be setting up the USB connection at boot
-        for attempt in range(10):
-            try:
-                return Keyboard(usb_hid.devices)
-            except OSError:
-                time.sleep(1)
-        return Keyboard(usb_hid.devices)
+        for device in usb_hid.devices:
+            if device.usage_page == 0x01 and device.usage == 0x06:
+                self._keyboard = device
+        if self._keyboard is None:
+            raise ValueError("no USB keyboard device (is usb_hid disabled in boot.py?)")
 
     def type(self, text, between_chunks=None):
-        if self._keyboard is None:
-            self._keyboard = self._open_keyboard()
+        """Type text; returns False if the computer stopped accepting keys."""
+        report = bytearray(8)  # [modifiers, reserved, key, 0, 0, 0, 0, 0]
+        held = None  # Keycode currently pressed
         skipped = 0
-        for i, char in enumerate(text):
-            key = self._keymap.get(char)
-            if key is None:
-                skipped += 1
-                continue
-            keycode, shift = key
-            try:
-                if shift:
-                    self._keyboard.send(hid_layouts.LEFT_SHIFT, keycode)
-                else:
-                    self._keyboard.send(keycode)
-            except OSError as e:  # Computer asleep or unplugged
-                print("Typing stopped:", e)
-                return
-            if between_chunks is not None and i % TYPE_CHUNK == TYPE_CHUNK - 1:
-                between_chunks()
+        try:
+            for i, char in enumerate(text):
+                key = self._keymap.get(char)
+                if key is None:
+                    skipped += 1
+                    continue
+                keycode, shift = key
+                if keycode == held:
+                    self._keyboard.send_report(self.RELEASE)
+                report[0] = self.SHIFT if shift else 0
+                report[2] = keycode
+                self._keyboard.send_report(report)
+                held = keycode
+                if between_chunks is not None and i % TYPE_CHUNK == TYPE_CHUNK - 1:
+                    # Let go first: a key held through a pause would auto-repeat
+                    self._keyboard.send_report(self.RELEASE)
+                    held = None
+                    between_chunks()
+            self._keyboard.send_report(self.RELEASE)
+        except OSError as e:  # Computer asleep or unplugged
+            print("Typing stopped:", e)
+            return False
         if skipped:
             print("Skipped", skipped, "characters the layout can't type")
+        return True
 
 
 class Connection:
@@ -271,7 +312,7 @@ class Session:
             )
         self.established = True
         print("Connected to voiceType")
-        self.led.set("off")
+        self.led.base("idle")
         self.keys.events.clear()  # Ignore presses from while we were connecting
         self.last_ping = self.last_heard = now_ms()
 
@@ -295,19 +336,27 @@ class Session:
             if event.pressed:
                 self.connection.send({"type": "down", "button": button})
                 self.held.add(button)
-                self.led.set("on")
+                self.led.show("on")
             elif button in self.held:
                 self.held.discard(button)
                 self.connection.send({"type": "up", "button": button})
-                self.led.set("waiting", WAIT_FOR_TEXT_MS)
+                self.led.show("waiting", WAIT_FOR_TEXT_MS)
             event = self.keys.events.get()
 
     def handle(self, message):
         kind = message.get("type")
         if kind == "text":
-            self.typer.type(message.get("text", ""), self.ping_while_typing)
+            self.led.show("on")
+            started = now_ms()
+            typed = self.typer.type(message.get("text", ""), self.ping_while_typing)
             self.last_heard = now_ms()  # Typing a lot of text takes a while
-            self.led.set("on" if self.held else "off")
+            if not typed:
+                self.led.show("refused", 600)
+            elif self.held:
+                self.led.show("on")
+            else:
+                # Stay lit a moment so even a short text is visible
+                self.led.show("on", max(1, MIN_TYPING_LIGHT_MS - (now_ms() - started)))
         elif kind == "state" and message.get("state") == "rejected":
             print(
                 "voiceType didn't start recording (disabled, busy, or button",
@@ -315,7 +364,7 @@ class Session:
                 "not bound to a pipeline)",
             )
             self.held.discard(message.get("button"))
-            self.led.set("error", 1000)
+            self.led.show("refused", 600)
         elif kind == "error":
             raise Disconnected("voiceType: {}".format(message.get("message")))
 
@@ -325,6 +374,7 @@ class Session:
             self.last_ping = now_ms()
 
     def ping_while_typing(self):
+        self.led.update()
         try:
             self.ping_if_due()
         except Disconnected:
@@ -365,7 +415,7 @@ def pause(duration_ms, led):
 
 def fail(message, led):
     """Report a setup problem forever (it needs a settings fix, not a retry)."""
-    led.set("error")
+    led.base("error")
     while True:
         print("Setup problem:", message)
         pause(5000, led)
@@ -407,7 +457,7 @@ def main():
     pool = None
     delay_s = 1
     while True:
-        led.set("connecting")
+        led.base("connecting")
         connection = None
         session = None
         problem = None
@@ -429,7 +479,7 @@ def main():
             fail(problem, led)
         if session is not None and session.established:
             delay_s = 1  # It was working; retry quickly
-        led.set("connecting")
+        led.base("connecting")
         print("Retrying in", delay_s, "s")
         pause(delay_s * 1000, led)
         delay_s = min(delay_s * 2, MAX_RETRY_DELAY_S)

@@ -4,7 +4,8 @@ The firmware runs under CPython with small stand-ins for the CircuitPython
 modules it uses: sockets that behave like CircuitPython's (the handshake happens
 in connect(), and a non-blocking read with no data raises OSError(EAGAIN)), a
 keypad whose button presses the test injects, and a USB keyboard that records
-key presses so the typed text can be decoded with the layout tables.
+its reports so the typed text can be decoded, like the computer would, with
+the layout tables.
 """
 
 import builtins
@@ -41,7 +42,10 @@ class FakeCircuitPython:
     def __init__(self):
         self.stopping = False
         self.lines = []  # print() output
-        self.key_reports = []  # keycodes sent per key press
+        self.key_reports = []  # USB keyboard reports sent
+        self.led = None  # The LED's pin
+        self.led_changes = []  # (time, on) whenever the LED changes
+        self.led_while_typing = []  # LED state at each report
         self._events = collections.deque()
         self._printed = threading.Condition()
 
@@ -63,6 +67,8 @@ class FakeCircuitPython:
             def __init__(self, pin):
                 self.direction = None
                 self._value = False
+                if pin == "LED":
+                    fakes.led = self
 
             @property
             def value(self):
@@ -71,14 +77,17 @@ class FakeCircuitPython:
             @value.setter
             def value(self, value):
                 fakes.check_stop()
+                if value != self._value:
+                    fakes.led_changes.append((time.monotonic(), value))
                 self._value = value
 
-        class Keyboard:
-            def __init__(self, devices):
-                pass
+        class KeyboardDevice:
+            usage_page = 0x01
+            usage = 0x06
 
-            def send(self, *keycodes):
-                fakes.key_reports.append(keycodes)
+            def send_report(self, report):
+                fakes.key_reports.append(bytes(report))
+                fakes.led_while_typing.append(fakes.led.value)
 
         class SSLSocket:
             """Like CircuitPython's: handshake in connect(), OSError(errno) when
@@ -153,13 +162,12 @@ class FakeCircuitPython:
             "keypad": SimpleNamespace(Keys=Keys),
             "socketpool": SimpleNamespace(SocketPool=SocketPool),
             "ssl": SimpleNamespace(create_default_context=SSLContext),
-            "usb_hid": SimpleNamespace(devices=[]),
+            "usb_hid": SimpleNamespace(devices=[KeyboardDevice()]),
             "wifi": SimpleNamespace(
                 radio=SimpleNamespace(
                     ipv4_address="127.0.0.1", connect=lambda ssid, password: None
                 )
             ),
-            "adafruit_hid.keyboard": SimpleNamespace(Keyboard=Keyboard),
             "hid_layouts": hid_layouts,
         }
 
@@ -185,13 +193,25 @@ class FakeCircuitPython:
             )
 
     def typed_text(self, layout) -> str:
+        """Decode the reports like the computer: a key types when it goes down."""
         by_key = {key: char for char, key in hid_layouts.keymap(layout).items()}
         chars = []
-        for keycodes in self.key_reports:
-            shift = hid_layouts.LEFT_SHIFT in keycodes
-            keycode = [k for k in keycodes if k != hid_layouts.LEFT_SHIFT][0]
-            chars.append(by_key[(keycode, shift)])
+        held = 0
+        for report in self.key_reports:
+            keycode = report[2]
+            if keycode and keycode != held:
+                chars.append(by_key[(keycode, bool(report[0] & 0x02))])
+            held = keycode
         return "".join(chars)
+
+    def wait_until_typed(self, count, timeout=10.0):
+        """Wait for count characters and the final all-keys-up report."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            reports = list(self.key_reports)
+            if len(self.typed_text("dvp")) >= count and reports[-1] == bytes(8):
+                return
+            time.sleep(0.02)
 
     def run(self):
         """Start code.py on a background thread (settings come from env vars)."""
@@ -326,11 +346,9 @@ def test_dictation_round_trip(setup):
     assert setup.callbacks.wait_for(("release", "remote:main"))
     assert ("cancel", "remote:main") not in setup.callbacks.events
 
-    text = 'Hello, World! 1234567890 $&[{}(=*)+]!# ~%`:<>?^|_"\n\tdone'
+    text = 'Hello, World! 1234567890 $&[{}(=*)+]!# ~%`:<>?^|_"\n\tdone...'
     listener.send_text(text)
-    deadline = time.monotonic() + 10
-    while len(setup.pico.key_reports) < len(text) and time.monotonic() < deadline:
-        time.sleep(0.05)
+    setup.pico.wait_until_typed(len(text))
     assert setup.pico.typed_text("dvp") == text
 
 
@@ -359,3 +377,45 @@ def test_reconnects_after_voicetype_restarts(setup):
     assert setup.pico.wait_for_line("Connection problem")
     setup.start_listener()
     assert setup.pico.wait_for_line("Connected to voiceType", count=2, timeout=15)
+
+
+def test_led_heartbeat_while_idle(setup):
+    setup.monkeypatch.setenv("VOICETYPE_HEARTBEAT_MS", "300")
+    setup.start_listener()
+    setup.pico.run()
+    assert setup.pico.wait_for_line("Connected to voiceType")
+
+    start = time.monotonic()
+    time.sleep(1.25)
+    changes = [(t, on) for t, on in setup.pico.led_changes if t >= start]
+    blips = [t for t, on in changes if on]
+    assert 3 <= len(blips) <= 5  # One every 300 ms
+    for (t_on, on), (t_off, off) in zip(changes, changes[1:]):
+        if on and not off:
+            assert t_off - t_on < 0.2  # A short blip, not a blink
+
+
+def test_led_is_on_while_typing(setup):
+    listener = setup.start_listener()
+    setup.pico.run()
+    assert setup.pico.wait_for_line("Connected to voiceType")
+
+    listener.send_text("hello")
+    setup.pico.wait_until_typed(5)
+    assert setup.pico.led_while_typing and all(setup.pico.led_while_typing)
+
+    time.sleep(0.6)  # The light stays on briefly after typing, then goes off
+    assert setup.pico.led.value is False
+
+
+def test_one_report_per_character(setup):
+    """Each key press releases the previous key; only repeats need a release."""
+    listener = setup.start_listener()
+    setup.pico.run()
+    assert setup.pico.wait_for_line("Connected to voiceType")
+
+    listener.send_text("hello")
+    setup.pico.wait_until_typed(5)
+    assert setup.pico.typed_text("dvp") == "hello"
+    # h e l [up] l o [up]: 7 reports, instead of a press and a release each (10)
+    assert len(setup.pico.key_reports) == 7

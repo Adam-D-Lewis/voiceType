@@ -29,7 +29,6 @@ KEYS = (
 SPACE = 0x2C
 ENTER = 0x28
 TAB = 0x2B
-LEFT_SHIFT = 0xE1
 
 # What each key in KEYS types on the computer: (without Shift, with Shift)
 LAYOUTS = {
