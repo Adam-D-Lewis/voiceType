@@ -274,6 +274,26 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
             )
         )
 
+    # "Keyboard backend" submenu: shows what each pipeline types with, and
+    # overrides the backend for all of them at runtime (e.g. to type on the
+    # remote device) without editing settings.toml and restarting.
+    typing_pipelines = []  # (pipeline name, configured keyboard backend)
+    if ctx.pipeline_manager:
+        for pipeline_cfg in ctx.pipeline_manager.pipelines.values():
+            if not pipeline_cfg.enabled:
+                continue
+            for stage_cfg in pipeline_cfg.stages:
+                if stage_cfg.get("stage") == "TypeText":
+                    typing_pipelines.append(
+                        (
+                            pipeline_cfg.name,
+                            stage_cfg.get("keyboard_backend", "auto").lower(),
+                        )
+                    )
+
+    if typing_pipelines:
+        menu_items.append(_keyboard_backend_item(ctx, icon, typing_pipelines))
+
     # Discover menu items contributed by pipeline stages
     if ctx.pipeline_manager:
         from voicetype.pipeline.stage_registry import STAGE_REGISTRY
@@ -310,6 +330,70 @@ def _build_menu(ctx: AppContext, icon: pystray.Icon) -> Menu:
     menu_items.append(Item("Quit", _quit))
 
     return Menu(*menu_items)
+
+
+def _keyboard_backend_item(
+    ctx: AppContext, icon: pystray.Icon, typing_pipelines: list
+) -> Item:
+    """Build the "Keyboard backend" submenu.
+
+    Lists what each pipeline types with, then radio items to override the
+    backend for every pipeline ("From settings" removes the override).
+    """
+    from voicetype.pipeline.stages import keyboard_backends
+
+    auto_backend, _ = keyboard_backends.detect_auto_backend()
+    override = keyboard_backends.get_backend_override()
+
+    def describe(method: str) -> str:
+        return f"auto ({auto_backend})" if method == "auto" else method
+
+    def choose(method: Optional[str]):
+        def handler(_icon: pystray._base.Icon, _item: Item):
+            keyboard_backends.set_backend_override(method)
+            chosen = method or "each pipeline's setting"
+            logger.info(f"Keyboard backend set to {chosen} via tray menu")
+            _icon.menu = _build_menu(ctx, icon)
+            _icon.update_menu()
+
+        return handler
+
+    # What each pipeline types with right now (informational, not clickable)
+    items = [
+        Item(f"{name}: {describe(override or configured)}", None, enabled=False)
+        for name, configured in typing_pipelines
+    ]
+    items.append(Menu.SEPARATOR)
+    items.append(
+        Item(
+            "From settings",
+            choose(None),
+            checked=lambda _item: keyboard_backends.get_backend_override() is None,
+            radio=True,
+        )
+    )
+
+    methods = ["auto", "eitype", "wtype", "pynput"]
+    if sys.platform != "linux":
+        methods = ["auto", "pynput"]
+    if ctx.remote_enabled or any(c == "remote" for _, c in typing_pipelines):
+        methods.append("remote")
+    for method in methods:
+        items.append(
+            Item(
+                describe(method),
+                choose(method),
+                checked=lambda _item, m=method: (
+                    keyboard_backends.get_backend_override() == m
+                ),
+                radio=True,
+            )
+        )
+
+    title = "Keyboard backend"
+    if override:
+        title += f": {describe(override)}"
+    return Item(title, Menu(*items))
 
 
 def set_error_icon(icon: pystray.Icon):

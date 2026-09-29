@@ -23,6 +23,7 @@ class AppContext:
     telemetry_enabled: bool = False
     trace_file_path: Optional[Path] = None
     file_openers: FileOpenersConfig = field(default_factory=FileOpenersConfig)
+    remote_enabled: bool = False  # Whether the remote trigger listener is configured
 
     @property
     def has_active_pipelines(self) -> bool:
