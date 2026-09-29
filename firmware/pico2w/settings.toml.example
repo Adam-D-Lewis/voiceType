@@ -1,0 +1,25 @@
+# Copy to the CIRCUITPY drive as settings.toml and fill in.
+# (CircuitPython settings.toml values can only be "strings" or integers.)
+
+# Your WiFi network (2.4 GHz; the Pico 2 W can't join 5 GHz networks)
+CIRCUITPY_WIFI_SSID = "your-wifi-name"
+CIRCUITPY_WIFI_PASSWORD = "your-wifi-password"
+
+# The computer running voiceType, and the port from [remote] in its settings.toml
+VOICETYPE_HOST = "nirvana"
+VOICETYPE_PORT = 8684
+
+# Printed by `voicetype remote-setup` (also in ~/.config/voicetype/remote/token)
+VOICETYPE_TOKEN = "paste-the-token-here"
+
+# The keyboard layout the computer the Pico is plugged into uses:
+# "us" (QWERTY), "dvorak", or "dvp" (Programmer Dvorak)
+VOICETYPE_LAYOUT = "dvp"
+
+# Buttons: pin=name, comma-separated. Each name triggers the voiceType pipeline
+# with hotkey = "remote:<name>". Wire each button between its pin and GND.
+VOICETYPE_BUTTONS = "GP15=main"
+
+# Set to 1 once everything works to hide the CIRCUITPY drive and serial console.
+# Hold the voiceType button (not BOOTSEL) while plugging in to get them back.
+VOICETYPE_HIDE_USB = 0
