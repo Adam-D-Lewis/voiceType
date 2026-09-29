@@ -11,10 +11,7 @@ from pydantic import BaseModel, Field
 from voicetype.pipeline import Resource
 from voicetype.pipeline.context import PipelineContext
 from voicetype.pipeline.stage_registry import STAGE_REGISTRY, PipelineStage
-from voicetype.pipeline.stages.keyboard_backends import (
-    create_keyboard_backend,
-    get_backend_override,
-)
+from voicetype.pipeline.stages.keyboard_backends import create_keyboard_backend
 
 
 class TypeTextConfig(BaseModel):
@@ -76,10 +73,9 @@ class TypeText(PipelineStage[Optional[str], None]):
         # Keep char_delay accessible for compatibility
         self.char_delay = self.cfg.char_delay
 
-        # Create the appropriate keyboard backend. The tray menu can override
-        # every stage's configured backend at runtime.
+        # Create the appropriate keyboard backend
         self.backend = create_keyboard_backend(
-            method=get_backend_override() or self.cfg.keyboard_backend,
+            method=self.cfg.keyboard_backend,
             char_delay=self.cfg.char_delay,
         )
 

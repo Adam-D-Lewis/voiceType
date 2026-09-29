@@ -5,8 +5,7 @@ keyboard backend based on the current platform and configuration.
 """
 
 import sys
-import threading
-from typing import Optional, Tuple, Union
+from typing import Union
 
 from loguru import logger
 
@@ -35,41 +34,7 @@ __all__ = [
     "EitypeNotFoundError",
     "clear_eitype_connection",
     "create_keyboard_backend",
-    "detect_auto_backend",
-    "get_backend_override",
-    "set_backend_override",
-    "KEYBOARD_BACKENDS",
 ]
-
-KEYBOARD_BACKENDS = ("auto", "pynput", "wtype", "eitype", "remote")
-
-UNKNOWN_DISPLAY_SERVER = "unknown display server"
-
-# Runtime override, e.g. from the tray menu, applied to every TypeText stage.
-# ``None`` means each stage uses its configured keyboard_backend.
-_backend_override: Optional[str] = None
-_backend_override_lock = threading.Lock()
-
-
-def set_backend_override(method: Optional[str]) -> None:
-    """Make every TypeText stage use this backend, or None for its own setting.
-
-    Takes effect from the next pipeline run.
-    """
-    global _backend_override
-    if method is not None and method not in KEYBOARD_BACKENDS:
-        raise ValueError(
-            f"Invalid keyboard backend: '{method}'. "
-            f"Valid options: {', '.join(KEYBOARD_BACKENDS)}"
-        )
-    with _backend_override_lock:
-        _backend_override = method
-
-
-def get_backend_override() -> Optional[str]:
-    """Return the runtime keyboard backend override, or None if not overridden."""
-    with _backend_override_lock:
-        return _backend_override
 
 
 def create_keyboard_backend(
@@ -123,23 +88,28 @@ def create_keyboard_backend(
     return _create_auto_backend(char_delay)
 
 
-def detect_auto_backend() -> Tuple[str, str]:
-    """Pick the backend "auto" uses on this platform, without creating it.
+def _create_auto_backend(
+    char_delay: float,
+) -> Union[PynputKeyboard, WtypeKeyboard, EitypeKeyboard]:
+    """Auto-detect and create the appropriate keyboard backend.
 
     Detection priority:
     1. Not Linux -> pynput
     2. X11 -> pynput
     3. Wayland + EI support (GNOME/KDE) -> eitype
     4. Wayland + wlroots compositor -> wtype
-    5. Other Wayland -> eitype if the RemoteDesktop portal exists, else wtype
-    6. Unknown display server -> pynput
+    5. Fallback -> pynput with warning
+
+    Args:
+        char_delay: Delay between characters (only used by pynput)
 
     Returns:
-        (backend name, reason it was picked)
+        A keyboard backend instance
     """
     # Not Linux - use pynput
     if sys.platform != "linux":
-        return "pynput", f"platform: {sys.platform}"
+        logger.info(f"Using pynput keyboard backend (platform: {sys.platform})")
+        return PynputKeyboard(char_delay=char_delay)
 
     # Import platform detection (only available on Linux)
     from voicetype.platform_detection import (
@@ -150,44 +120,44 @@ def detect_auto_backend() -> Tuple[str, str]:
         supports_is,
     )
 
+    # X11 - use pynput
     if is_x11():
-        return "pynput", "X11 display server"
+        logger.info("Using pynput keyboard backend (X11 display server)")
+        return PynputKeyboard(char_delay=char_delay)
 
+    # Not Wayland and not X11 - fallback to pynput
     if not is_wayland():
-        return "pynput", UNKNOWN_DISPLAY_SERVER
-
-    compositor = get_compositor_type()
-    if compositor in (CompositorType.GNOME, CompositorType.KDE) and supports_is():
-        return "eitype", f"Wayland {compositor.value} with EI support"
-    if compositor == CompositorType.WLROOTS:
-        return "wtype", "Wayland wlroots compositor"
-    if supports_is():
-        return "eitype", f"Wayland {compositor.value} with RemoteDesktop portal"
-    return "wtype", f"Wayland {compositor.value}, no EI support"
-
-
-def _create_auto_backend(
-    char_delay: float,
-) -> Union[PynputKeyboard, WtypeKeyboard, EitypeKeyboard]:
-    """Create the keyboard backend detect_auto_backend() picks.
-
-    Args:
-        char_delay: Delay between characters (only used by pynput)
-
-    Returns:
-        A keyboard backend instance
-    """
-    method, reason = detect_auto_backend()
-    if reason == UNKNOWN_DISPLAY_SERVER:
         logger.warning(
             "Unknown display server, falling back to pynput keyboard backend. "
             "Set keyboard_backend explicitly if typing doesn't work."
         )
-    else:
-        logger.info(f"Using {method} keyboard backend ({reason})")
+        return PynputKeyboard(char_delay=char_delay)
 
-    if method == "eitype":
+    # Wayland - determine which backend to use
+    compositor = get_compositor_type()
+    logger.debug(f"Detected Wayland compositor type: {compositor.value}")
+
+    # GNOME or KDE with EI support -> try eitype
+    if compositor in (CompositorType.GNOME, CompositorType.KDE) and supports_is():
+        logger.info(
+            f"Using eitype keyboard backend (Wayland {compositor.value} with EI support)"
+        )
         return EitypeKeyboard()
-    if method == "wtype":
+
+    # wlroots-based compositor -> use wtype
+    if compositor == CompositorType.WLROOTS:
+        logger.info("Using wtype keyboard backend (Wayland wlroots compositor)")
         return WtypeKeyboard()
-    return PynputKeyboard(char_delay=char_delay)
+
+    # Unknown Wayland compositor - try eitype first (if portal available), then wtype
+    if supports_is():
+        logger.info(
+            f"Using eitype keyboard backend (Wayland {compositor.value} with RemoteDesktop portal)"
+        )
+        return EitypeKeyboard()
+
+    # Last resort for Wayland - try wtype
+    logger.info(
+        f"Using wtype keyboard backend (Wayland {compositor.value}, no EI support)"
+    )
+    return WtypeKeyboard()
