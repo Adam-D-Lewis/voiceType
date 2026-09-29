@@ -5,8 +5,9 @@ shows up as just a keyboard: this hides the CIRCUITPY drive (which holds your
 WiFi password and voiceType token) and the serial console.
 
 To get the drive back, hold the voiceType button (the one wired to the first
-pin in VOICETYPE_BUTTONS, GP15 by default) while plugging the Pico in. Don't
-hold BOOTSEL: that starts the chip's bootloader, whose drive is called RP2350
+pin in VOICETYPE_BUTTONS, GP15 by default) while plugging the Pico in, and keep
+holding it until the drive appears: this file checks the button once, a moment
+after power-up. Don't hold BOOTSEL: that starts the chip's bootloader, whose drive is called RP2350
 and only holds INDEX.HTM and INFO_UF2.TXT.
 
 Changes to this file take effect after unplugging and replugging the Pico.

@@ -138,7 +138,9 @@ with `hotkey = "remote:jarvis"`.
 - Once everything works, set `VOICETYPE_HIDE_USB = 1` and replug. The Pico then
   shows up as just a keyboard: `CIRCUITPY` (which holds your WiFi password and
   token) and the serial console are hidden. To get them back, hold the
-  voiceType button (not BOOTSEL) while plugging in.
+  voiceType button (not BOOTSEL) while plugging in, and keep holding it until
+  the drive appears. The Pico checks the button only once, a moment after it
+  powers up.
 - Don't set `CIRCUITPY_WEB_API_PASSWORD`: it turns on CircuitPython's web
   workflow, which lets anyone with the password change the Pico's code over WiFi.
 
@@ -171,8 +173,8 @@ Things to confirm on real hardware (checked items are confirmed):
       that the device went away and plays the error sound.
 - [ ] Restart voiceType while the Pico is plugged in: the LED blinks slowly,
       then the Pico reconnects within ~10 seconds.
-- [ ] Set `VOICETYPE_HIDE_USB = 1` and replug: no drive appears. Replug while
-      holding the button: the drive is back.
+- [x] Set `VOICETYPE_HIDE_USB = 1` and replug: no drive appears. Replug while
+      holding the button until the drive appears: the drive is back.
 
 ## Protocol
 
